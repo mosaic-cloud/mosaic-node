@@ -1,0 +1,10 @@
+
+/.git
+/.hg
+
+/.outputs
+/.tools
+
+*#
+*~
+*.beam
