@@ -3,82 +3,122 @@
 
 -behaviour (riak_core_vnode).
 
--export ([start/0]).
+-export ([service_up/0]).
 -export ([
-		start_vnode/1,
-		init/1, terminate/2, delete/1, is_empty/1,
-		handle_command/3,
+		start_vnode/1, init/1, terminate/2, delete/1,
+		handle_command/3, is_empty/1,
 		handoff_starting/2, handoff_finished/2, handoff_cancelled/1,
 		handle_handoff_command/3, handle_handoff_data/2,
 		encode_handoff_item/2]).
 
--record (state, {partition, ports}).
+-record (state, {name, partition, object_store, process_controller}).
 
-start () ->
-	MasterName = riak_core_vnode_master:reg_name (mosaic_executor_vnode),
-	MasterSpecification = {MasterName, {riak_core_vnode_master, start_link, [mosaic_executor_vnode]}, permanent, 60, worker, dynamic},
-	MasterOutcome = case supervisor:start_child (mosaic_cluster_sup, MasterSpecification) of
-		{ok, MasterProcess1} ->
-			{ok, MasterProcess1};
-		{error, {already_started, MasterProcess1}} ->
-			{ok, MasterProcess1};
-		Error1 = {error, _Reason1} ->
-			Error1
-	end,
-	case MasterOutcome of
-		{ok, MasterProcess2} ->
+service_up () ->
+	case mosaic_cluster_sup:start_child_vnode_master (mosaic_executor_vnode) of
+		{ok, Master} ->
 			ok = riak_core:register_vnode_module (mosaic_executor_vnode),
-			ok = riak_core_node_watcher:service_up (mosaic_executor, MasterProcess2),
+			ok = riak_core_node_watcher:service_up (mosaic_executor, Master),
 			ok;
-		Error2 = {error, _Reason2} ->
-			Error2
+		Error = {error, _Reason1} ->
+			Error
 	end.
 
-start_vnode (Index) ->
-	riak_core_vnode_master:get_vnode_pid (Index, mosaic_executor_vnode).
+start_vnode (Partition) ->
+	riak_core_vnode_master:get_vnode_pid (Partition, mosaic_executor_vnode).
 
 init ([Partition]) ->
-	ok = error_logger:info_report ([{?MODULE, init, Partition, erlang:self ()}]),
-	{ok, #state{partition = Partition, ports = orddict:new ()}}.
+	true = erlang:process_flag (trap_exit, true),
+	Name = generate_name (Partition),
+	ObjectStoreName = generate_object_store_name (Partition),
+	ProcessControllerName = generate_process_controller_name (Partition),
+	case mosaic_tools:ensure_registered (Name, erlang:self ()) of
+		ok ->
+			case mosaic_object_store:start_supervised (ObjectStoreName, defaults) of
+				{ok, ObjectStore} ->
+					true = erlang:link (ObjectStore),
+					case mosaic_process_controller:start_supervised (ProcessControllerName, defaults) of
+						{ok, ProcessController} ->
+							true = erlang:link (ProcessController),
+							{ok, #state{
+									name = Name, partition = Partition,
+									object_store = ObjectStore, process_controller = ProcessController}};
+						{error, Reason} ->
+							{stop, {failed_starting_subordinate, {process_controller, ProcessControllerName, Reason}}}
+					end;
+				{error, Reason} ->
+					{stop, {failed_starting_subordinate, {object_store, ObjectStoreName, Reason}}}
+			end;
+		{error, Reason} ->
+			{stop, Reason}
+	end.
 
-terminate (_Reason, _State) ->
-	ok.
+terminate (Signal, _State = #state{object_store = ObjectStore, process_controller = ProcessController}) ->
+	Outcome1 = mosaic_process_controller:stop (ProcessController, Signal),
+	Outcome2 = mosaic_object_store:stop (ObjectStore, Signal),
+	case {Outcome1, Outcome2} of
+		{ok, ok} ->
+			ok;
+		{{error, Reason}, ok} ->
+			{error, {failed_stopping_subordinates, [{process_controller, Reason}]}};
+		{ok, {error, Reason}} ->
+			{error, {failed_stopping_subordinates, [{object_store, Reason}]}};
+		{{error, Reason1}, {error, Reason2}} ->
+			{error, {failed_stopping_subordinates, [{process_controller, Reason1}, {object_store, Reason2}]}}
+	end.
 
 delete (State) ->
 	{ok, State}.
 
-is_empty (State) ->
-	{false, State}.
+is_empty (State = #state{object_store = ObjectStore, process_controller = ProcessController}) ->
+	{ok, ObjectCount} = mosaic_object_store:count (ObjectStore),
+	{ok, ProcessCount} = mosaic_process_controller:count (ProcessController),
+	{(ObjectCount + ProcessCount) == 0, State}.
 
 handle_command ({ping, Key}, _Sender, State) ->
 	{reply, {pong, Key, {State#state.partition, erlang:node ()}}, State};
 	
-handle_command ({open_port, Key, Name, Settings}, _Sender, OldState = #state{ports = OldPorts}) ->
-	ok = error_logger:info_report ([{?MODULE, open_port, OldState#state.partition, erlang:self (), Key, Name, Settings}]),
-	Port = erlang:open_port (Name, Settings),
-	NewPorts = orddict:store (Key, {Port, Name, Settings}, OldPorts),
-	NewState = OldState#state{ports = NewPorts},
-	{reply, {open_port_ok, Key}, NewState};
+handle_command ({define_process, Key, Module, Arguments}, _Sender, State = #state{object_store = ObjectStore})
+		when is_atom (Module) ->
+	ok = mosaic_object_store:include (ObjectStore, Key, none, {Module, Arguments}),
+	{reply, {ok, Key}, State};
 	
-handle_command ({riak_core_fold_req_v1, Fun, InputAcc}, _Sender, State = #state{ports = Ports}) ->
-	OutputAcc = orddict:fold (
-			fun (Key, {_Port, Name, Settings}, CurrentAcc) -> Fun (Key, {Name, Settings}, CurrentAcc) end,
-			InputAcc, Ports),
-	{reply, OutputAcc, State};
+handle_command ({create_process, Key}, _Sender, State = #state{object_store = ObjectStore, process_controller = ProcessController}) ->
+	{ok, {Key, none, {Module, Arguments}}} = mosaic_object_store:select (ObjectStore, Key),
+	{ok, Process} = mosaic_process_controller:create (ProcessController, Key, Module, Arguments),
+	{reply, {ok, Process}, State};
+	
+handle_command ({stop_process, Key, Signal}, _Sender, State = #state{process_controller = ProcessController}) ->
+	ok = mosaic_process_controller:stop (ProcessController, Key, Signal),
+	{reply, ok, State};
+	
+handle_command ({riak_core_fold_req_v1, Fun, InputAcc}, _Sender, State = #state{object_store = ObjectStore, process_controller = ProcessController}) ->
+	{ok, OutputAcc1} = mosaic_object_store:fold (ObjectStore,
+			fun ({Key, none, Object}, CurrentAcc) ->
+				Fun (Key, {object, ObjectStore, Object}, CurrentAcc)
+			end, InputAcc),
+	{ok, OutputAcc2} = mosaic_process_controller:fold (ProcessController,
+			fun ({Key, Process}, CurrentAcc) ->
+				Fun (Key, {process, ProcessController, Process}, CurrentAcc)
+			end, OutputAcc1),
+	{reply, OutputAcc2, State};
 	
 handle_command (Command, _Sender, State) ->
 	{reply, {error, {invalid_command, Command}}, State}.
 
-handoff_starting (Node, State) ->
-	ok = error_logger:info_report ([{?MODULE, handoff_starting, State#state.partition, erlang:self (), Node}]),
+handoff_starting (_Node, State) ->
 	{true, State}.
 
-handoff_finished (Node, State) ->
-	ok = error_logger:info_report ([{?MODULE, handoff_finished, State#state.partition, erlang:self (), Node}]),
-	ok.
+handoff_finished (Node, State = #state{process_controller = ProcessController}) ->
+	{ok, ProcessCount} = mosaic_process_controller:count (ProcessController),
+	if
+		(ProcessCount == 0) ->
+			ok;
+		(ProcessCount > 0) ->
+			ok = timer:sleep (1000),
+			handoff_finished (Node, State)
+	end.
 
 handoff_cancelled (State) ->
-	ok = error_logger:info_report ([{?MODULE, handoff_canceled, State#state.partition, erlang:self ()}]),
 	{ok, State}.
 
 handle_handoff_command (Request = {riak_core_fold_req_v1, _Fun, _Acc}, Sender, State) ->
@@ -87,12 +127,31 @@ handle_handoff_command (Request = {riak_core_fold_req_v1, _Fun, _Acc}, Sender, S
 handle_handoff_command (_Request, _Sender, State) ->
 	{forward, State}.
 
-handle_handoff_data (Binary, OldState = #state{ports = OldPorts}) ->
-	Object = {Key, {Name, Settings}} = erlang:binary_to_term (Binary),
-	ok = error_logger:info_report ([{?MODULE, handle_handoff_data, OldState#state.partition, erlang:self (), Object}]),
-	NewPorts = orddict:store (Key, {undefined, Name, Settings}, OldPorts),
-	NewState = OldState#state{ports = NewPorts},
-	{reply, ok, NewState}.
+handle_handoff_data (Binary, State = #state{object_store = ObjectStore, process_controller = ProcessController}) ->
+	ok = case erlang:binary_to_term (Binary) of
+		{Key, {object, _PeerObjectStore, Object}} ->
+			ok = mosaic_object_store:include (ObjectStore, Key, none, Object),
+			ok;
+		{Key, {process, PeerProcessController, _PeerProcess}} ->
+			{ok, _Target} = mosaic_process_controller:migrate (PeerProcessController, ProcessController, Key),
+			ok
+	end,
+	{reply, ok, State}.
 
 encode_handoff_item (Key, Object) ->
-	erlang:term_to_binary (Object).
+	erlang:term_to_binary ({Key, Object}).
+
+generate_name (Partition) ->
+	erlang:list_to_atom (erlang:atom_to_list (mosaic_executor_vnode) ++ "#" ++ generate_partition_prefix (Partition)).
+
+generate_object_store_name (Partition) ->
+	erlang:list_to_atom ("mosaic_executor_vnode#object_store#" ++ generate_partition_prefix (Partition)).
+
+generate_process_controller_name (Partition) ->
+	erlang:list_to_atom ("mosaic_executor_vnode#process_controller#" ++ generate_partition_prefix (Partition)).
+
+generate_partition_prefix (Partition) when is_number (Partition), Partition >= 0, Partition < 1461501637330902918203684832716283019655932542976 ->
+	IdentifierHex = erlang:integer_to_list (Partition, 16),
+	IdentifierHexPadded = lists:duplicate (40 - erlang:length (IdentifierHex), $0) ++ IdentifierHex,
+	IdentifierHexTrimmed = string:sub_string (IdentifierHexPadded, 1, 8),
+	IdentifierHexTrimmed.

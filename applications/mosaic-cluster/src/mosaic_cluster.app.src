@@ -3,8 +3,8 @@
 	{description, "mOSAIC cluster manager"},
 	{vsn, "1"},
 	{applications, [kernel, stdlib, riak_core]},
-	{modules, [mosaic_cluster_app, mosaic_cluster_sup, mosaic_executor_vnode]},
+	{modules, []},
 	{registered, [mosaic_cluster_sup]},
-	{mod, {mosaic_cluster_app, void}},
+	{mod, {mosaic_cluster_app, defaults}},
 	{env, []}
 ]}.

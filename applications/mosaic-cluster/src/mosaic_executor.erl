@@ -1,74 +1,189 @@
 
 -module (mosaic_executor).
 
+-export ([define_and_create_process/2, define_and_create_processes/3]).
+-export ([define_process/2, define_processes/3, define_processes/4]).
+-export ([create_process/1, create_processes/1, create_processes/2]).
+-export ([stop_process/1, stop_process/2, stop_processes/2, stop_processes/3]).
 -export ([ping/0, ping/1, ping/2]).
--export ([open_port/2, open_port/3, open_port/4]).
+
+
+define_and_create_process (Module, Arguments)
+		when is_atom (Module) ->
+	case define_process (Module, Arguments) of
+		{ok, Key} ->
+			case create_process (Key) of
+				{ok, Process} ->
+					{ok, Key, Process};
+				Error = {error, _Reason} ->
+					Error
+			end;
+		Error = {error, _Reason} ->
+			Error
+	end.
+
+
+define_and_create_processes (Module, Arguments, Count)
+		when is_atom (Module), is_integer (Count), (Count > 0) ->
+	{ok, Keys, DefineReasons} = define_processes (Module, Arguments, Count),
+	{ok, Processes, CreateReasons} = create_processes (Keys),
+	{ok, Processes, DefineReasons ++ CreateReasons}.
+
+
+define_process (Module, Arguments)
+		when is_atom (Module) ->
+	case define_processes (Module, Arguments, 1) of
+		{ok, [], []} ->
+			{error, vnode_unreachable};
+		{ok, [Key], []} ->
+			{ok, Key};
+		{ok, [], [{_Key, Reason}]} ->
+			{error, Reason}
+	end.
+
+define_processes (Module, Arguments, Count)
+		when is_atom (Module), is_integer (Count), Count > 0 ->
+	define_processes (Module, Arguments, Count, Count * 2).
+
+define_processes (Module, Arguments, Count, Retries)
+		when is_atom (Module), is_integer (Count), is_integer (Retries), Count > 0, Retries >= Count ->
+	Service = mosaic_executor,
+	Master = riak_core_vnode_master:reg_name (mosaic_executor_vnode),
+	Fuzz = erlang:make_ref (),
+	{ok, _, {Keys, Reasons}, _} = sync_command (
+			fun (Index) ->
+				Key = chash:key_of (term_to_binary ({Fuzz, Index})),
+				{ok, Key, {define_process, Key, Module, Arguments}, 1, Service, Master, Index + 1}
+			end, 0,
+			fun ({Key, {define_process, Key, _, _}, 1, _, _}, [{_, Reply}], {Keys, Reasons}) ->
+				case Reply of
+					{ok, Key} ->
+						{ok, {[Key | Keys], Reasons}};
+					{error, Reason} ->
+						{ok, {Keys, [{Key, Reason} | Reasons]}};
+					_ ->
+						{ok, {Keys, [{Key, {invalid_reply, Reply}} | Reasons]}}
+				end
+			end, {[], []},
+			Count, Retries),
+	{ok, lists:reverse (Keys), lists:reverse (Reasons)}.
+
+
+create_process (Key) ->
+	case create_processes ([Key]) of
+		{ok, [], []} ->
+			{error, vnode_unreachable};
+		{ok, [{Key, Process}], []} ->
+			{ok, Process};
+		{ok, [], [{Key, Reason}]} ->
+			{error, Reason}
+	end.
+
+create_processes (Keys)
+		when is_list (Keys), (Keys =/= []) ->
+	create_processes (Keys, erlang:length (Keys) * 2).
+
+create_processes (Keys, Retries)
+		when is_list (Keys), is_integer (Retries), Retries > 0, Retries >= length (Keys) ->
+	Service = mosaic_executor,
+	Master = riak_core_vnode_master:reg_name (mosaic_executor_vnode),
+	{ok, _, {SuccessfullKeys, Reasons}, _} = sync_command (
+			fun ([Key | RemainingKeys]) ->
+				{ok, Key, {create_process, Key}, 1, Service, Master, RemainingKeys}
+			end, Keys,
+			fun ({Key, {create_process, Key}, 1, _, _}, [{_, Reply}], {SuccessfullKeys, Reasons}) ->
+				case Reply of
+					{ok, Process} ->
+						{ok, {[{Key, Process} | SuccessfullKeys], Reasons}};
+					{error, Reason} ->
+						{ok, {SuccessfullKeys, [{Key, Reason} | Reasons]}};
+					_ ->
+						{ok, {SuccessfullKeys, [{Key, {invalid_reply, Reply}} | Reasons]}}
+				end
+			end, {[], []},
+			erlang:length (Keys), Retries),
+	{ok, lists:reverse (SuccessfullKeys), lists:reverse (Reasons)}.
+
+
+stop_process (Key) ->
+	stop_process (Key, normal).
+
+stop_process (Key, Signal) ->
+	case stop_processes ([Key], Signal) of
+		{ok, [], []} ->
+			{error, vnode_unreachable};
+		{ok, [Key], []} ->
+			ok;
+		{ok, [], [{Key, Reason}]} ->
+			{error, Reason}
+	end.
+
+stop_processes (Keys, Signal)
+		when is_list (Keys), (Keys =/= []) ->
+	stop_processes (Keys, Signal, erlang:length (Keys) * 2).
+
+stop_processes (Keys, Signal, Retries)
+		when is_list (Keys), is_integer (Retries), Retries > 0, Retries >= length (Keys) ->
+	Service = mosaic_executor,
+	Master = riak_core_vnode_master:reg_name (mosaic_executor_vnode),
+	{ok, _, {SuccessfullKeys, Reasons}, _} = sync_command (
+			fun ([Key | RemainingKeys]) ->
+				{ok, Key, {stop_process, Key, Signal}, 1, Service, Master, RemainingKeys}
+			end, Keys,
+			fun ({Key, {stop_process, Key, _}, 1, _, _}, [{_, Reply}], {SuccessfullKeys, Reasons}) ->
+				case Reply of
+					ok ->
+						{ok, {[Key | SuccessfullKeys], Reasons}};
+					{error, Reason} ->
+						{ok, {SuccessfullKeys, [{Key, Reason} | Reasons]}};
+					_ ->
+						{ok, {SuccessfullKeys, [{Key, {invalid_reply, Reply}} | Reasons]}}
+				end
+			end, {[], []},
+			erlang:length (Keys), Retries),
+	{ok, lists:reverse (SuccessfullKeys), lists:reverse (Reasons)}.
+
 
 ping () ->
 	ping (4).
 
-ping (Count) when is_integer (Count), Count > 0 ->
+ping (Count)
+		when is_integer (Count), (Count > 0) ->
 	ping (Count, Count * 2).
 
-ping (Count, Retries) when is_integer (Count), is_integer (Retries), Count > 0, Retries >= Count ->
+ping (Count, Retries)
+		when is_integer (Count), is_integer (Retries), (Count > 0), (Retries >= Count) ->
 	Service = mosaic_executor,
 	Master = riak_core_vnode_master:reg_name (mosaic_executor_vnode),
 	Fuzz = erlang:make_ref (),
-	{ok, Index, Outcomes, Pending} = sync_command (
+	{ok, _, {PingCount, Outcomes}, _} = sync_command (
 			fun (Index) ->
 				Key = chash:key_of (term_to_binary ({Fuzz, Index})),
 				{ok, Key, {ping, Key}, 1, Service, Master, Index + 1}
 			end, 0,
-			fun ({Key, {ping, Key}, 1, Service1, Master1}, [{Target, Reply}], Outcomes) when Service1 =:= Service, Master1 =:= Master ->
+			fun ({Key, {ping, Key}, 1, _, _}, [{Target, Reply}], {PingCount, Outcomes}) ->
 				Outcome = case Reply of
 					{pong, Key, Target} ->
 						{pong, Target};
 					{pong, OtherKey, Target} ->
-						{pang, Target, {missmatched_key, OtherKey, Target}};
+						{pang, Target, {mismatched_key, OtherKey, Target}};
 					{pong, _, OtherTarget} ->
-						{pang, Target, {missmatched_target, OtherTarget, Target}};
+						{pang, Target, {mismatched_target, OtherTarget, Target}};
 					{error, Reason} ->
 						{pang, Target, Reason};
 					_ ->
 						{pang, Target, {invalid_reply, Reply}}
 				end,
-				{ok, [Outcome | Outcomes]}
-			end, [],
-			Count, Retries),
-	case Pending of
-		undefined ->
-			{ok, Index, lists:reverse (Outcomes)};
-		_ ->
-			{ok, Index - 1, lists:reverse (Outcomes)}
-	end.
-
-open_port (Name, Settings) ->
-	open_port (Name, Settings, 1).
-
-open_port (Name, Settings, Count) when is_integer (Count), Count > 0 ->
-	open_port (Name, Settings, Count, Count * 2).
-
-open_port (Name, Settings, Count, Retries) when is_integer (Count), is_integer (Retries), Count > 0, Retries >= Count ->
-	Service = mosaic_executor,
-	Master = riak_core_vnode_master:reg_name (mosaic_executor_vnode),
-	Fuzz = erlang:make_ref (),
-	{ok, _, {Keys, ErrorReasons}, _} = sync_command (
-			fun (Index) ->
-				Key = chash:key_of (term_to_binary ({Fuzz, Index})),
-				{ok, Key, {open_port, Key, Name, Settings}, 1, Service, Master, Index + 1}
-			end, 0,
-			fun ({Key, {open_port, Key, _, _}, 1, _, _}, [{_, Reply}], {Keys, ErrorReasons}) ->
-				case Reply of
-					{open_port_ok, Key} ->
-						{ok, {[Key | Keys], ErrorReasons}};
-					{error, Reason} ->
-						{ok, {Keys, [Reason | ErrorReasons]}};
+				case Outcome of
+					{pong, _} ->
+						{ok, {PingCount + 1, [Outcome | Outcomes]}};
 					_ ->
-						{ok, {Keys, [{invalid_outcome, Reply} | ErrorReasons]}}
+						{ok, {PingCount, [Outcome | Outcomes]}}
 				end
-			end, {[], []},
+			end, {0, []},
 			Count, Retries),
-	{ok, lists:reverse (Keys), lists:reverse (ErrorReasons)}.
+	{ok, PingCount, lists:reverse (Outcomes)}.
+
 
 sync_command (RequestFun, RequestState, RepliesFun, RepliesState, Count, Retries)
 		when is_function (RequestFun, 1), is_function (RepliesFun, 3),
