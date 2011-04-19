@@ -18,44 +18,59 @@ start_link () ->
 
 start_link (Type)
 		when is_atom (Type) ->
-	start_link (Type, Type).
+	start_link ({local, Type}, Type).
 
-start_link (Name, Type)
-		when is_atom (Name), is_atom (Type) ->
-	supervisor:start_link ({local, Name}, mosaic_cluster_sup, [Type]).
-
-
-start_child_process_controller (Name, Configuration) ->
-	start_child_process_controller (mosaic_process_controller_sup, Name, Configuration).
-
-start_child_process_controller (Supervisor, Name, Configuration)
-		when (is_pid (Supervisor) or is_atom (Supervisor)), is_atom (Name) ->
-	start_child (Supervisor, [Name, Configuration]).
+start_link (QualifiedName = {local, LocalName}, Type)
+		when is_atom (LocalName), is_atom (Type) ->
+	supervisor:start_link (QualifiedName, mosaic_cluster_sup, [QualifiedName, Type]);
+	
+start_link (QualifiedName = noname, Type)
+		when is_atom (Type) ->
+	supervisor:start_link (mosaic_cluster_sup, [QualifiedName, Type]).
 
 
-start_child_process (Name, Module, Disposition) ->
-	start_child_process (mosaic_process_sup, Name, Module, Disposition).
+start_child_process_controller (QualifiedName, Configuration) ->
+	start_child_process_controller (mosaic_process_controller_sup, QualifiedName, Configuration).
 
-start_child_process (Supervisor, Name, Module, Disposition)
-		when (is_pid (Supervisor) or is_atom (Supervisor)), is_atom (Name), is_atom (Module), is_tuple (Disposition) ->
-	start_child (Supervisor, [Name, Module, Disposition]).
-
-
-start_child_object_store (Name, Configuration) ->
-	start_child_object_store (mosaic_object_store_sup, Name, Configuration).
-
-start_child_object_store (Supervisor, Name, Configuration)
-		when (is_pid (Supervisor) or is_atom (Supervisor)), is_atom (Name) ->
-	start_child (Supervisor, [Name, Configuration]).
+start_child_process_controller (Supervisor, QualifiedName, Configuration)
+		when (is_pid (Supervisor) orelse is_atom (Supervisor)),
+				((QualifiedName =:= noname) orelse (is_record (QualifiedName, local, 2) andalso is_atom (element (2, QualifiedName)))) ->
+	start_child (Supervisor, [QualifiedName, Configuration]).
 
 
-start_child_daemon (Name, Module, Arguments, Policy) ->
-	start_child_daemon (mosaic_daemon_sup, Name, Module, Arguments, Policy).
+start_child_process (QualifiedName, Module, Disposition) ->
+	start_child_process (mosaic_process_sup, QualifiedName, Module, Disposition).
 
-start_child_daemon (Supervisor, Name, Module, Arguments, Policy)
-		when (is_pid (Supervisor) or is_atom (Supervisor)), is_atom (Name), is_atom (Module),
-				(Policy =:= permanent) or (Policy =:= transient) or (Policy =:= temporary) ->
-	case child_spec ({worker, Policy}, Name, Module, start_link, [Name | Arguments]) of
+start_child_process (Supervisor, QualifiedName, Module, Disposition)
+		when (is_pid (Supervisor) orelse is_atom (Supervisor)),
+				is_atom (Module), (is_record (Disposition, create, 2) orelse is_record (Disposition, migrate, 2)),
+				((QualifiedName =:= noname) orelse (is_record (QualifiedName, local, 2) andalso is_atom (element (2, QualifiedName)))) ->
+	start_child (Supervisor, [QualifiedName, Module, Disposition]).
+
+
+start_child_object_store (QualifiedName, Configuration) ->
+	start_child_object_store (mosaic_object_store_sup, QualifiedName, Configuration).
+
+start_child_object_store (Supervisor, QualifiedName, Configuration)
+		when (is_pid (Supervisor) orelse is_atom (Supervisor)),
+				((QualifiedName =:= noname) orelse (is_record (QualifiedName, local, 2) andalso is_atom (element (2, QualifiedName)))) ->
+	start_child (Supervisor, [QualifiedName, Configuration]).
+
+
+start_child_daemon (QualifiedName, Module, Arguments, Policy) ->
+	start_child_daemon (mosaic_daemon_sup, QualifiedName, Module, Arguments, Policy).
+
+start_child_daemon (Supervisor, QualifiedName, Module, Arguments, Policy)
+		when (is_pid (Supervisor) orelse is_atom (Supervisor)), is_atom (Module), is_list (Arguments),
+				((QualifiedName =:= noname) orelse (is_record (QualifiedName, local, 2) andalso is_atom (element (2, QualifiedName)))),
+				(Policy =:= permanent) orelse (Policy =:= transient) orelse (Policy =:= temporary) ->
+	{ok, StartLinkArguments} = if
+		QualifiedName =:= noname ->
+			{ok, Arguments};
+		true ->
+			[QualifiedName | Arguments]
+	end,
+	case child_spec ({worker, Policy}, QualifiedName, Module, start_link, StartLinkArguments) of
 		{ok, Specification} ->
 			start_child (Supervisor, Specification);
 		Error = {error, _Reason} ->
@@ -65,8 +80,8 @@ start_child_daemon (Supervisor, Name, Module, Arguments, Policy)
 
 start_child_vnode_master (Module)
 		when is_atom (Module) ->
-	Name = riak_core_vnode_master:reg_name (Module),
-	case child_spec ({worker, permanent}, Name, riak_core_vnode_master, start_link, [Module]) of
+	LocalName = riak_core_vnode_master:reg_name (Module),
+	case child_spec ({worker, permanent}, LocalName, riak_core_vnode_master, start_link, [Module]) of
 		{ok, Specification} ->
 			start_child (mosaic_vnode_master_sup, Specification);
 		Error = {error, _Reason} ->
@@ -86,12 +101,19 @@ start_child (Supervisor, Specification) ->
 			{error, already_started};
 		{error, already_present} ->
 			{error, already_started};
-		{error, {Error, _Specification}} ->
-			{error, Error}
+		{error, {Error, Specification}} ->
+			{error, Error};
+		Error = {error, _Reason} ->
+			Error
 	end.
 
 
-init ([mosaic_cluster_sup]) ->
+init ([Type])
+		when is_atom (Type) ->
+	init ([{local, Type}, Type]);
+	
+init ([QualifiedName, mosaic_cluster_sup]) ->
+	ok = mosaic_tools:ensure_registered (QualifiedName),
 	{ok, {{one_for_all, 1, 60}, [
 		child_spec_unwrapped (supervisor, mosaic_process_controller_sup, supervisor, start_link,
 				[{local, mosaic_process_controller_sup}, mosaic_cluster_sup, [mosaic_process_controller_sup]]),
@@ -104,22 +126,27 @@ init ([mosaic_cluster_sup]) ->
 		child_spec_unwrapped (supervisor, mosaic_vnode_master_sup, supervisor, start_link,
 				[{local, mosaic_vnode_master_sup}, mosaic_cluster_sup, [mosaic_vnode_master_sup]])]}};
 	
-init ([mosaic_process_controller_sup]) ->
+init ([QualifiedName, mosaic_process_controller_sup]) ->
+	ok = mosaic_tools:ensure_registered (QualifiedName),
 	{ok, {{simple_one_for_one, 60, 60}, [
 			child_spec_unwrapped ({worker, temporary}, undefined, mosaic_process_controller, start_link, [])]}};
 	
-init ([mosaic_process_sup]) ->
+init ([QualifiedName, mosaic_process_sup]) ->
+	ok = mosaic_tools:ensure_registered (QualifiedName),
 	{ok, {{simple_one_for_one, 60, 60}, [
 			child_spec_unwrapped ({worker, temporary}, undefined, mosaic_process, start_link, [])]}};
 	
-init ([mosaic_object_store_sup]) ->
+init ([QualifiedName, mosaic_object_store_sup]) ->
+	ok = mosaic_tools:ensure_registered (QualifiedName),
 	{ok, {{simple_one_for_one, 60, 60}, [
 			child_spec_unwrapped ({worker, temporary}, undefined, mosaic_object_store, start_link, [])]}};
 	
-init ([mosaic_daemon_sup]) ->
+init ([QualifiedName, mosaic_daemon_sup]) ->
+	ok = mosaic_tools:ensure_registered (QualifiedName),
 	{ok, {{one_for_one, 60, 60}, []}};
 	
-init ([mosaic_vnode_master_sup]) ->
+init ([QualifiedName, mosaic_vnode_master_sup]) ->
+	ok = mosaic_tools:ensure_registered (QualifiedName),
 	{ok, {{one_for_one, 1, 60}, []}}.
 
 

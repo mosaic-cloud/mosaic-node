@@ -10,10 +10,11 @@
 
 
 init ({create, defaults}) ->
-	Token = string:to_lower (string:right (erlang:integer_to_list (erlang:phash2 (erlang:now (), 1 bsl 32), 16), 8, $0)),
+	Token = erlang:phash2 (erlang:now (), 1 bsl 32),
+	TokenHex = string:to_lower (string:right (erlang:integer_to_list (Token, 16), 8, $0)),
 	Arguments = {
 			{spawn_executable, "./applications/mosaic-cluster/priv/wait.elf"},
-			[{arg0, "[mosaic_dummy_process#" ++ Token ++ "]"}]},
+			[{arg0, "[mosaic_dummy_process#" ++ TokenHex ++ "]"}]},
 	mosaic_port_process:init ({create, Arguments});
 	
 init (migrate) ->

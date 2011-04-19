@@ -11,7 +11,7 @@
 		handle_handoff_command/3, handle_handoff_data/2,
 		encode_handoff_item/2]).
 
--record (state, {name, partition, object_store, process_controller}).
+-record (state, {qualified_name, partition, object_store, process_controller}).
 
 service_up () ->
 	case mosaic_cluster_sup:start_child_vnode_master (mosaic_executor_vnode) of
@@ -28,25 +28,25 @@ start_vnode (Partition) ->
 
 init ([Partition]) ->
 	true = erlang:process_flag (trap_exit, true),
-	Name = generate_name (Partition),
-	ObjectStoreName = generate_object_store_name (Partition),
-	ProcessControllerName = generate_process_controller_name (Partition),
-	case mosaic_tools:ensure_registered (Name, erlang:self ()) of
+	QualifiedName = {local, generate_local_name (Partition)},
+	ObjectStoreQualifiedName = {local, generate_object_store_local_name (Partition)},
+	ProcessControllerQualifiedName = {local, generate_process_controller_local_name (Partition)},
+	case mosaic_tools:ensure_registered (QualifiedName, erlang:self ()) of
 		ok ->
-			case mosaic_object_store:start_supervised (ObjectStoreName, defaults) of
+			case mosaic_object_store:start_supervised (ObjectStoreQualifiedName, defaults) of
 				{ok, ObjectStore} ->
 					true = erlang:link (ObjectStore),
-					case mosaic_process_controller:start_supervised (ProcessControllerName, defaults) of
+					case mosaic_process_controller:start_supervised (ProcessControllerQualifiedName, defaults) of
 						{ok, ProcessController} ->
 							true = erlang:link (ProcessController),
 							{ok, #state{
-									name = Name, partition = Partition,
+									qualified_name = QualifiedName, partition = Partition,
 									object_store = ObjectStore, process_controller = ProcessController}};
 						{error, Reason} ->
-							{stop, {failed_starting_subordinate, {process_controller, ProcessControllerName, Reason}}}
+							{stop, {failed_starting_subordinate, {process_controller, ProcessControllerQualifiedName, Reason}}}
 					end;
 				{error, Reason} ->
-					{stop, {failed_starting_subordinate, {object_store, ObjectStoreName, Reason}}}
+					{stop, {failed_starting_subordinate, {object_store, ObjectStoreQualifiedName, Reason}}}
 			end;
 		{error, Reason} ->
 			{stop, Reason}
@@ -127,8 +127,10 @@ handle_handoff_command (Request = {riak_core_fold_req_v1, _Fun, _Acc}, Sender, S
 handle_handoff_command (_Request, _Sender, State) ->
 	{forward, State}.
 
-handle_handoff_data (Binary, State = #state{object_store = ObjectStore, process_controller = ProcessController}) ->
-	ok = case erlang:binary_to_term (Binary) of
+handle_handoff_data (DataBinary, State = #state{object_store = ObjectStore, process_controller = ProcessController}) ->
+	DataTerm = erlang:binary_to_term (DataBinary),
+	%ok = mosaic_tools:report_info (mosaic_executor_vnode, handle_handoff_data, data_term, DataTerm),
+	ok = case DataTerm of
 		{Key, {object, _PeerObjectStore, Object}} ->
 			ok = mosaic_object_store:include (ObjectStore, Key, none, Object),
 			ok;
@@ -141,17 +143,17 @@ handle_handoff_data (Binary, State = #state{object_store = ObjectStore, process_
 encode_handoff_item (Key, Object) ->
 	erlang:term_to_binary ({Key, Object}).
 
-generate_name (Partition) ->
+generate_local_name (Partition) ->
 	erlang:list_to_atom (erlang:atom_to_list (mosaic_executor_vnode) ++ "#" ++ generate_partition_prefix (Partition)).
 
-generate_object_store_name (Partition) ->
+generate_object_store_local_name (Partition) ->
 	erlang:list_to_atom ("mosaic_executor_vnode#object_store#" ++ generate_partition_prefix (Partition)).
 
-generate_process_controller_name (Partition) ->
+generate_process_controller_local_name (Partition) ->
 	erlang:list_to_atom ("mosaic_executor_vnode#process_controller#" ++ generate_partition_prefix (Partition)).
 
 generate_partition_prefix (Partition) when is_number (Partition), Partition >= 0, Partition < 1461501637330902918203684832716283019655932542976 ->
-	IdentifierHex = erlang:integer_to_list (Partition, 16),
+	IdentifierHex = string:to_lower (erlang:integer_to_list (Partition, 16)),
 	IdentifierHexPadded = lists:duplicate (40 - erlang:length (IdentifierHex), $0) ++ IdentifierHex,
 	IdentifierHexTrimmed = string:sub_string (IdentifierHexPadded, 1, 8),
 	IdentifierHexTrimmed.

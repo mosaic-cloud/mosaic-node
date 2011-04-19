@@ -1,52 +1,65 @@
 
 -module (mosaic_tools).
 
--export ([resolve_registered/1, resolve_or_start_registered/4, ensure_registered/2]).
--export ([report_error/4]).
+-export ([resolve_registered/1]).
+-export ([ensure_registered/1, ensure_registered/2]).
+-export ([enforce_registered/1, enforce_registered/2]).
+-export ([report_error/4, report_info/4]).
 
-resolve_registered (Name) when is_atom (Name) ->
-	case erlang:whereis (Name) of
+
+resolve_registered (QualifiedName = {local, LocalName})
+		when is_atom (LocalName) ->
+	case erlang:whereis (LocalName) of
+		Process when (is_pid (Process) or is_port (Process)) ->
+			{ok, Process};
 		undefined ->
-			{error, {unregistered_process_name, Name}};
-		Process ->
-			{ok, Process}
+			{error, {unregistered_process, QualifiedName}}
 	end.
 
-resolve_or_start_registered (Name, Module, StartFun, StartArguments) when is_atom (Name), is_atom (Module), is_atom (StartFun), is_list (StartArguments) ->
-	case erlang:whereis (Name) of
-		undefined ->
-			case erlang:apply (Module, StartFun, StartArguments) of
-				Outcome = {ok, Process} when is_pid (Process); is_port (Process) ->
-					case erlang:whereis (Name) of
-						undefined ->
-							{error, {unregistered_process_name, Name}};
-						Process ->
-							Outcome;
-						OtherProcess ->
-							{error, {mismatched_process_name, Name, Process, OtherProcess}}
-					end;
-				{ok, OtherProcess} ->
-					{error, {invalid_process, OtherProcess}};
-				Error = {error, _Reason} ->
-					Error;
-				Outcome ->
-					{error, {invalid_outcome, Outcome}}
-			end;
-		Process ->
-			{ok, Process}
-	end.
 
-ensure_registered (Name, Process) when is_atom (Name), is_pid (Process); is_port (Process) ->
-	case erlang:whereis (Name) of
-		undefined ->
-			true = erlang:register (Name, Process),
-			ok;
+ensure_registered (QualifiedName) ->
+	ensure_registered (QualifiedName, erlang:self ()).
+
+ensure_registered (QualifiedName = {local, LocalName}, Process)
+		when is_atom (LocalName), (is_pid (Process) or is_port (Process)) ->
+	case erlang:whereis (LocalName) of
 		Process ->
 			ok;
-		OtherProcess ->
-			{error, {mismatched_process, Name, Process, OtherProcess}}
-	end.
+		OtherProcess when (is_pid (OtherProcess) or is_port (OtherProcess)) ->
+			{error, {mismatched_process_name, QualifiedName, Process, OtherProcess}};
+		undefined ->
+			true = erlang:register (LocalName, Process),
+			ensure_registered (QualifiedName, Process)
+	end;
+	
+ensure_registered (noname, Process)
+		when is_pid (Process) or is_port (Process) ->
+	ok.
+
+
+enforce_registered (QualifiedName) ->
+	enforce_registered (QualifiedName, erlang:self ()).
+
+enforce_registered (QualifiedName = {local, LocalName}, Process)
+		when is_atom (LocalName), (is_pid (Process) or is_port (Process)) ->
+	case erlang:whereis (LocalName) of
+		Process ->
+			ok;
+		OtherProcess when (is_pid (OtherProcess) or is_port (OtherProcess)) ->
+			{error, {mismatched_process_name, QualifiedName, Process, OtherProcess}};
+		undefined ->
+			{error, {unregistered_process, QualifiedName}}
+	end;
+	
+enforce_registered (noname, Process)
+		when (is_pid (Process) or is_port (Process)) ->
+	ok.
+
+
+report_info (Module, Function, InfoType, InfoDetails) ->
+	ok = error_logger:info_report ([{source, Module, Function, erlang:self ()}, {info, InfoType, InfoDetails}]),
+	ok.
 
 report_error (Module, Function, ErrorType, ErrorDetails) ->
-	ok = error_logger:error_report (mosaic_error, [{source, Module, Function, erlang:self ()}, {error, ErrorType, ErrorDetails}]),
+	ok = error_logger:error_report ([{source, Module, Function, erlang:self ()}, {error, ErrorType, ErrorDetails}]),
 	ok.

@@ -12,6 +12,9 @@
 -record (state, {status, migration_outcome, terminate_delegate, begin_migration_delegate, commit_migration_delegate, rollback_migration_delegate}).
 
 
+init ({create, defaults}) ->
+	init ({create, ok});
+	
 init ({create, ok}) ->
 	{ok, #state{
 			status = active, migration_outcome = undefined,

@@ -6,20 +6,21 @@
 -export ([init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2, handle_info/2]).
 
 
--record (state, {name, status, callback_module, callback_state, migration_state}).
+-record (state, {qualified_name, status, callback_module, callback_state, migration_state}).
 -record (migration_state, {role, status, token, migrator}).
 
 
-init ({Name, CallbackModule, Disposition}) when is_atom (Name), is_atom (CallbackModule) ->
+init ({QualifiedName, CallbackModule, Disposition})
+		when is_atom (CallbackModule) ->
 	false = erlang:process_flag (trap_exit, true),
-	case mosaic_tools:ensure_registered (Name, erlang:self ()) of
+	case mosaic_tools:ensure_registered (QualifiedName) of
 		ok ->
 			case Disposition of
 				{create, Arguments} ->
 					case erlang:apply (CallbackModule, init, [{create, Arguments}]) of
 						{ok, CallbackState} ->
 							{ok, #state{
-									name = Name, status = active,
+									qualified_name = QualifiedName, status = active,
 									callback_module = CallbackModule, callback_state = CallbackState,
 									migration_state = none}};
 						Outcome = {stop, _Reason} ->
@@ -29,7 +30,7 @@ init ({Name, CallbackModule, Disposition}) when is_atom (Name), is_atom (Callbac
 					case erlang:apply (CallbackModule, init, [migrate]) of
 						{ok, CallbackState} ->
 							{ok, #state{
-									name = Name, status = migrating,
+									qualified_name = QualifiedName, status = migrating,
 									callback_module = CallbackModule, callback_state = CallbackState,
 									migration_state = #migration_state{
 											role = target, status = waiting_begin, token = Token, migrator = none}}};
@@ -49,8 +50,8 @@ init (Arguments) ->
 terminate (
 			Reason,
 			_State = #state{
-					status = Status, callback_module = CallbackModule, callback_state = CallbackState, migration_state = none}
-		) when (Status =:= active) or (Status =:= migration_succeeded) or (Status =:= migration_failed) ->
+					status = Status, callback_module = CallbackModule, callback_state = CallbackState, migration_state = none})
+		when (Status =:= active) or (Status =:= migration_succeeded) or (Status =:= migration_failed) ->
 	ok = erlang:apply (CallbackModule, terminate, [Reason, CallbackState]);
 	
 terminate (
@@ -86,7 +87,8 @@ handle_call ({call, Request}, Sender, OldState = #state{callback_module = Callba
 			{stop, Reason, Reply, OldState#state{callback_state = NewCallbackState}}
 	end;
 	
-handle_call ({begin_migration, Token, Arguments, Migrator}, _Sender, OldState) when is_pid (Migrator) ->
+handle_call ({begin_migration, Token, Arguments, Migrator}, _Sender, OldState)
+		when is_pid (Migrator) ->
 	case handle_begin_migration (Token, Arguments, Migrator, OldState) of
 		{continue, Reply, NewState} ->
 			{reply, Reply, NewState};
@@ -156,8 +158,8 @@ handle_begin_migration (
 			OldState = #state{
 					status = migrating, callback_module = CallbackModule, callback_state = OldCallbackState,
 					migration_state = OldMigrationState = #migration_state{
-							role = Role, status = waiting_begin, token = Token, migrator = none}}
-		) when (Role =:= source) or (Role =:= target) ->
+							role = Role, status = waiting_begin, token = Token, migrator = none}})
+		when (Role =:= source) or (Role =:= target) ->
 	Self = erlang:self (),
 	CompletionFun = fun (Completion) -> Self ! {continue_migration, Token, Completion}, ok end,
 	case erlang:apply (CallbackModule, begin_migration, [{Role, Arguments, CompletionFun}, OldCallbackState]) of
@@ -191,8 +193,8 @@ handle_begin_migration (
 	
 handle_begin_migration (
 			Token, _Arguments, _Migrator,
-			State = #state{status = migrating, migration_state = #migration_state{token = OtherToken}}
-		) when (Token =/= OtherToken) ->
+			State = #state{status = migrating, migration_state = #migration_state{token = OtherToken}})
+		when (Token =/= OtherToken) ->
 	ok = mosaic_tools:report_error (mosaic_process_internals, handle_begin_migration, invalid_token, {Token}),
 	{continue, {error, invalid_token}, State};
 	
@@ -214,15 +216,15 @@ handle_continue_migration (
 			OldState = #state{
 					status = migrating,
 					migration_state = OldMigrationState = #migration_state{
-							role = Role, status = waiting_completed, token = Token, migrator = Migrator}}
-		) when (Role =:= source) or (Role =:= target) ->
+							role = Role, status = waiting_completed, token = Token, migrator = Migrator}})
+		when (Role =:= source) or (Role =:= target) ->
 	Migrator ! {continue_migration, Token, completed},
 	{continue, undefined, OldState#state{migration_state = OldMigrationState#migration_state{status = waiting_commit}}};
 	
 handle_continue_migration (
 			Token, _Outcome,
-			State = #state{status = migrating, migration_state = #migration_state{token = OtherToken}}
-		) when (Token =/= OtherToken) ->
+			State = #state{status = migrating, migration_state = #migration_state{token = OtherToken}})
+		when (Token =/= OtherToken) ->
 	ok = mosaic_tools:report_error (mosaic_process_internals, handle_continue_migration, invalid_token, {Token}),
 	{continue, undefined, State};
 	
@@ -242,8 +244,8 @@ handle_commit_migration (
 			OldState = #state{
 					status = migrating, callback_module = CallbackModule, callback_state = OldCallbackState,
 					migration_state = #migration_state{
-							role = Role, status = waiting_commit, token = Token, migrator = Migrator}}
-		) when (Role =:= source) or (Role =:= target) ->
+							role = Role, status = waiting_commit, token = Token, migrator = Migrator}})
+		when (Role =:= source) or (Role =:= target) ->
 	case erlang:apply (CallbackModule, commit_migration, [OldCallbackState]) of
 		{continue, NewCallbackState} ->
 			Migrator ! {commit_migration, Token, succeeded},
@@ -263,8 +265,8 @@ handle_commit_migration (
 	
 handle_commit_migration (
 			Token,
-			State = #state{status = migrating, migration_state = #migration_state{token = OtherToken}}
-		) when (Token =/= OtherToken) ->
+			State = #state{status = migrating, migration_state = #migration_state{token = OtherToken}})
+		when (Token =/= OtherToken) ->
 	ok = mosaic_tools:report_error (mosaic_process_internals, handle_commit_migration, invalid_token, {Token}),
 	{continue, {error, invalid_token}, State};
 	
@@ -278,8 +280,8 @@ handle_rollback_migration (
 			OldState = #state{
 					status = migrating, callback_module = CallbackModule, callback_state = OldCallbackState,
 					migration_state = #migration_state{
-							role = Role, status = _, token = Token, migrator = Migrator}}
-		) when (Role =:= source) or (Role =:= target) ->
+							role = Role, status = _, token = Token, migrator = Migrator}})
+		when (Role =:= source) or (Role =:= target) ->
 	case erlang:apply (CallbackModule, rollback_migration, [OldCallbackState]) of
 		{continue, NewCallbackState} ->
 			Migrator ! {rollback_migration, Token, succeeded},
@@ -299,8 +301,8 @@ handle_rollback_migration (
 	
 handle_rollback_migration (
 			Token,
-			State = #state{status = migrating, migration_state = #migration_state{token = OtherToken}}
-		) when (Token =/= OtherToken) ->
+			State = #state{status = migrating, migration_state = #migration_state{token = OtherToken}})
+		when (Token =/= OtherToken) ->
 	ok = mosaic_tools:report_error (mosaic_process_internals, handle_rollback_migration, invalid_token, {Token}),
 	{continue, {error, invalid_token}, State};
 	

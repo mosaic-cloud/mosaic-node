@@ -3,7 +3,7 @@
 
 -behaviour (gen_fsm).
 
--export ([start/6]).
+-export ([start/6, start/7, start_link/6, start_link/7]).
 -export ([migrate/2]).
 -export ([init/1, terminate/3, code_change/4, handle_sync_event/4, handle_event/3, handle_info/3]).
 -export ([
@@ -17,10 +17,37 @@
 		target_commit_waiting/2, target_commit_succeeded_waiting/2]).
 
 
-start (Source, SourceToken, Target, TargetToken, Observer, ObserverToken)
-		when is_pid (Source), is_pid (Target), is_pid (Observer), (Source =/= Target), (Source =/= Observer), (Target =/= Observer),
+start (Source, SourceToken, Target, TargetToken, Observer, ObserverToken) ->
+	start (noname, Source, SourceToken, Target, TargetToken, Observer, ObserverToken).
+
+start (QualifiedName = {local, LocalName}, Source, SourceToken, Target, TargetToken, Observer, ObserverToken)
+		when is_atom (LocalName), is_pid (Source), is_pid (Target), is_pid (Observer),
+				(Source =/= Target), (Source =/= Observer), (Target =/= Observer),
 				(SourceToken =/= TargetToken), (SourceToken =/= ObserverToken), (TargetToken =/= ObserverToken) ->
-	gen_fsm:start (mosaic_process_migrator, {Source, SourceToken, Target, TargetToken, Observer, ObserverToken}, []).
+	gen_fsm:start (QualifiedName, mosaic_process_migrator, {QualifiedName, Source, SourceToken, Target, TargetToken, Observer, ObserverToken}, []);
+	
+start (QualifiedName = noname, Source, SourceToken, Target, TargetToken, Observer, ObserverToken)
+		when is_pid (Source), is_pid (Target), is_pid (Observer),
+				(Source =/= Target), (Source =/= Observer), (Target =/= Observer),
+				(SourceToken =/= TargetToken), (SourceToken =/= ObserverToken), (TargetToken =/= ObserverToken) ->
+	gen_fsm:start (mosaic_process_migrator, {QualifiedName, Source, SourceToken, Target, TargetToken, Observer, ObserverToken}, []).
+
+
+start_link (Source, SourceToken, Target, TargetToken, Observer, ObserverToken) ->
+	start_link (noname, Source, SourceToken, Target, TargetToken, Observer, ObserverToken).
+
+start_link (QualifiedName = {local, LocalName}, Source, SourceToken, Target, TargetToken, Observer, ObserverToken)
+		when is_atom (LocalName), is_pid (Source), is_pid (Target), is_pid (Observer),
+				(Source =/= Target), (Source =/= Observer), (Target =/= Observer),
+				(SourceToken =/= TargetToken), (SourceToken =/= ObserverToken), (TargetToken =/= ObserverToken) ->
+	gen_fsm:start_link (QualifiedName, mosaic_process_migrator, {QualifiedName, Source, SourceToken, Target, TargetToken, Observer, ObserverToken}, []);
+	
+start_link (QualifiedName = noname, Source, SourceToken, Target, TargetToken, Observer, ObserverToken)
+		when is_pid (Source), is_pid (Target), is_pid (Observer),
+				(Source =/= Target), (Source =/= Observer), (Target =/= Observer),
+				(SourceToken =/= TargetToken), (SourceToken =/= ObserverToken), (TargetToken =/= ObserverToken) ->
+	gen_fsm:start_link (mosaic_process_migrator, {QualifiedName, Source, SourceToken, Target, TargetToken, Observer, ObserverToken}, []).
+
 
 migrate (Migrator, Arguments)
 		when is_pid (Migrator) ->
@@ -30,16 +57,21 @@ migrate (Migrator, Arguments)
 -record (state, {source, source_token, target, target_token, observer, observer_token, source_completed, target_completed}).
 
 
-init ({Source, SourceToken, Target, TargetToken, Observer, ObserverToken})
+init ({QualifiedName, Source, SourceToken, Target, TargetToken, Observer, ObserverToken})
 		when is_pid (Source), is_pid (Target), is_pid (Observer), (Source =/= Target), (Source =/= Observer), (Target =/= Observer),
 				(SourceToken =/= TargetToken), (SourceToken =/= ObserverToken), (TargetToken =/= ObserverToken) ->
-	false = erlang:process_flag (trap_exit, true),
-	StateData = #state{
-			source = Source, source_token = SourceToken,
-			target = Target, target_token = TargetToken,
-			observer = Observer, observer_token = ObserverToken,
-			source_completed = false, target_completed = false},
-	{ok, source_begin_waiting, StateData}.
+	case mosaic_tools:ensure_registered (QualifiedName) of
+		ok ->
+			false = erlang:process_flag (trap_exit, true),
+			StateData = #state{
+					source = Source, source_token = SourceToken,
+					target = Target, target_token = TargetToken,
+					observer = Observer, observer_token = ObserverToken,
+					source_completed = false, target_completed = false},
+			{ok, source_begin_waiting, StateData};
+		{error, Reason} ->
+			{stop, Reason}
+	end.
 
 
 terminate (Reason, _StateName, _StateData = #state{observer = Observer, observer_token = ObserverToken}) ->
@@ -111,6 +143,10 @@ peers_completed_waiting ({continue_migration, TargetToken, completed}, StateData
 
 continue_migration (target_begin_waiting, source, OldStateData = #state{source_completed = false, target_completed = false}) ->
 	{next_state, target_begin_waiting, OldStateData#state{source_completed = true}};
+	
+continue_migration (target_begin_succeeded_waiting, source, OldStateData = #state{source_completed = false, target_completed = false}) ->
+	NewStateData = OldStateData#state{source_completed = true},
+	{next_state, target_begin_succeeded_waiting, NewStateData};
 	
 continue_migration (peers_completed_waiting, source, OldStateData = #state{source_completed = false, target_completed = TargetCompleted}) ->
 	NewStateData = OldStateData#state{source_completed = true},

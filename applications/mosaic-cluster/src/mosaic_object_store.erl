@@ -8,14 +8,14 @@
 -export ([select/2, include/4, replace/5, exclude/3, fold/3, count/1]).
 -export ([init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2, handle_info/2]).
 
-start (Name, Configuration) when is_atom (Name) ->
-	gen_server:start ({local, Name}, mosaic_object_store, {Name, Configuration}, []).
+start (QualifiedName = {local, LocalName}, Configuration) when is_atom (LocalName) ->
+	gen_server:start (QualifiedName, mosaic_object_store, {QualifiedName, Configuration}, []).
 
-start_link (Name, Configuration) when is_atom (Name) ->
-	gen_server:start_link ({local, Name}, mosaic_object_store, {Name, Configuration}, []).
+start_link (QualifiedName = {local, LocalName}, Configuration) when is_atom (LocalName) ->
+	gen_server:start_link (QualifiedName, mosaic_object_store, {QualifiedName, Configuration}, []).
 
-start_supervised (Name, Configuration) when is_atom (Name) ->
-	mosaic_cluster_sup:start_child_object_store (Name, Configuration).
+start_supervised (QualifiedName, Configuration) ->
+	mosaic_cluster_sup:start_child_object_store (QualifiedName, Configuration).
 
 stop (Store) ->
 	stop (Store, normal).
@@ -41,14 +41,14 @@ fold (Store, Fun, InputAcc) when is_pid (Store) or is_atom (Store), is_function 
 count (Store) when is_pid (Store) or is_atom (Store) ->
 	gen_server:call (Store, {count}).
 
--record (state, {name, table}).
+-record (state, {qualified_name, table}).
 
-init ({Name, defaults}) when is_atom (Name) ->
+init ({QualifiedName, defaults}) ->
 	false = erlang:process_flag (trap_exit, true),
-	case mosaic_tools:ensure_registered (Name, erlang:self ()) of
+	case mosaic_tools:ensure_registered (QualifiedName) of
 		ok ->
-			Table = ets:new (Name, [ordered_set, named_table, protected]),
-			{ok, #state{name = Name, table = Table}};
+			Table = ets:new (noname, [ordered_set, protected]),
+			{ok, #state{qualified_name = QualifiedName, table = Table}};
 		{error, Reason} ->
 			{stop, Reason}
 	end.

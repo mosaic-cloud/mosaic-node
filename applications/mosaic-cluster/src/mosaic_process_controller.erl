@@ -3,53 +3,82 @@
 
 -behaviour (gen_server).
 
--export ([start/2, start_link/2, start_supervised/2]).
--export ([stop/1, stop/2, stop/3]).
+-export ([start/0, start/1, start/2, start_link/0, start_link/1, start_link/2]).
+-export ([start_supervised/0, start_supervised/1, start_supervised/2, start_supervised/3]).
+-export ([stop/1, stop/2]).
 -export ([create/4, migrate/3, migrate/4, migrate/5, migrate/6, fold/3, count/1]).
 -export ([init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2, handle_info/2]).
 
 
-start (Name, Configuration)
-		when is_atom (Name) ->
-	gen_server:start ({local, Name}, mosaic_process_controller, {Name, Configuration}, []).
+start () ->
+	start (defaults).
 
-start_link (Name, Configuration)
-		when is_atom (Name) ->
-	gen_server:start_link ({local, Name}, mosaic_process_controller, {Name, Configuration}, []).
+start (Configuration) ->
+	start (noname, Configuration).
 
-start_supervised (Name, Configuration)
-		when is_atom (Name) ->
-	mosaic_cluster_sup:start_child_process_controller (Name, Configuration).
+start (QualifiedName = {local, LocalName}, Configuration)
+		when is_atom (LocalName) ->
+	gen_server:start (QualifiedName, mosaic_process_controller, {QualifiedName, Configuration}, []);
+	
+start (QualifiedName = noname, Configuration) ->
+	gen_server:start (mosaic_process_controller, {QualifiedName, Configuration}, []).
+
+
+start_link () ->
+	start_link (defaults).
+
+start_link (Configuration) ->
+	start_link (noname, Configuration).
+
+start_link (QualifiedName = {local, LocalName}, Configuration)
+		when is_atom (LocalName) ->
+	gen_server:start_link (QualifiedName, mosaic_process_controller, {QualifiedName, Configuration}, []);
+	
+start_link (QualifiedName = noname, Configuration) ->
+	gen_server:start_link (mosaic_process_controller, {QualifiedName, Configuration}, []).
+
+
+start_supervised () ->
+	start_supervised (defaults).
+
+start_supervised (Configuration) ->
+	start_supervised (noname, Configuration).
+
+start_supervised (QualifiedName, Configuration) ->
+	start_supervised (mosaic_process_controller_sup, QualifiedName, Configuration).
+
+start_supervised (Supervisor, QualifiedName, Configuration) ->
+	mosaic_cluster_sup:start_child_process_controller (Supervisor, QualifiedName, Configuration).
+
 
 stop (Controller) ->
 	stop (Controller, normal).
 
-stop (Controller, Reason)
+stop (Controller, Signal)
 		when (is_atom (Controller) or is_pid (Controller)) ->
-	gen_server:call (Controller, {stop, Reason}).
+	gen_server:call (Controller, {stop, Signal}).
 
-stop (Controller, Key, Signal)
-		when (is_atom (Controller) or is_pid (Controller)) ->
-	gen_server:call (Controller, {stop, Key, Signal}).
 
-create (Controller, Key, Module, Arguments)
+create (Controller, Key, Module, CreateArguments)
 		when (is_pid (Controller) or is_atom (Controller)), is_atom (Module) ->
-	gen_server:call (Controller, {create, Key, Module, Arguments}).
+	gen_server:call (Controller, {create, Key, Module, CreateArguments}).
+
 
 migrate (SourceController, TargetController, Key) ->
 	migrate (SourceController, TargetController, Key, defaults).
 
-migrate (SourceController, TargetController, Key, Arguments)
+migrate (SourceController, TargetController, Key, MigrateArguments)
 		when is_pid (SourceController), is_pid (TargetController), (SourceController =/= TargetController) ->
-	gen_server:call (TargetController, {migrate_as_target, SourceController, Key, Arguments}).
+	gen_server:call (TargetController, {migrate_as_target, SourceController, Key, MigrateArguments}).
 
 migrate (SourceController, TargetController, Key, Observer, ObserverToken) ->
 	migrate (SourceController, TargetController, Key, defaults, Observer, ObserverToken).
 
-migrate (SourceController, TargetController, Key, Arguments, Observer, ObserverToken)
+migrate (SourceController, TargetController, Key, MigrateArguments, Observer, ObserverToken)
 		when is_pid (SourceController), is_pid (TargetController), is_pid (Observer),
 				(SourceController =/= TargetController), (SourceController =/= Observer), (TargetController =/= Observer) ->
-	gen_server:call (TargetController, {migrate_as_target, SourceController, Key, Arguments, Observer, ObserverToken}).
+	gen_server:call (TargetController, {migrate_as_target, SourceController, Key, MigrateArguments, Observer, ObserverToken}).
+
 
 fold (Controller, Function, InputAccumulator)
 		when is_pid (Controller), is_function (Function, 2) ->
@@ -60,21 +89,20 @@ count (Controller)
 	gen_server:call (Controller, {count}).
 
 
--record (state, {name, processes, link_mapping, link_pending, migrations, migration_mapping, process_supervisor}).
--record (process_state, {name, module, process}).
+-record (state, {qualified_name, processes, link_mapping, link_pending, migrations, migration_mapping, process_supervisor}).
+-record (process_state, {module, process}).
 -record (migration_as_target_state, {migrator, migrator_token, observer, observer_token}).
 -record (migration_as_source_state, {migrator, migrator_token}).
 
 
-init ({Name, defaults})
-		when is_atom (Name) ->
+init ({QualifiedName, defaults}) ->
 	false = erlang:process_flag (trap_exit, true),
-	case mosaic_tools:ensure_registered (Name, erlang:self ()) of
+	case mosaic_tools:ensure_registered (QualifiedName) of
 		ok ->
 			case erlang:whereis (mosaic_process_sup) of
 				ProcessSupervisor when is_pid (ProcessSupervisor) ->
 					State = #state{
-							name = Name,
+							qualified_name = QualifiedName,
 							processes = orddict:new (), link_mapping = orddict:new (), link_pending = ordsets:new (),
 							migrations = orddict:new (), migration_mapping = orddict:new (),
 							process_supervisor = ProcessSupervisor},
@@ -106,18 +134,17 @@ handle_call ({stop, Signal}, _Sender, State) ->
 	end;
 	
 handle_call (
-			{create, Key, Module, Arguments}, _Sender,
+			{create, Key, Module, CreateArguments}, _Sender,
 			OldState = #state{processes = OldProcesses, link_mapping = OldLinkMapping,
 			process_supervisor = ProcessSupervisor})
 		when is_atom (Module) ->
 	ProcessExists = orddict:is_key (Key, OldProcesses),
 	if
 		not ProcessExists ->
-			{ok, Name} = generate_process_name (Key, Module),
-			case mosaic_process:start_supervised (ProcessSupervisor, Name, Module, {create, Arguments}) of
+			case mosaic_process:start_supervised (ProcessSupervisor, noname, Module, {create, CreateArguments}) of
 				{ok, Process} ->
 					true = erlang:link (Process),
-					ProcessState = #process_state{name = Name, module = Module, process = Process},
+					ProcessState = #process_state{module = Module, process = Process},
 					NewProcesses = orddict:store (Key, ProcessState, OldProcesses),
 					NewLinkMapping = orddict:store (Process, Key, OldLinkMapping),
 					NewState = OldState#state{processes = NewProcesses, link_mapping = NewLinkMapping},
@@ -130,18 +157,7 @@ handle_call (
 	end;
 	
 handle_call (
-			{stop, Key, Signal}, _Sender,
-			State = #state{processes = Processes}) ->
-	case orddict:find (Key, Processes) of
-		{ok, #process_state{process = Process}} ->
-			Outcome = mosaic_process:stop (Process, Signal),
-			{reply, Outcome, State};
-		error ->
-			{reply, {error, process_does_not_exist}, State}
-	end;
-	
-handle_call (
-			{migrate_as_target, SourceController, Key, Arguments}, Sender,
+			{migrate_as_target, SourceController, Key, MigrateArguments}, Sender,
 			OldState)
 		when is_pid (SourceController) ->
 	WaiterToken = erlang:make_ref (),
@@ -169,7 +185,7 @@ handle_call (
 				true = erlang:unlink (Migrator),
 				erlang:exit (normal)
 			end),
-	case handle_call ({migrate_as_target, SourceController, Key, Arguments, Waiter, WaiterToken}, undefined, OldState) of
+	case handle_call ({migrate_as_target, SourceController, Key, MigrateArguments, Waiter, WaiterToken}, undefined, OldState) of
 		{reply, {ok, Migrator, Target}, NewState} ->
 			true = erlang:unlink (Waiter),
 			Waiter ! {'begin', Migrator, Target, WaiterToken},
@@ -180,7 +196,7 @@ handle_call (
 	end;
 	
 handle_call (
-			{migrate_as_target, SourceController, Key, Arguments, Observer, ObserverToken}, _Sender,
+			{migrate_as_target, SourceController, Key, MigrateArguments, Observer, ObserverToken}, _Sender,
 			OldState = #state{
 					processes = OldProcesses, link_mapping = OldLinkMapping,
 					migrations = OldMigrations, migration_mapping = OldMigrationMapping,
@@ -194,19 +210,18 @@ handle_call (
 			TargetToken = erlang:make_ref (),
 			case gen_server:call (SourceController, {migrate_as_source, Key}) of
 				{ok, Module, Source} ->
-					{ok, TargetName} = generate_process_name (Key, Module),
-					case mosaic_process:start_supervised (ProcessSupervisor, TargetName, Module, {migrate, TargetToken}) of
+					case mosaic_process:start_supervised (ProcessSupervisor, noname, Module, {migrate, TargetToken}) of
 						{ok, Target} ->
 							case mosaic_process_migrator:start (Source, SourceToken, Target, TargetToken, Observer, ObserverToken) of
 								{ok, Migrator} ->
 									case gen_server:call (SourceController, {migrate_as_source, Key, Migrator, MigratorToken}) of
 										ok ->
-											case mosaic_process_migrator:migrate (Migrator, Arguments) of
+											case mosaic_process_migrator:migrate (Migrator, MigrateArguments) of
 												ok ->
-													%true = erlang:link (Migrator),
+													true = erlang:link (Migrator),
 													true = erlang:link (Target),
 													TargetProcessState = #process_state{
-															name = TargetName, module = Module, process = Target},
+															module = Module, process = Target},
 													TargetMigrationState = #migration_as_target_state{
 															migrator = Migrator, migrator_token = MigratorToken,
 															observer = Observer, observer_token = ObserverToken},
@@ -270,7 +285,7 @@ handle_call (
 			MigrationExists = orddict:is_key (Key, OldMigrations),
 			if
 				not MigrationExists ->
-					%true = erlang:link (Migrator),
+					true = erlang:link (Migrator),
 					SourceMigrationState = #migration_as_source_state{migrator = Migrator, migrator_token = MigratorToken},
 					NewMigrations = orddict:store (Key, SourceMigrationState, OldMigrations),
 					NewMigrationMapping = orddict:store (MigratorToken, Key, OldMigrationMapping),
@@ -317,7 +332,7 @@ handle_info ({'EXIT', ProcessSupervisor, _Reason}, State = #state{process_superv
 	{stop, process_supervisor_exited, State};
 	
 handle_info (
-			{'EXIT', Link, _Reason},
+			{'EXIT', Link, Reason},
 			OldState = #state{
 					processes = OldProcesses, link_mapping = OldLinkMapping, link_pending = OldLinkPending,
 					migrations = OldMigrations, migration_mapping = OldMigrationMapping})
@@ -325,34 +340,43 @@ handle_info (
 	case orddict:find (Link, OldLinkMapping) of
 		{ok, Key} ->
 			{ok, #process_state{process = Process}} = orddict:find (Key, OldProcesses),
-			% ok = error_logger:info_report ([{process_exited, Key, Process, Reason}]),
-			NewProcesses = orddict:erase (Key, OldProcesses),
-			NewLinkMapping1 = orddict:erase (Process, OldLinkMapping),
-			NewLinkPending1 = if Link =/= Process -> ordsets:add_element (Process, OldLinkPending); true -> OldLinkPending end,
-			{NewLinkMapping2, NewLinkPending2, NewMigrations, NewMigrationMapping} = case orddict:find (Key, OldMigrations) of
+			{ok, NewProcesses1, NewLinkMapping1, NewLinkPending1} = if
+				Link =:= Process ->
+					NewProcesses1_ = orddict:erase (Key, OldProcesses),
+					NewLinkMapping1_ = orddict:erase (Process, OldLinkMapping),
+					{ok, NewProcesses1_, NewLinkMapping1_, OldLinkPending};
+				Link =/= Process, Reason =/= normal ->
+					NewProcesses1_ = orddict:erase (Key, OldProcesses),
+					NewLinkMapping1_ = orddict:erase (Process, OldLinkMapping),
+					NewLinkPending1_ = ordsets:add_element (Process, OldLinkPending),
+					{ok, NewProcesses1_, NewLinkMapping1_, NewLinkPending1_};
+				Link =/= Process, Reason =:= normal ->
+					{ok, OldProcesses, OldLinkMapping, OldLinkPending}
+			end,
+			{ok, NewLinkMapping2, NewLinkPending2, NewMigrations, NewMigrationMapping} = case orddict:find (Key, OldMigrations) of
 				{ok, OldMigrationState} ->
-					{Migrator, MigratorToken} = case OldMigrationState of
+					{ok, Migrator, MigratorToken} = case OldMigrationState of
 						#migration_as_target_state{migrator = Migrator_, migrator_token = MigratorToken_} ->
-							{Migrator_, MigratorToken_};
+							{ok, Migrator_, MigratorToken_};
 						#migration_as_source_state{migrator = Migrator_, migrator_token = MigratorToken_} ->
-							{Migrator_, MigratorToken_}
+							{ok, Migrator_, MigratorToken_}
 					end,
-					NewMigrations_ = orddict:erase (Key, OldMigrations),
-					NewMigrationMapping_ = orddict:erase (MigratorToken, OldMigrationMapping),
-					NewLinkMapping2_ = if Link =/= Migrator -> orddict:erase (Migrator, NewLinkMapping1); true -> NewLinkMapping1 end,
+					NewLinkMapping2_ = orddict:erase (Migrator, NewLinkMapping1),
 					NewLinkPending2_ = if Link =/= Migrator -> ordsets:add_element (Migrator, NewLinkPending1); true -> NewLinkPending1 end,
-					{NewLinkMapping2_, NewLinkPending2_, NewMigrations_, NewMigrationMapping_};
+					NewMigrations2_ = orddict:erase (Key, OldMigrations),
+					NewMigrationMapping2_ = orddict:erase (MigratorToken, OldMigrationMapping),
+					{ok, NewLinkMapping2_, NewLinkPending2_, NewMigrations2_, NewMigrationMapping2_};
 				error ->
-					{NewLinkMapping1, NewLinkPending1, OldMigrations, OldMigrationMapping}
+					{ok, NewLinkMapping1, NewLinkPending1, OldMigrations, OldMigrationMapping}
 			end,
 			NewState = OldState#state{
-					processes = NewProcesses, link_mapping = NewLinkMapping2, link_pending = NewLinkPending2,
+					processes = NewProcesses1, link_mapping = NewLinkMapping2, link_pending = NewLinkPending2,
 					migrations = NewMigrations, migration_mapping = NewMigrationMapping},
 			{noreply, NewState};
 		error ->
 			LinkPending = ordsets:is_element (Link, OldLinkPending),
 			if
-				LinkPending ->
+				LinkPending =:= true ->
 					NewLinkPending = ordsets:del_element (Link, OldLinkPending),
 					NewState = OldState#state{link_pending = NewLinkPending},
 					{noreply, NewState};
@@ -365,16 +389,3 @@ handle_info (
 handle_info (Message, State) ->
 	ok = mosaic_tools:report_error (mosaic_process_controller, handle_info, invalid_message, {Message}),
 	{noreply, State}.
-
-
-generate_process_name (Key, Module) when is_integer (Key) ->
-	Name = erlang:list_to_atom (erlang:atom_to_list (Module) ++ "#" ++ erlang:integer_to_list (Key)),
-	case erlang:whereis (Name) of
-		undefined ->
-			{ok, Name};
-		_ ->
-			generate_process_name (Key + 1, Module)
-	end;
-	
-generate_process_name (_Key, Module) ->
-	generate_process_name (1, Module).

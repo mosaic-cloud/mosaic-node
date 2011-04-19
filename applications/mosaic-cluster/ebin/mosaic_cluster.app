@@ -2,7 +2,7 @@
              [{description,"mOSAIC cluster manager"},
               {vsn,"1"},
               {applications,[kernel,stdlib,riak_core]},
-              {modules,[mosaic_cluster_app,mosaic_cluster_sup,
+              {modules,[mosaic_cluster,mosaic_cluster_app,mosaic_cluster_sup,
                         mosaic_dummy_process,mosaic_executor,
                         mosaic_executor_tests,mosaic_executor_vnode,
                         mosaic_object_store,mosaic_port_process,

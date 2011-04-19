@@ -4,11 +4,10 @@
 -export ([test/0]).
 
 
-%-define (process_tester__enabled, _).
-%-define (process_controller__enabled, _).
-%-define (process_migrator__enabled, _).
-%-define (port_process__enabled, _).
--define (dummy_process__enabled, _).
+-define (process_tester__enabled, _).
+-define (process_controller__enabled, _).
+-define (process_migrator__enabled, _).
+-define (port_process__enabled, _).
 
 
 -export ([
@@ -20,29 +19,29 @@
 		process_tester__migrate_as_target/1]).
 
 -ifdef (process_tester__enabled).
--test ({process_tester__start_stop, [{stop_method, stop}, {stop_reason, normal}]}).
--test ({process_tester__start_stop, [{stop_method, stop}, {stop_reason, reference}]}).
--test ({process_tester__start_stop, [{stop_method, call}, {stop_reason, normal}]}).
--test ({process_tester__start_stop, [{stop_method, cast}, {stop_reason, normal}]}).
--test ({process_tester__start_stop, [{stop_method, info}, {stop_reason, normal}]}).
--test ({process_tester__start_error, defaults}).
--test ({process_tester__stop_error, defaults}).
--test ({process_tester__ping, [{ping_method, call_reply}]}).
--test ({process_tester__ping, [{ping_method, call_noreply}]}).
--test ({process_tester__ping, [{ping_method, cast}]}).
--test ({process_tester__ping, [{ping_method, info}]}).
--test ({process_tester__migrate_as_source, reject}).
--test ({process_tester__migrate_as_source, terminate}).
--test ({process_tester__migrate_as_source, {commit, succeed}}).
--test ({process_tester__migrate_as_source, {commit, fail}}).
--test ({process_tester__migrate_as_source, {rollback, succeed}}).
--test ({process_tester__migrate_as_source, {rollback, fail}}).
--test ({process_tester__migrate_as_target, reject}).
--test ({process_tester__migrate_as_target, terminate}).
--test ({process_tester__migrate_as_target, {commit, succeed}}).
--test ({process_tester__migrate_as_target, {commit, fail}}).
--test ({process_tester__migrate_as_target, {rollback, succeed}}).
--test ({process_tester__migrate_as_target, {rollback, fail}}).
+-test ({process_tester__start_stop, [[{stop_method, stop}, {stop_signal, normal}]]}).
+-test ({process_tester__start_stop, [[{stop_method, stop}, {stop_signal, reference}]]}).
+-test ({process_tester__start_stop, [[{stop_method, call}, {stop_signal, normal}]]}).
+-test ({process_tester__start_stop, [[{stop_method, cast}, {stop_signal, normal}]]}).
+-test ({process_tester__start_stop, [[{stop_method, info}, {stop_signal, normal}]]}).
+-test ({process_tester__start_error, [defaults]}).
+-test ({process_tester__stop_error, [defaults]}).
+-test ({process_tester__ping, [[{ping_method, call_reply}]]}).
+-test ({process_tester__ping, [[{ping_method, call_noreply}]]}).
+-test ({process_tester__ping, [[{ping_method, cast}]]}).
+-test ({process_tester__ping, [[{ping_method, info}]]}).
+-test ({process_tester__migrate_as_source, [reject]}).
+-test ({process_tester__migrate_as_source, [terminate]}).
+-test ({process_tester__migrate_as_source, [{commit, succeed}]}).
+-test ({process_tester__migrate_as_source, [{commit, fail}]}).
+-test ({process_tester__migrate_as_source, [{rollback, succeed}]}).
+-test ({process_tester__migrate_as_source, [{rollback, fail}]}).
+-test ({process_tester__migrate_as_target, [reject]}).
+-test ({process_tester__migrate_as_target, [terminate]}).
+-test ({process_tester__migrate_as_target, [{commit, succeed}]}).
+-test ({process_tester__migrate_as_target, [{commit, fail}]}).
+-test ({process_tester__migrate_as_target, [{rollback, succeed}]}).
+-test ({process_tester__migrate_as_target, [{rollback, fail}]}).
 -endif.
 
 
@@ -53,12 +52,13 @@
 		process_controller__migrate/1]).
 
 -ifdef (process_controller__enabled).
-%-test ({process_controller__start_stop, defaults}).
-%-test ({process_controller__start_error, defaults}).
-%-test ({process_controller__create, succeed}).
-%-test ({process_controller__create, {fail, module}}).
-%-test ({process_controller__create, {fail, failed}}).
--test ({process_controller__migrate, defaults}).
+-test ({process_controller__start_stop, [defaults]}).
+-test ({process_controller__start_error, [defaults]}).
+-test ({process_controller__create, [succeed]}).
+-test ({process_controller__create, [{fail, module}]}).
+-test ({process_controller__create, [{fail, failed}]}).
+-test ({process_controller__migrate, [once]}).
+-test ({process_controller__migrate, [twice]}).
 -endif.
 
 
@@ -66,7 +66,7 @@
 		process_migrator__migrate/1]).
 
 -ifdef (process_migrator__enabled).
--test ({process_migrator__migrate, defaults}).
+-test ({process_migrator__migrate, [defaults]}).
 -endif.
 
 
@@ -76,169 +76,157 @@
 		port_process__migrate_as_target/1]).
 
 -ifdef (port_process__enabled).
--test ({port_process__start_stop, defaults}).
--test ({port_process__migrate_as_source, commit}).
--test ({port_process__migrate_as_source, rollback}).
--test ({port_process__migrate_as_target, commit}).
--test ({port_process__migrate_as_target, rollback}).
+-test ({port_process__start_stop, [defaults]}).
+-test ({port_process__migrate_as_source, [commit]}).
+-test ({port_process__migrate_as_source, [rollback]}).
+-test ({port_process__migrate_as_target, [commit]}).
+-test ({port_process__migrate_as_target, [rollback]}).
 -endif.
 
 
--export ([
-		dummy_process__start_stop/1,
-		dummy_process__migrate/1]).
-
--ifdef (dummy_process__enabled).
--test ({dummy_process__start_stop, defaults}).
--test ({dummy_process__migrate, defaults}).
--endif.
+test () ->
+	mosaic_tests:test_module (mosaic_process_tests).
 
 
-process_tester__start_stop ([{stop_method, StopMethod}, {stop_reason, reference}]) ->
-	process_tester__start_stop ([{stop_method, StopMethod}, {stop_reason, erlang:make_ref ()}]);
+process_tester__start_stop ([{stop_method, StopMethod}, {stop_signal, reference}]) ->
+	process_tester__start_stop ([{stop_method, StopMethod}, {stop_signal, erlang:make_ref ()}]);
 	
-process_tester__start_stop ([{stop_method, StopMethod}, {stop_reason, StopReason}]) ->
-	Name = mosaic_process_test,
-	Token = erlang:make_ref (),
-	{ok, Process} = start_process (Name, mosaic_process_tester, {create, ok}),
+process_tester__start_stop ([{stop_method, StopMethod}, {stop_signal, StopSignal}]) ->
+	{ok, Process} = start_link_process (noname, mosaic_process_tester, {create, defaults}),
 	ok = case StopMethod of
 		stop ->
-			{ok, Token} = mosaic_process:stop (Process, {stop, StopReason, {ok, Token}}, 1000),
+			ReplyToken = erlang:make_ref (),
+			{ok, ReplyToken} = mosaic_process:stop (Process, {stop, StopSignal, {ok, ReplyToken}}),
 			ok;
 		call ->
-			{ok, Token} = mosaic_process:call (Process, {stop, StopReason, {ok, Token}}, 1000),
+			ReplyToken = erlang:make_ref (),
+			{ok, ReplyToken} = mosaic_process:call (Process, {stop, StopSignal, {ok, ReplyToken}}),
 			ok;
 		cast ->
-			ok = mosaic_process:cast (Process, {stop, StopReason}),
+			ok = mosaic_process:cast (Process, {stop, StopSignal}),
 			ok;
 		info ->
-			Process ! {stop, StopReason},
+			Process ! {stop, StopSignal},
 			ok
 	end,
-	{ok, StopReason} = join_process (Process, [StopReason]),
+	ok = join_process (Process, [StopSignal]),
 	ok.
 
 process_tester__start_error (defaults) ->
-	Name = mosaic_process_test,
-	ErrorReason = erlang:make_ref (),
-	{error, ErrorReason} = start_process (Name, mosaic_process_tester, {create, {stop, ErrorReason}}),
-	undefined = erlang:whereis (mosaic_process_test),
+	StopToken = erlang:make_ref (),
+	{error, StopToken} = start_link_process (noname, mosaic_process_tester, {create, {stop, StopToken}}),
 	ok.
 
 process_tester__stop_error (defaults) ->
-	Name = mosaic_process_test,
-	ErrorReason = erlang:make_ref (),
-	{ok, Process} = start_process (Name, mosaic_process_tester, {create, ok}),
-	{error, ErrorReason} = mosaic_process:stop (Process, {reply, {error, ErrorReason}}, 1000),
-	ok = stop_process (Process, normal),
+	ReplyToken = erlang:make_ref (),
+	{ok, Process} = start_link_process (noname, mosaic_process_tester, {create, defaults}),
+	{error, ReplyToken} = mosaic_process:stop (Process, {reply, {error, ReplyToken}}),
+	ok = stop_and_join_process (Process),
 	ok.
 
 process_tester__ping ([{ping_method, PingMethod}]) ->
-	Name = mosaic_process_test,
 	Self = erlang:self (),
-	Token1 = erlang:make_ref (),
-	{ok, Process} = start_process (Name, mosaic_process_tester, {create, ok}),
-	{ok, Token2} = case PingMethod of
+	PingToken = erlang:make_ref (),
+	{ok, Process} = start_link_process (noname, mosaic_process_tester, {create, defaults}),
+	{ok, PongToken} = case PingMethod of
 		call_reply ->
-			{pong, Token1, Token2_} = mosaic_process:call (Process, {ping, Self, Token1, reply}, 1000),
-			{ok, Token2_};
+			{pong, PingToken, PongToken_} = mosaic_process:call (Process, {ping, Self, PingToken, reply}),
+			{ok, PongToken_};
 		call_noreply ->
-			{pong, Token1, Token2_} = mosaic_process:call (Process, {ping, Self, Token1, noreply}, 1000),
-			{ok, Token2_};
+			{pong, PingToken, PongToken_} = mosaic_process:call (Process, {ping, Self, PingToken, noreply}),
+			{ok, PongToken_};
 		cast ->
-			ok = mosaic_process:cast (Process, {ping, Self, Token1}),
-			{ok, Token1};
+			ok = mosaic_process:cast (Process, {ping, Self, PingToken}),
+			{ok, PingToken};
 		info ->
-			Process ! {ping, Self, Token1},
-			{ok, Token1}
+			Process ! {ping, Self, PingToken},
+			{ok, PingToken}
 	end,
-	ok = receive {pong, Token1, Token2} -> ok after 1000 -> receive_timeout () end,
-	ok = stop_process (Process, normal),
+	ok = receive {pong, PingToken, PongToken} -> ok after 1000 -> receive_unexpected () end,
+	ok = stop_and_join_process (Process),
 	ok.
 
 process_tester__migrate_as_source (Completion) ->
-	SourceName = mosaic_process_test_source,
+	MigrateArguments = erlang:make_ref (),
 	Self = erlang:self (),
-	Token = erlang:make_ref (),
-	Arguments = erlang:make_ref (),
-	{ok, Source} = start_process (SourceName, mosaic_process_tester, {create, ok}),
+	SourceToken = erlang:make_ref (),
+	{ok, Source} = start_link_process (noname, mosaic_process_tester, {create, defaults}),
 	ok = case Completion of
 		reject ->
-			{error, rejected} = mosaic_process:begin_migration (Source, Token, reject, Self),
-			ok = stop_process (Source, normal),
+			{error, rejected} = mosaic_process:begin_migration (Source, SourceToken, reject, Self),
+			ok = stop_and_join_process (Source),
 			ok;
 		terminate ->
-			{error, terminated} = mosaic_process:begin_migration (Source, Token, terminate, Self),
-			{ok, {migration_failed, terminated}} = join_process (Source, [{migration_failed, terminated}]),
+			{error, terminated} = mosaic_process:begin_migration (Source, SourceToken, terminate, Self),
+			ok = join_process (Source, [{migration_failed, terminated}]),
 			ok;
 		{_, CompletionOutcome} ->
-			ok = mosaic_process:begin_migration (Source, Token, {continue, Arguments, CompletionOutcome}, Self),
-			ok = receive {begin_migration, Token, succeeded} -> ok after 1000 -> receive_timeout () end,
-			ok = receive {continue_migration, Token, prepared, Arguments} -> ok after 1000 -> receive_timeout () end,
-			ok = receive {continue_migration, Token, completed} -> ok after 1000 -> receive_timeout () end,
+			ok = mosaic_process:begin_migration (Source, SourceToken, {continue, MigrateArguments, CompletionOutcome}, Self),
+			ok = receive {begin_migration, SourceToken, succeeded} -> ok after 1000 -> receive_unexpected () end,
+			ok = receive {continue_migration, SourceToken, prepared, MigrateArguments} -> ok after 1000 -> receive_unexpected () end,
+			ok = receive {continue_migration, SourceToken, completed} -> ok after 1000 -> receive_unexpected () end,
 			case Completion of
 				{commit, succeed} ->
-					ok = mosaic_process:commit_migration (Source, Token),
-					ok = receive {commit_migration, Token, succeeded} -> ok after 1000 -> receive_timeout () end,
-					{ok, normal} = join_process (Source, [normal]),
+					ok = mosaic_process:commit_migration (Source, SourceToken),
+					ok = receive {commit_migration, SourceToken, succeeded} -> ok after 1000 -> receive_unexpected () end,
+					ok = join_process (Source),
 					ok;
 				{commit, fail} ->
-					{error, failed} = mosaic_process:commit_migration (Source, Token),
-					ok = receive {commit_migration, Token, failed, failed} -> ok after 1000 -> receive_timeout () end,
-					{ok, {migration_failed, failed}} = join_process (Source, [{migration_failed, failed}]),
+					{error, failed} = mosaic_process:commit_migration (Source, SourceToken),
+					ok = receive {commit_migration, SourceToken, failed, failed} -> ok after 1000 -> receive_unexpected () end,
+					ok = join_process (Source, [{migration_failed, failed}]),
 					ok;
 				{rollback, succeed} ->
-					ok = mosaic_process:rollback_migration (Source, Token),
-					ok = receive {rollback_migration, Token, succeeded} -> ok after 1000 -> receive_timeout () end,
-					ok = stop_process (Source, normal),
+					ok = mosaic_process:rollback_migration (Source, SourceToken),
+					ok = receive {rollback_migration, SourceToken, succeeded} -> ok after 1000 -> receive_unexpected () end,
+					ok = stop_and_join_process (Source),
 					ok;
 				{rollback, fail} ->
-					{error, failed} = mosaic_process:rollback_migration (Source, Token),
-					ok = receive {rollback_migration, Token, failed, failed} -> ok after 1000 -> receive_timeout () end,
-					{ok, {migration_failed, failed}} = join_process (Source, [{migration_failed, failed}]),
+					{error, failed} = mosaic_process:rollback_migration (Source, SourceToken),
+					ok = receive {rollback_migration, SourceToken, failed, failed} -> ok after 1000 -> receive_unexpected () end,
+					ok = join_process (Source, [{migration_failed, failed}]),
 					ok
 			end
 	end,
 	ok.
 
 process_tester__migrate_as_target (Completion) ->
-	TargetName = mosaic_process_test_target,
 	Self = erlang:self (),
-	Token = erlang:make_ref (),
-	{ok, Target} = start_process (TargetName, mosaic_process_tester, {migrate, Token}),
+	TargetToken = erlang:make_ref (),
+	{ok, Target} = start_link_process (noname, mosaic_process_tester, {migrate, TargetToken}),
 	ok = case Completion of
 		reject ->
-			{error, rejected} = mosaic_process:begin_migration (Target, Token, reject, Self),
-			{ok, {migration_failed, rejected}} = join_process (Target, [{migration_failed, rejected}]),
+			{error, rejected} = mosaic_process:begin_migration (Target, TargetToken, reject, Self),
+			ok = join_process (Target, [{migration_failed, rejected}]),
 			ok;
 		terminate ->
-			{error, terminated} = mosaic_process:begin_migration (Target, Token, terminate, Self),
-			{ok, {migration_failed, terminated}} = join_process (Target, [{migration_failed, terminated}]),
+			{error, terminated} = mosaic_process:begin_migration (Target, TargetToken, terminate, Self),
+			ok = join_process (Target, [{migration_failed, terminated}]),
 			ok;
 		{_, CompletionOutcome} ->
-			ok = mosaic_process:begin_migration (Target, Token, {continue, CompletionOutcome}, Self),
-			ok = receive {begin_migration, Token, succeeded} -> ok after 1000 -> receive_timeout () end,
-			ok = receive {continue_migration, Token, completed} -> ok after 1000 -> receive_timeout () end,
+			ok = mosaic_process:begin_migration (Target, TargetToken, {continue, CompletionOutcome}, Self),
+			ok = receive {begin_migration, TargetToken, succeeded} -> ok after 1000 -> receive_unexpected () end,
+			ok = receive {continue_migration, TargetToken, completed} -> ok after 1000 -> receive_unexpected () end,
 			ok = case Completion of
 				{commit, succeed} ->
-					ok = mosaic_process:commit_migration (Target, Token),
-					ok = receive {commit_migration, Token, succeeded} -> ok after 1000 -> receive_timeout () end,
-					ok = stop_process (Target, normal),
+					ok = mosaic_process:commit_migration (Target, TargetToken),
+					ok = receive {commit_migration, TargetToken, succeeded} -> ok after 1000 -> receive_unexpected () end,
+					ok = stop_and_join_process (Target),
 					ok;
 				{commit, fail} ->
-					{error, failed} = mosaic_process:commit_migration (Target, Token),
-					ok = receive {commit_migration, Token, failed, failed} -> ok after 1000 -> receive_timeout () end,
-					{ok, {migration_failed, failed}} = join_process (Target, [{migration_failed, failed}]),
+					{error, failed} = mosaic_process:commit_migration (Target, TargetToken),
+					ok = receive {commit_migration, TargetToken, failed, failed} -> ok after 1000 -> receive_unexpected () end,
+					ok = join_process (Target, [{migration_failed, failed}]),
 					ok;
 				{rollback, succeed} ->
-					ok = mosaic_process:rollback_migration (Target, Token),
-					ok = receive {rollback_migration, Token, succeeded} -> ok after 1000 -> receive_timeout () end,
-					{ok, normal} = join_process (Target, [normal]),
+					ok = mosaic_process:rollback_migration (Target, TargetToken),
+					ok = receive {rollback_migration, TargetToken, succeeded} -> ok after 1000 -> receive_unexpected () end,
+					ok = join_process (Target),
 					ok;
 				{rollback, fail} ->
-					{error, failed} = mosaic_process:rollback_migration (Target, Token),
-					ok = receive {rollback_migration, Token, failed, failed} -> ok after 1000 -> receive_timeout () end,
-					{ok, {migration_failed, failed}} = join_process (Target, [{migration_failed, failed}]),
+					{error, failed} = mosaic_process:rollback_migration (Target, TargetToken),
+					ok = receive {rollback_migration, TargetToken, failed, failed} -> ok after 1000 -> receive_unexpected () end,
+					ok = join_process (Target, [{migration_failed, failed}]),
 					ok
 			end
 	end,
@@ -246,259 +234,210 @@ process_tester__migrate_as_target (Completion) ->
 
 
 process_controller__start_stop (defaults) ->
-	Name = mosaic_process_test,
-	{ok, ProcessSupervisor} = mosaic_cluster_sup:start_link (mosaic_process_sup),
-	true = erlang:unlink (ProcessSupervisor),
-	{ok, Controller} = mosaic_process_controller:start_link (Name, defaults),
-	ok = mosaic_process_controller:stop (Controller),
-	{ok, normal} = join_process (Controller, [normal]),
-	true = erlang:exit (ProcessSupervisor, normal),
+	{ok, Supervisor} = mosaic_cluster_sup:start_link (mosaic_process_sup),
+	{ok, Controller} = start_link_process_controller (noname, defaults),
+	ok = stop_and_join_process_controller (Controller),
+	true = erlang:exit (Supervisor, normal),
 	ok.
 
 process_controller__start_error (defaults) ->
-	Name = mosaic_process_test,
-	{error, process_supervisor_does_not_exist} = mosaic_process_controller:start_link (Name, defaults),
+	{error, process_supervisor_does_not_exist} = mosaic_process_controller:start_link (noname, defaults),
 	ok.
 
 process_controller__create (Outcome) ->
-	Name = mosaic_process_test,
-	{ok, ProcessSupervisor} = mosaic_cluster_sup:start_link (mosaic_process_sup),
-	{ok, Controller} = mosaic_process_controller:start_link (Name, defaults),
-	case Outcome of
+	Key = erlang:make_ref (),
+	{ok, Supervisor} = mosaic_cluster_sup:start_link (mosaic_process_sup),
+	{ok, Controller} = mosaic_process_controller:start_link (noname, defaults),
+	ok = case Outcome of
 		succeed ->
-			{ok, Process} = mosaic_process_controller:create (Controller, key, mosaic_process_tester, ok),
-			true = erlang:link (Process),
-			ok = stop_process (Process, normal);
+			{ok, Process} = mosaic_process_controller:create (Controller, Key, mosaic_process_tester, defaults),
+			ok = link_process (Process),
+			ok = stop_and_join_process (Process),
+			ok;
 		{fail, failed} ->
-			{error, failed} = mosaic_process_controller:create (Controller, key, mosaic_process_tester, {stop, failed});
+			{error, failed} = mosaic_process_controller:create (Controller, Key, mosaic_process_tester, {stop, failed}),
+			ok;
 		{fail, module} ->
-			{error, {undef, [{undefined_module, init, _} | _]}} = mosaic_process_controller:create (Controller, key, undefined_module, undefined)
+			{error, {undef, [{undefined_module, init, _} | _]}} = mosaic_process_controller:create (Controller, Key, undefined_module, undefined),
+			ok
 	end,
-	ok = mosaic_process_controller:stop (Controller),
-	{ok, normal} = join_process (Controller, [normal]),
-	true = erlang:exit (ProcessSupervisor, normal),
+	ok = stop_and_join_process_controller (Controller),
+	true = erlang:exit (Supervisor, normal),
 	ok.
 
-process_controller__migrate (defaults) ->
-	SourceName = mosaic_process_test_source,
-	TargetName = mosaic_process_test_target,
-	Self = erlang:self (),
-	Token = erlang:make_ref (),
-	{ok, ProcessSupervisor} = mosaic_cluster_sup:start_link (mosaic_process_sup),
-	{ok, Source} = mosaic_process_controller:start_link (SourceName, defaults),
-	{ok, Target} = mosaic_process_controller:start_link (TargetName, defaults),
-	{ok, SourceProcess} = mosaic_process_controller:create (Source, key, mosaic_process_tester, ok),
-	true = erlang:link (SourceProcess),
-	{ok, Migrator, TargetProcess} = mosaic_process_controller:migrate (Source, Target, key, {continue, {continue, succeed}, succeed}, Self, Token),
-	true = erlang:link (Migrator),
-	true = erlang:link (TargetProcess),
-	{ok, normal} = join_process (Migrator, [normal]),
-	{ok, normal} = join_process (SourceProcess, [normal]),
-	ok = mosaic_process_controller:stop (Target, key, normal),
-	{ok, normal} = join_process (TargetProcess, [normal]),
-	ok = mosaic_process_controller:stop (Source),
-	ok = mosaic_process_controller:stop (Target),
-	{ok, normal} = join_process (Source, [normal]),
-	{ok, normal} = join_process (Target, [normal]),
-	true = erlang:exit (ProcessSupervisor, normal),
+process_controller__migrate (once) ->
+	Key = erlang:make_ref (),
+	{ok, Supervisor} = mosaic_cluster_sup:start_link (mosaic_process_sup),
+	{ok, SourceController} = start_link_process_controller (noname, defaults),
+	{ok, TargetController} = start_link_process_controller (noname, defaults),
+	{ok, Source} = mosaic_process_controller:create (SourceController, Key, mosaic_process_tester, defaults),
+	ok = link_process (Source),
+	{ok, Target} = mosaic_process_controller:migrate (SourceController, TargetController, Key),
+	ok = link_process (Target),
+	ok = join_process (Source),
+	ok = stop_and_join_process (Target),
+	ok = stop_and_join_process_controller (SourceController),
+	ok = stop_and_join_process_controller (TargetController),
+	true = erlang:exit (Supervisor, normal),
+	ok;
+	
+process_controller__migrate (twice) ->
+	Key = erlang:make_ref (),
+	{ok, Supervisor} = mosaic_cluster_sup:start_link (mosaic_process_sup),
+	{ok, SourceController} = start_link_process_controller (noname, defaults),
+	{ok, TargetController} = start_link_process_controller (noname, defaults),
+	{ok, Source1} = mosaic_process_controller:create (SourceController, Key, mosaic_process_tester, defaults),
+	ok = link_process (Source1),
+	{ok, Target1} = mosaic_process_controller:migrate (SourceController, TargetController, Key),
+	ok = link_process (Target1),
+	ok = join_process (Source1),
+	Source2 = Target1,
+	{ok, Target2} = mosaic_process_controller:migrate (TargetController, SourceController, Key),
+	ok = link_process (Target2),
+	ok = join_process (Source2),
+	ok = stop_and_join_process (Target2),
+	ok = stop_and_join_process_controller (SourceController),
+	ok = stop_and_join_process_controller (TargetController),
+	true = erlang:exit (Supervisor, normal),
 	ok.
 
 
 process_migrator__migrate (defaults) ->
-	SourceName = mosaic_process_test_source,
-	SourceToken = erlang:make_ref (),
-	TargetName = mosaic_process_test_target,
-	TargetToken = erlang:make_ref (),
 	Self = erlang:self (),
 	SelfToken = erlang:make_ref (),
-	TesterArguments = {continue, {continue, succeed}, succeed},
-	{ok, Source} = start_process (SourceName, mosaic_process_tester, {create, ok}),
-	{ok, Target} = start_process (TargetName, mosaic_process_tester, {migrate, TargetToken}),
-	{ok, Migrator} = mosaic_process_migrator:start (Source, SourceToken, Target, TargetToken, Self, SelfToken),
-	true = erlang:link (Migrator),
-	ok = mosaic_process_migrator:migrate (Migrator, TesterArguments),
-	{ok, normal} = join_process (Source, [normal]),
-	{ok, normal} = join_process (Migrator, [normal]),
-	ok = stop_process (Target, normal),
+	SourceToken = erlang:make_ref (),
+	TargetToken = erlang:make_ref (),
+	{ok, Source} = start_link_process (noname, mosaic_process_tester, {create, defaults}),
+	{ok, Target} = start_link_process (noname, mosaic_process_tester, {migrate, TargetToken}),
+	{ok, Migrator} = start_link_process_migrator (noname, Source, SourceToken, Target, TargetToken, Self, SelfToken),
+	ok = mosaic_process_migrator:migrate (Migrator, defaults),
+	ok = join_process_migrator (Migrator),
+	ok = join_process (Source),
+	ok = stop_and_join_process (Target),
 	ok.
 
 
 port_process__start_stop (defaults) ->
-	Name = mosaic_process_test,
-	Arguments = {{spawn_executable, "/bin/cat"}, []},
-	{ok, Process} = start_process (Name, mosaic_port_process, {create, Arguments}),
-	ok = stop_process (Process, normal),
+	CreateArguments = {{spawn_executable, "/bin/cat"}, []},
+	{ok, Process} = start_link_process (noname, mosaic_port_process, {create, CreateArguments}),
+	ok = stop_and_join_process (Process),
 	ok.
 
 port_process__migrate_as_source (CompletionMethod) ->
-	SourceName = mosaic_process_test_source,
-	Arguments = {{spawn_executable, "/bin/cat"}, []},
-	Token = erlang:make_ref (),
-	{ok, Source} = start_process (SourceName, mosaic_port_process, {create, Arguments}),
-	ok = mosaic_process:begin_migration (Source, Token, none, erlang:self ()),
-	ok = receive {begin_migration, Token, succeeded} -> ok after 1000 -> receive_timeout () end,
-	ok = receive {continue_migration, Token, prepared, Arguments} -> ok after 1000 -> receive_timeout () end,
-	ok = receive {continue_migration, Token, completed} -> ok after 1000 -> receive_timeout () end,
+	CreateArguments = {{spawn_executable, "/bin/cat"}, []},
+	Self = erlang:self (),
+	SourceToken = erlang:make_ref (),
+	{ok, Source} = start_link_process (noname, mosaic_port_process, {create, CreateArguments}),
+	ok = mosaic_process:begin_migration (Source, SourceToken, defaults, Self),
+	ok = receive {begin_migration, SourceToken, succeeded} -> ok after 1000 -> receive_unexpected () end,
+	ok = receive {continue_migration, SourceToken, prepared, CreateArguments} -> ok after 1000 -> receive_unexpected () end,
+	ok = receive {continue_migration, SourceToken, completed} -> ok after 1000 -> receive_unexpected () end,
 	ok = case CompletionMethod of
 		commit ->
-			ok = mosaic_process:commit_migration (Source, Token),
-			ok = receive {commit_migration, Token, succeeded} -> ok after 1000 -> receive_timeout () end,
-			{ok, normal} = join_process (Source, [normal]),
+			ok = mosaic_process:commit_migration (Source, SourceToken),
+			ok = receive {commit_migration, SourceToken, succeeded} -> ok after 1000 -> receive_unexpected () end,
+			ok = join_process (Source),
 			ok;
 		rollback ->
-			ok = mosaic_process:rollback_migration (Source, Token),
-			ok = receive {rollback_migration, Token, succeeded} -> ok after 1000 -> receive_timeout () end,
-			ok = stop_process (Source, normal),
+			ok = mosaic_process:rollback_migration (Source, SourceToken),
+			ok = receive {rollback_migration, SourceToken, succeeded} -> ok after 1000 -> receive_unexpected () end,
+			ok = stop_and_join_process (Source),
 			ok
 	end,
 	ok.
 
 port_process__migrate_as_target (CompletionMethod) ->
-	TargetName = mosaic_process_test_target,
-	Arguments = {{spawn_executable, "/bin/cat"}, []},
-	Token = erlang:make_ref (),
-	{ok, Target} = start_process (TargetName, mosaic_port_process, {migrate, Token}),
-	ok = mosaic_process:begin_migration (Target, Token, Arguments, erlang:self ()),
-	ok = receive {begin_migration, Token, succeeded} -> ok after 1000 -> receive_timeout () end,
-	ok = receive {continue_migration, Token, completed} -> ok after 1000 -> receive_timeout () end,
+	CreateArguments = {{spawn_executable, "/bin/cat"}, []},
+	Self = erlang:self (),
+	TargetToken = erlang:make_ref (),
+	{ok, Target} = start_link_process (noname, mosaic_port_process, {migrate, TargetToken}),
+	ok = mosaic_process:begin_migration (Target, TargetToken, CreateArguments, Self),
+	ok = receive {begin_migration, TargetToken, succeeded} -> ok after 1000 -> receive_unexpected () end,
+	ok = receive {continue_migration, TargetToken, completed} -> ok after 1000 -> receive_unexpected () end,
 	ok = case CompletionMethod of
 		commit ->
-			ok = mosaic_process:commit_migration (Target, Token),
-			ok = receive {commit_migration, Token, succeeded} -> ok after 1000 -> receive_timeout () end,
-			ok = stop_process (Target, normal),
+			ok = mosaic_process:commit_migration (Target, TargetToken),
+			ok = receive {commit_migration, TargetToken, succeeded} -> ok after 1000 -> receive_unexpected () end,
+			ok = stop_and_join_process (Target),
 			ok;
 		rollback ->
-			ok = mosaic_process:rollback_migration (Target, Token),
-			ok = receive {rollback_migration, Token, succeeded} -> ok after 1000 -> receive_timeout () end,
-			{ok, normal} = join_process (Target, [normal]),
+			ok = mosaic_process:rollback_migration (Target, TargetToken),
+			ok = receive {rollback_migration, TargetToken, succeeded} -> ok after 1000 -> receive_unexpected () end,
+			ok = join_process (Target),
 			ok
 	end,
 	ok.
 
 
-dummy_process__start_stop (defaults) ->
-	Name = mosaic_process_test,
-	{ok, Process} = start_process (Name, mosaic_dummy_process, {create, defaults}),
-	ok = stop_process (Process, normal),
+start_link_process (QualifiedName, Module, Disposition) ->
+	enforce_start_outcome (QualifiedName, mosaic_process:start_link (QualifiedName, Module, Disposition)).
+
+link_process (Process) ->
+	true = erlang:link (Process),
 	ok.
 
-dummy_process__migrate (defaults) ->
-	SourceName = mosaic_process_test_source,
-	SourceToken = erlang:make_ref (),
-	TargetName = mosaic_process_test_target,
-	TargetToken = erlang:make_ref (),
-	Self = erlang:self (),
-	SelfToken = erlang:make_ref (),
-	{ok, Source} = start_process (SourceName, mosaic_dummy_process, {create, defaults}),
-	{ok, Target} = start_process (TargetName, mosaic_dummy_process, {migrate, TargetToken}),
-	{ok, Migrator} = mosaic_process_migrator:start (Source, SourceToken, Target, TargetToken, Self, SelfToken),
-	true = erlang:link (Migrator),
-	ok = mosaic_process_migrator:migrate (Migrator, none),
-	{ok, normal} = join_process (Source, [normal]),
-	{ok, normal} = join_process (Migrator, [normal]),
-	ok = stop_process (Target, normal),
-	ok.
+stop_and_join_process (Process) ->
+	stop_and_join_process (Process, normal, [normal]).
+
+stop_and_join_process (Process, Signal, Reasons) ->
+	continue_stop_and_join (Process, Reasons, mosaic_process:stop (Process, Signal)).
+
+join_process (Process) ->
+	join_process (Process, [normal]).
+
+join_process (Process, Reasons) ->
+	continue_stop_and_join (Process, Reasons, ok).
 
 
-start_process (Name, Module, Arguments)
-		when is_atom (Name), is_atom (Module) ->
-	case mosaic_process:start_link (Name, Module, Arguments) of
+start_link_process_controller (QualifiedName, Configuration) ->
+	enforce_start_outcome (QualifiedName, mosaic_process_controller:start_link (QualifiedName, Configuration)).
+
+stop_and_join_process_controller (Controller) ->
+	stop_and_join_process_controller (Controller, normal, [normal]).
+
+stop_and_join_process_controller (Controller, Signal, Reasons) ->
+	continue_stop_and_join (Controller, Reasons, mosaic_process_controller:stop (Controller, Signal)).
+
+
+start_link_process_migrator (QualifiedName, Source, SourceToken, Target, TargetToken, Observer, ObserverToken) ->
+	enforce_start_outcome (QualifiedName, mosaic_process_migrator:start_link (QualifiedName, Source, SourceToken, Target, TargetToken, Observer, ObserverToken)).
+
+join_process_migrator (Migrator) ->
+	continue_stop_and_join (Migrator, [normal], ok).
+
+
+enforce_start_outcome (QualifiedName, Outcome) ->
+	case Outcome of
 		{ok, Process} when is_pid (Process) ->
-			case erlang:whereis (Name) of
-				Process ->
-					true = erlang:link (Process),
-					{ok, Process};
-				OtherProcess when (Process =/= OtherProcess) ->
-					{mismatched_process_name, Name, Process, OtherProcess};
-				undefined ->
-					{mismatched_process_name, Name, Process}
+			case mosaic_tools:enforce_registered (QualifiedName, Process) of
+				ok ->
+					Outcome;
+				Error = {error, _Reason} ->
+					Error
 			end;
 		Error = {error, _Reason} ->
 			Error
 	end.
 
-join_process (Process, Reasons)
-		when is_pid (Process), is_list (Reasons) ->
-	receive
-		{'EXIT', Process, Reason} ->
-			case lists:member (Reason, Reasons) of
-				true ->
-					{ok, Reason};
-				false ->
-					{unexpected_reason, Reason}
-			end
-	after 1000 ->
-		timeout
+
+continue_stop_and_join (Process, Reasons, Outcome) ->
+	case Outcome of
+		ok ->
+			case mosaic_tests:join (Process, Reasons) of
+				{ok, _} ->
+					ok;
+				Error = {error, _Reason} ->
+					Error
+			end;
+		Error = {error, _Reason} ->
+			Error
 	end.
 
-stop_process (Process, Reason) ->
-	ok = mosaic_process:stop (Process, Reason, 1000),
-	{ok, normal} = join_process (Process, [Reason]),
-	ok.
 
-trace_process (Process)
-		when is_pid (Process) ->
-	Loop = fun (Loop) ->
-		receive
-			Trace ->
-				ok = error_logger:info_report ([lists:flatten (io_lib:format ("Traced...~n~p", [Trace]))]),
-				Loop (Loop)
-		end
-	end,
-	Tracer = spawn_link (fun () -> Loop (Loop) end),
-	1 = erlang:trace (Process, true, [send, 'receive', procs, {tracer, Tracer}]),
-	ok.
-
-receive_timeout () ->
+receive_unexpected () ->
 	receive
 		Message ->
 			{unexpected_message, Message}
 	after 0 ->
 		timeout
 	end.
-
-
-test () ->
-	OldTrapExit = erlang:process_flag (trap_exit, true),
-	Specifications = lists:flatten (
-			lists:map (
-				fun ({test, Specification}) -> [Specification]; ({_, _}) -> [] end,
-				mosaic_process_tests:module_info (attributes))),
-	Outcome = test (Specifications),
-	true = erlang:process_flag (trap_exit, OldTrapExit),
-	ok = case Outcome of
-		ok ->
-			ok = error_logger:info_report (["Testing succeeded!"]),
-			ok;
-		{failed, _Test, Reason} ->
-			ok = error_logger:error_report ([lists:flatten (io_lib:format ("Testing failed!~n~p", [Reason]))]),
-			ok;
-		{unexpected_message, Message} ->
-			ok = error_logger:error_report ([lists:flatten (io_lib:format ("Testing failed!~n~p", [{unexpected_message, Message}]))]),
-			ok
-	end,
-	ok.
-
-test ([Test = {TestFunction, TestArguments} | Tests])
-		when is_atom (TestFunction) ->
-	ok = error_logger:info_report ([lists:flatten (io_lib:format ("Testing `~w` with `~w`...", [TestFunction, TestArguments]))]),
-	Token = erlang:make_ref (),
-	Slave = erlang:spawn_link (
-			fun () ->
-				false = erlang:process_flag (trap_exit, true),
-				ok = erlang:apply (mosaic_process_tests, TestFunction, [TestArguments]),
-				exit ({succeeded, Token})
-			end),
-	receive
-		{'EXIT', Slave, {succeeded, Token}} ->
-			test (Tests);
-		{'EXIT', Slave, Reason} ->
-			{failed, Test, Reason};
-		Message ->
-			{unexpected_message, Message}
-	after 10000 ->
-		{failed, Test, timeout}
-	end;
-	
-test ([]) ->
-	ok.
