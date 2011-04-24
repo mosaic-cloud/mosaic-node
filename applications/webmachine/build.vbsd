@@ -1,0 +1,8 @@
+
+(vbs:require-erlang)
+
+(vbs:define-erlang-application 'webmachine
+	dependencies: 'mochiweb
+	erl: "\\./repositories/webmachine/src/.*\\.erl"
+	hrl: "\\./repositories/webmachine/(include|src)/.*\\.hrl"
+	additional-ebin: "\\./generated/webmachine\\.app")

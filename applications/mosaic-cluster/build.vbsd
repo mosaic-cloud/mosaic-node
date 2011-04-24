@@ -1,0 +1,9 @@
+
+(vbs:require-erlang)
+
+(vbs:define-erlang-application 'mosaic_cluster
+	dependencies: 'riak_core
+	erl: "\\./sources/.*\\.erl"
+	hrl: "\\./sources/.*\\.hrl"
+	additional-ebin: "\\./sources/.*\\.app"
+	additional-priv: "\\./sources/.*\\.config")

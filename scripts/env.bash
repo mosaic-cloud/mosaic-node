@@ -3,6 +3,7 @@
 _scripts="$( readlink -e -- ./scripts || true )"
 _tools="$( readlink -f -- ./.tools || true )"
 _outputs="$( readlink -f -- ./.outputs || true )"
+_make=ninja
 
 _PATH="${_tools}/bin:${PATH}"
 
@@ -18,27 +19,26 @@ if test -z "${_epmd}" ; then
 	_epmd=epmd
 fi
 
-_rebar="$( PATH="${_PATH}" type -P -- rebar || true )"
-if test -z "${_rebar}" ; then
-	echo "[ww] missing \`rebar\` (Erlang build tool) executable in path: \`${_PATH}\`; ignoring!" >&2
-	_rebar=rebar
+_vbs="$( PATH="${_PATH}" type -P -- vbs || true )"
+if test -z "${_vbs}" ; then
+	echo "[ww] missing \`vbs\` (Volution Build System tool) executable in path: \`${_PATH}\`; ignoring!" >&2
+	_vbs=vbs
 fi
 
-_erl_libs=""
-_erl_ebins=( "./applications/mosaic-cluster/ebin" )
-for _erl_ebin in "${_outputs}/deps/"*"/ebin" ; do
-	if test -e "${_erl_ebin}" ; then
-		_erl_ebins+=( "${_erl_ebin}" )
-	fi
-done
-_erl_epmd_port=31807
+_ninja="$( PATH="${_PATH}" which -- ninja 2>/dev/null || true )"
+if test -z "${_ninja}" ; then
+	echo "[ww] missing \`ninja\` (Ninja build tool) executable in path: \`${_PATH}\`; ignoring!" >&2
+	_ninja=ninja
+fi
+
+_erl_libs="${_outputs}/erlang/applications"
 _erl_cookie=b895e1d3-b7fe-4524-9fc9-e0b2f488396e
+_erl_epmd_port=31807
 _erl_args=(
 	+Bd +Ww
 	-env ERL_CRASH_DUMP /dev/null
 	-env ERL_LIBS "${_erl_libs}"
 	-env ERL_EPMD_PORT "${_erl_epmd_port}"
-	-pa "${_erl_ebins[@]}"
 )
 
 _epmd_port="${_erl_epmd_port}"
@@ -47,4 +47,7 @@ _epmd_args=(
 	-debug
 )
 
-_rebar_args=( -j 4 )
+_ninja_file="${_outputs}/.make.ninja"
+_ninja_args=(
+	-f "${_ninja_file}"
+)

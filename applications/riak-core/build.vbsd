@@ -1,0 +1,13 @@
+
+(vbs:require-erlang)
+
+(vbs:define-erlang-application 'basho_stats
+	erl: "\\./repositories/basho-stats/src/.*\\.erl"
+	hrl: "\\./repositories/basho-stats/include/.*\\.hrl"
+	additional-ebin: "\\./generated/basho_stats\\.app")
+
+(vbs:define-erlang-application 'riak_core
+	dependencies: '(basho_stats webmachine)
+	erl: "\\./repositories/riak-core/src/.*\\.erl"
+	hrl: "\\./repositories/riak-core/include/.*\\.hrl"
+	additional-ebin: "\\./generated/riak_core\\.app")

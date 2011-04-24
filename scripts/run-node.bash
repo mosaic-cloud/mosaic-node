@@ -23,7 +23,7 @@ _erl_argv=(
 		"${_erl_args[@]}"
 		# -noshell -noinput
 		-sname "mosaic-cluster-${_index}" -setcookie "${_erl_cookie}"
-		-config "./applications/mosaic-cluster/priv/mosaic_cluster.config"
+		-config "${_outputs}/erlang/applications/mosaic_cluster/priv/mosaic_cluster.config"
 		-riak_core ring_state_dir "\"/tmp/mosaic-cluster/${_index}/ring\""
 		-riak_core handoff_port "$(( _erl_epmd_port + _index ))"
 		-run mosaic_cluster test

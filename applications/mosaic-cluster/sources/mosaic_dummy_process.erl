@@ -13,7 +13,7 @@ init ({create, defaults}) ->
 	Token = erlang:phash2 (erlang:now (), 1 bsl 32),
 	TokenHex = string:to_lower (string:right (erlang:integer_to_list (Token, 16), 8, $0)),
 	Arguments = {
-			{spawn_executable, "./applications/mosaic-cluster/priv/wait.elf"},
+			{spawn_executable, "/bin/cat"},
 			[{arg0, "[mosaic_dummy_process#" ++ TokenHex ++ "]"}]},
 	mosaic_port_process:init ({create, Arguments});
 	

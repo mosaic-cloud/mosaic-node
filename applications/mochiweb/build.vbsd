@@ -1,0 +1,7 @@
+
+(vbs:require-erlang)
+
+(vbs:define-erlang-application 'mochiweb
+	erl: "\\./repositories/mochiweb/src/.*\\.erl"
+	hrl: "\\./repositories/mochiweb/(include|src)/.*\\.hrl"
+	additional-ebin: "\\./generated/mochiweb\\.app")

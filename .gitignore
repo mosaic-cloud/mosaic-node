@@ -5,6 +5,8 @@
 /.outputs
 /.tools
 
+generated
+
 *#
 *~
 *.beam
