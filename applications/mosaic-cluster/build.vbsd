@@ -2,7 +2,7 @@
 (vbs:require-erlang)
 
 (vbs:define-erlang-application 'mosaic_cluster
-	dependencies: 'riak_core
+	dependencies: '(riak_core webmachine mochiweb)
 	erl: "\\./sources/.*\\.erl"
 	hrl: "\\./sources/.*\\.hrl"
 	additional-ebin: "\\./sources/.*\\.app"
