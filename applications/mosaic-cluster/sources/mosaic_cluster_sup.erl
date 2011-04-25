@@ -68,7 +68,7 @@ start_child_daemon (Supervisor, QualifiedName, Module, Arguments, Policy)
 		QualifiedName =:= noname ->
 			{ok, Arguments};
 		true ->
-			[QualifiedName | Arguments]
+			{ok, [QualifiedName | Arguments]}
 	end,
 	case child_spec ({worker, Policy}, QualifiedName, Module, start_link, StartLinkArguments) of
 		{ok, Specification} ->
