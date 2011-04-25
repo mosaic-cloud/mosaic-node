@@ -9,7 +9,6 @@
 start (normal, defaults) ->
 	case mosaic_cluster_sup:start_link () of
 		{ok, Supervisor} ->
-			ok = mosaic_webmachine:enforce_start (),
 			{ok, Supervisor, void};
 		Error = {error, _Reason} ->
 			Error

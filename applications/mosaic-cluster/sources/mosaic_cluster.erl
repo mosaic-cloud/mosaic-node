@@ -1,7 +1,33 @@
 
 -module (mosaic_cluster).
 
+-export ([ring_include/1, ring_exclude/1]).
 -export ([test/0, boot/0, join/0, leave/0]).
+
+
+ring_include (Node)
+		when is_atom (Node) ->
+	case net_adm:ping (Node) of
+		pong ->
+			case riak_core_gossip:send_ring (Node) of
+				ok ->
+					ok;
+				Error = {error, _Reason} ->
+					Error
+			end;
+		pang ->
+			{error, nodedown}
+	end.
+
+ring_exclude (Node)
+		when is_atom (Node) ->
+	try riak_core_gossip:remove_from_cluster (Node) of
+		_ ->
+			ok
+	catch
+		error : badarg ->
+			ok
+	end.
 
 
 test () ->
@@ -14,9 +40,11 @@ test () ->
 				{ok, Nodes} ->
 					case Nodes of
 						[Node | _] ->
-							{ok, [{up}, {define_and_create_dummy_processes, 32}, {sleep, 6 * 1000}, {join, Nodes}]};
+							%{ok, [{up}, {wm}, {define_and_create_dummy_processes, 32}, {sleep, 6 * 1000}, {join, Nodes}]};
+							{ok, [{up}, {wm}]};
 						_ ->
-							{ok, [{up}, {sleep, 3 * 1000}, {join, Nodes}, {sleep, 12 * 1000}, {leave}]}
+							%{ok, [{up}, {sleep, 3 * 1000}, {join, Nodes}, {sleep, 12 * 1000}, {leave}]}
+							{ok, [{up}]}
 					end;
 				undefined ->
 					{ok, []}
@@ -36,6 +64,10 @@ test ({define_and_create_dummy_processes, Count}) ->
 test ({up}) ->
 	ok = mosaic_executor_vnode:service_up (),
 	ok = riak_core_node_watcher:node_up (),
+	ok;
+	
+test ({wm}) ->
+	ok = mosaic_webmachine:enforce_start (),
 	ok;
 	
 test ({join, Nodes}) ->
