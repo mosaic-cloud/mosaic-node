@@ -40,11 +40,11 @@ test () ->
 				{ok, Nodes} ->
 					case Nodes of
 						[Node | _] ->
-							%{ok, [{up}, {wm}, {define_and_create_dummy_processes, 32}, {sleep, 6 * 1000}, {join, Nodes}]};
-							{ok, [{up}, {wm}]};
+							%{ok, [{wm}, {up}, {define_and_create_dummy_processes, 32}, {sleep, 6 * 1000}, {join, Nodes}]};
+							{ok, [{wm}, {up}]};
 						_ ->
-							%{ok, [{up}, {sleep, 3 * 1000}, {join, Nodes}, {sleep, 12 * 1000}, {leave}]}
-							{ok, [{up}]}
+							%{ok, [{wm}, {up}, {sleep, 3 * 1000}, {join, Nodes}, {sleep, 12 * 1000}, {leave}]}
+							{ok, [{wm}, {up}]}
 					end;
 				undefined ->
 					{ok, []}

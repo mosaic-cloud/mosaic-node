@@ -18,14 +18,25 @@ start_link (QualifiedName = {local, LocalName}, Options)
 enforce_start () ->
 	QualifiedName = {local, mosaic_webmachine},
 	{ok, Dispatches} = dispatches ([mosaic_console_wm, mosaic_cluster_wm]),
-	Options = [
-			{ip, "127.0.0.1"},
-			{port, 9999},
-			{dispatch, Dispatches},
-			{error_handler, webmachine_error_handler},
-			{enable_perf_logger, false},
-			{log_dir, "/tmp/webmachine"}],
-	{ok, _Server} = mosaic_cluster_sup:start_child_daemon (QualifiedName, mosaic_webmachine, [Options], permanent),
+	ok = case application:get_env (mosaic_cluster, webmachine_listen) of
+		undefined ->
+			{error, webmachine_unconfigured};
+		{ok, {Address, Port}} when is_list (Address), is_number (Port), (Port >= 0), (Port < 65536) ->
+			Options = [
+					{ip, Address},
+					{port, Port},
+					{dispatch, Dispatches},
+					{error_handler, webmachine_error_handler},
+					{enable_perf_logger, false},
+					{log_dir, undefined}],
+			case mosaic_cluster_sup:start_child_daemon (QualifiedName, mosaic_webmachine, [Options], permanent) of
+				{ok, Server} when is_pid (Server) ->
+					true = erlang:unlink (Server),
+					ok;
+				Error = {error, _Reason} ->
+					Error
+			end
+	end,
 	ok.
 
 

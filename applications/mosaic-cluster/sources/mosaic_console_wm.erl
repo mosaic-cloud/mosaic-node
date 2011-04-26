@@ -4,6 +4,7 @@
 -export ([init/1, allowed_methods/2, content_types_provided/2, handle_as_html/2, ping/2]).
 
 
+-dispatch ({[], defaults}).
 -dispatch ({["console"], defaults}).
 
 
@@ -11,7 +12,7 @@
 <<"<!DOCTYPE html>
 <html id=\"jsconsole\">
 	<head>
-		<title>jsconsole</title>
+		<title>", (erlang:list_to_binary (erlang:atom_to_list (erlang:node ())))/binary, "</title>
 		<meta id=\"meta\" name=\"viewport\" content=\"width=device-width; height=device-height; user-scalable=no; initial-scale=1.0\" />
 		<link rel=\"stylesheet\" href=\"http://jsconsole.com/console.css\" type=\"text/css\" />
 	</head>
@@ -49,26 +50,32 @@
 				return (_content_data);
 			}
 			
-			var $mosaic = {
-				cluster : {
-					nodes : {
-						get : function () {
-							return ($get (\"cluster/nodes\"));
-						},
-					},
-					ring : {
-						get : function () {
-							return ($get (\"cluster/ring\"));
-						},
-						include : function (_node) {
-							return ($get (\"cluster/ring/include/\" + _node));
-						},
-						exclude : function (_node) {
-							return ($get (\"cluster/ring/exclude/\" + _node));
-						},
-					},
-				},
-			}
+			var $mosaic = function () {};
+			$mosaic.cluster = function () {};
+			$mosaic.cluster.nodes = function () {
+				return ($get (\"cluster/nodes\"));
+			};
+			$mosaic.cluster.nodes.self = function () {
+				return ($mosaic.cluster.nodes () .self);
+			};
+			$mosaic.cluster.nodes.peers = function () {
+				return ($mosaic.cluster.nodes () .peers);
+			};
+			$mosaic.cluster.ring = function () {
+				return ($get (\"cluster/ring\"));
+			};
+			$mosaic.cluster.ring.nodes = function () {
+				return ($mosaic.cluster.ring () .nodes);
+			};
+			$mosaic.cluster.ring.partitions = function () {
+				return ($mosaic.cluster.ring () .partitions);
+			};
+			$mosaic.cluster.ring.include = function (_node) {
+				return ($get (\"cluster/ring/include/\" + _node));
+			};
+			$mosaic.cluster.ring.exclude = function (_node) {
+				return ($get (\"cluster/ring/exclude/\" + _node));
+			};
 			
 		</script>
 	</body>
