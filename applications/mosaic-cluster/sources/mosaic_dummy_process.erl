@@ -7,7 +7,7 @@
 		init/1, terminate/2, handle_stop/2,
 		handle_call/3, handle_cast/2, handle_info/2,
 		begin_migration/2, commit_migration/1, rollback_migration/1]).
--export ([arguments_from_json/1]).
+-export ([parse_arguments_from_json/1]).
 
 
 init ({create, defaults}) ->
@@ -50,8 +50,8 @@ rollback_migration (State) ->
 	mosaic_port_process:rollback_migration (State).
 
 
-arguments_from_json ({struct, []}) ->
+parse_arguments_from_json ({struct, []}) ->
 	{ok, defaults};
 	
-arguments_from_json (_) ->
-	{error, {invalid_arguments}}.
+parse_arguments_from_json (Arguments) ->
+	{error, {invalid_arguments, Arguments}}.

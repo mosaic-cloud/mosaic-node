@@ -105,8 +105,17 @@ handle_command ({create_process, Key}, _Sender, State = #state{object_store = Ob
 	{reply, {ok, Process}, State};
 	
 handle_command ({stop_process, Key, Signal}, _Sender, State = #state{process_controller = ProcessController}) ->
-	ok = mosaic_process_controller:stop (ProcessController, Key, Signal),
-	{reply, ok, State};
+	case mosaic_process_controller:resolve (ProcessController, Key) of
+		{ok, Process} when is_pid (Process) ->
+			case mosaic_process:stop (Process, Signal) of
+				ok ->
+					{reply, ok, State};
+				Error = {error, _Reason} ->
+					{reply, Error, State}
+			end;
+		Error = {error, _Reason} ->
+			{reply, Error, State}
+	end;
 	
 handle_command ({riak_core_fold_req_v1, Fun, InputAcc}, _Sender, State = #state{object_store = ObjectStore, process_controller = ProcessController}) ->
 	{ok, OutputAcc1} = mosaic_object_store:fold (ObjectStore,

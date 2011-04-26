@@ -67,7 +67,7 @@ define_processes (Module, Arguments, Count, Retries)
 	{ok, _, {Keys, Reasons}, _} = sync_command (
 			fun (Index) ->
 				Key = chash:key_of (term_to_binary ({Fuzz, Index})),
-				{ok, Targets} = mosaic_cluster:targets (Key, mosaic_executor, 1, active_without_fallbacks),
+				{ok, Targets = [_]} = mosaic_cluster:targets (Key, mosaic_executor, 1, active_without_fallbacks),
 				{ok, Key, {define_process, Key, Module, Arguments}, Service, Master, Targets, Index + 1}
 			end, 0,
 			fun ({Key, {define_process, Key, _, _}, _, _, _}, [{_, Reply}], {Keys, Reasons}) ->
@@ -104,7 +104,7 @@ create_processes (Keys, Retries)
 	Master = riak_core_vnode_master:reg_name (mosaic_executor_vnode),
 	{ok, _, {SuccessfullKeys, Reasons}, _} = sync_command (
 			fun ([Key | RemainingKeys]) ->
-				{ok, Targets} = mosaic_cluster:targets (Key, mosaic_executor, 1, active_without_fallbacks),
+				{ok, Targets = [_]} = mosaic_cluster:targets (Key, mosaic_executor, 1, active_without_fallbacks),
 				{ok, Key, {create_process, Key}, Service, Master, Targets, RemainingKeys}
 			end, Keys,
 			fun ({Key, {create_process, Key}, _, _, _}, [{_, Reply}], {SuccessfullKeys, Reasons}) ->
@@ -144,7 +144,7 @@ stop_processes (Keys, Signal, Retries)
 	Master = riak_core_vnode_master:reg_name (mosaic_executor_vnode),
 	{ok, _, {SuccessfullKeys, Reasons}, _} = sync_command (
 			fun ([Key | RemainingKeys]) ->
-				{ok, Targets} = mosaic_cluster:targets (Key, mosaic_executor, 1, active_without_fallbacks),
+				{ok, Targets = [_]} = mosaic_cluster:targets (Key, mosaic_executor, 1, active_without_fallbacks),
 				{ok, Key, {stop_process, Key, Signal}, Service, Master, Targets, RemainingKeys}
 			end, Keys,
 			fun ({Key, {stop_process, Key, _}, _, _, _}, [{_, Reply}], {SuccessfullKeys, Reasons}) ->
@@ -176,7 +176,7 @@ ping (Count, Retries)
 	{ok, _, {PingCount, Outcomes}, _} = sync_command (
 			fun (Index) ->
 				Key = chash:key_of (term_to_binary ({Fuzz, Index})),
-				{ok, Targets} = mosaic_cluster:targets (Key, mosaic_executor, 1, primaries),
+				{ok, Targets = [_]} = mosaic_cluster:targets (Key, mosaic_executor, 1, primaries),
 				{ok, Key, {ping, Key}, Service, Master, Targets, Index + 1}
 			end, 0,
 			fun ({Key, {ping, Key}, _, _, _}, [{Target, Reply}], {PingCount, Outcomes}) ->
@@ -218,7 +218,7 @@ sync_command1 (RequestFun, OldRequestState, RepliesFun, RepliesState, undefined,
 	{ok, Key, Command, Service, Master, Targets, NewRequestState} = RequestFun (OldRequestState),
 	sync_command1 (RequestFun, NewRequestState, RepliesFun, RepliesState, {Key, Command, Service, Master, Targets}, Count, Retries);
 	
-sync_command1 (RequestFun, RequestState, RepliesFun, OldRepliesState, PendingRequest = {Key, Command, Service, Master, Targets}, Count, Retries) ->
+sync_command1 (RequestFun, RequestState, RepliesFun, OldRepliesState, PendingRequest = {_Key, Command, _Service, Master, Targets}, Count, Retries) ->
 	case Targets of
 		Targets when is_list (Targets) ->
 			Replies = lists:map (

@@ -12,14 +12,15 @@
 <<"<!DOCTYPE html>
 <html id=\"jsconsole\">
 	<head>
-		<title>", (erlang:list_to_binary (erlang:atom_to_list (erlang:node ())))/binary, "</title>
+		<title>", (mosaic_webmachine:format_atom (erlang:node ())) / binary, "</title>
 		<meta id=\"meta\" name=\"viewport\" content=\"width=device-width; height=device-height; user-scalable=no; initial-scale=1.0\" />
 		<link rel=\"stylesheet\" href=\"http://jsconsole.com/console.css\" type=\"text/css\" />
 	</head>
 	<body>
 		<form><textarea autofocus id=\"exec\" spellcheck=\"false\" autocapitalize=\"off\" autofocus rows=\"1\"></textarea></form>
 		<div id=\"console\"><ul id=\"output\"></ul></div>
-		<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.5.2/jquery.js\"></script>
+		<script src=\"http://code.jquery.com/jquery-1.5.2.min.js\"></script>
+		<script src=\"https://github.com/douglascrockford/JSON-js/raw/8e0b15cb492f63067a88ad786e4d5fc0fa89a241/json2.js\"></script>
 		<script src=\"http://jsconsole.com/prettify.js\"></script>
 		<script src=\"http://jsconsole.com/console.js\"></script>
 		<script>$(\"ul#output>li\").remove();</script>
@@ -79,6 +80,16 @@
 				});
 			}
 			
+			function _wrapped_2 (_function) {
+				return (function (_argument_1, _argument_2) {
+					try {
+						return (_function (_argument_1, _argument_2));
+					} catch (_exception) {
+						return (undefined);
+					}
+				});
+			}
+			
 			var $mosaic = function () {};
 			$mosaic.cluster = function () {};
 			$mosaic.services = function () {};
@@ -108,14 +119,14 @@
 			$mosaic.cluster.ring.nodes = _wrapped_0 (function () {
 				return ($get (\"cluster/ring\") .nodes);
 			});
-			$mosaic.cluster.ring.partitions = _wrapped_0 (function () {
-				return ($get (\"cluster/ring\") .partitions);
-			});
-			$mosaic.cluster.ring.include = _wrapped_1 (function (_node) {
+			$mosaic.cluster.ring.nodes.include = _wrapped_1 (function (_node) {
 				return ($get (\"cluster/ring/include\", {node : _node}) .ok);
 			});
-			$mosaic.cluster.ring.exclude = _wrapped_1 (function (_node) {
+			$mosaic.cluster.ring.nodes.exclude = _wrapped_1 (function (_node) {
 				return ($get (\"cluster/ring/exclude\", {node : _node}) .ok);
+			});
+			$mosaic.cluster.ring.partitions = _wrapped_0 (function () {
+				return ($get (\"cluster/ring\") .partitions);
 			});
 			
 			$mosaic.services.executor = function () {};
@@ -134,6 +145,16 @@
 					_count = 4;
 				_outcome = $get (\"services/executor/ping\", {count : _count});
 				return ({pongs : _outcome.pongs, pangs : _outcome.pangs});
+			});
+			$mosaic.services.executor.processes = _wrapped_0 (function () {
+				return ($get (\"services/executor/processes\") .processes);
+			});
+			$mosaic.services.executor.processes.create = _wrapped_2 (function (_type, _arguments) {
+				_arguments = JSON.stringify (_arguments);
+				return ($get (\"services/executor/processes/create\", {type : _type, arguments : _arguments}) .key);
+			});
+			$mosaic.services.executor.processes.stop = _wrapped_1 (function (_key) {
+				return ($get (\"services/executor/processes/stop\", {key : _key}) .ok);
 			});
 			
 		</script>

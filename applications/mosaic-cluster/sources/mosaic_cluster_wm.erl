@@ -38,15 +38,9 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 		{ring} ->
 			mosaic_webmachine:enforce_request ('GET', [], Request);
 		{ring, Operation} when ((Operation =:= include) orelse (Operation =:= exclude)) ->
-			case mosaic_webmachine:enforce_request ('GET', ["node"], Request) of
-				{ok, false, [NodeString]} ->
-					try
-						Node = erlang:list_to_existing_atom (NodeString),
-						{ok, false, State#state{arguments = dict:from_list ([{node, Node}])}}
-					catch
-						error : badarg ->
-							{error, {invalid_query, {invalid_node, NodeString}}}
-					end;
+			case mosaic_webmachine:enforce_request ('GET', [{"node", fun mosaic_webmachine:parse_existing_atom/1}], Request) of
+				{ok, false, [Node]} ->
+					{ok, false, State#state{arguments = dict:from_list ([{node, Node}])}};
 				Error = {error, _Reason} ->
 					Error
 			end
@@ -60,7 +54,10 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			Self = erlang:node (),
 			Peers = erlang:nodes (),
 			Nodes = [Self | Peers],
-			{ok, json_struct, [{self, Self}, {peers, Peers}, {nodes, Nodes}]};
+			{ok, json_struct, [
+					{self, mosaic_webmachine:format_atom (Self)},
+					{peers, lists:map (fun mosaic_webmachine:format_atom/1, Peers)},
+					{nodes, lists:map (fun mosaic_webmachine:format_atom/1, Nodes)}]};
 		{nodes, self, activate} ->
 			case mosaic_cluster:node_activate () of
 				ok ->
@@ -79,10 +76,12 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			{ok, Nodes} = mosaic_cluster:nodes (),
 			{ok, Partitions} = mosaic_cluster:partitions (),
 			{ok, json_struct, [
-					{nodes, Nodes},
+					{nodes, lists:map (fun mosaic_webmachine:format_atom/1, Nodes)},
 					{partitions, lists:map (
 							fun ({Key, Node}) ->
-								{struct, [{key, erlang:list_to_binary (erlang:integer_to_list (Key))}, {node, Node}]}
+								{struct, [
+										{key, mosaic_webmachine:format_numeric_key (Key)},
+										{node, mosaic_webmachine:format_atom (Node)}]}
 							end, Partitions)}]};
 		{ring, include} ->
 			Node = dict:fetch (node, Arguments),

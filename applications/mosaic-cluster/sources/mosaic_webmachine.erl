@@ -5,6 +5,8 @@
 -export ([return_with_outcome/3, respond_with_outcome/3]).
 -export ([return_with_content/5, respond_with_content/4]).
 -export ([enforce_request/3]).
+-export ([parse_existing_atom/1, parse_integer/1, parse_float/1, parse_hex_binary_key/1, parse_json/1]).
+-export ([format_atom/1, format_numeric_key/1, format_binary_key/1, format_reason/1]).
 
 
 start_link (QualifiedName = {local, LocalName}, Options)
@@ -119,30 +121,142 @@ respond_with_content (Type, ContentTerm, Request, State) ->
 	{Content, Response, State}.
 
 
-encode_content (json, ContentTerm) ->
-	{ok, "application/json", mochijson2:encode (ContentTerm)};
+encode_content (json, Content) ->
+	{ok, "application/json", format_json (Content)};
 	
-encode_content (error, ReasonTerm) ->
-	ReasonString = erlang:iolist_to_binary (io_lib:format ("~76p", [ReasonTerm])),
-	encode_content (json, {struct, [{ok, false}, {error, ReasonString}]}).
+encode_content (error, Reason) ->
+	encode_content (json, {struct, [{ok, false}, {error, format_reason (Reason)}]}).
 
 
-enforce_request (Method, ArgumentNames, Request)
-		when is_atom (Method), is_list (ArgumentNames) ->
+enforce_request (Method, Arguments, Request)
+		when is_atom (Method), is_list (Arguments) ->
 	case wrq:method (Request) of
 		Method ->
-			case lists:sort (lists:map (fun ({Name, _Value}) -> Name end, wrq:req_qs (Request))) of
-				ArgumentNames ->
-					case ArgumentNames of
-						[] ->
-							{ok, false};
-						_ ->
-							ArgumentValues = lists:map (fun (Name) -> wrq:get_qs_value (Name, Request) end, ArgumentNames),
-							{ok, false, ArgumentValues}
-						end;
-				OtherArgumentNames ->
-					{error, {invalid_query, {invalid_arguments, OtherArgumentNames}}}
+			case Arguments of
+				[] ->
+					{ok, false};
+				_ ->
+					case parse_arguments (Arguments, Request) of
+						{ok, ArgumentNames, ArgumentValues} ->
+							case lists:filter (
+									fun (Name) -> not lists:member (Name, ArgumentNames) end,
+									lists:map (fun ({Name, _}) -> Name end, wrq:req_qs (Request))) of
+								[] ->
+									{ok, false, ArgumentValues};
+								UnexpectedArgumentNames ->
+									{error, {unexpected_arguments, UnexpectedArgumentNames}}
+							end;
+						{error, Reason} ->
+							{error, Reason}
+					end
 			end;
 		OtherMethod ->
 			{error, {invalid_method, OtherMethod}}
 	end.
+
+
+parse_arguments (Arguments, Request)
+		when is_list (Arguments) ->
+	case parse_arguments (Arguments, Request, [], []) of
+		{ok, Names, Values} ->
+			{ok, lists:reverse (Names), lists:reverse (Values)};
+		Error = {error, _Reason} ->
+			Error
+	end.
+
+parse_arguments ([], _Request, Names, Values) ->
+	{ok, Names, Values};
+	
+parse_arguments ([Name | Arguments], Request, Names, Values)
+		when is_list (Name) ->
+	case wrq:get_qs_value (Name, Request) of
+		Value when is_list (Value) ->
+			parse_arguments (Arguments, Request, [Name | Names], [Value | Values]);
+		undefined ->
+			{error, {missing_argument, Name}}
+	end;
+	
+parse_arguments ([{Name, Parser} | Arguments], Request, Names, Values)
+		when is_list (Name), is_function (Parser, 1) ->
+	case wrq:get_qs_value (Name, Request) of
+		ValueString when is_list (ValueString) ->
+			case Parser (ValueString) of
+				{ok, ValueTerm} ->
+					parse_arguments (Arguments, Request, [Name | Names], [ValueTerm | Values]);
+				{error, Reason} ->
+					{error, {invalid_argument, Name, Reason}}
+			end;
+		undefined ->
+			{error, {missing_argument, Name}}
+	end.
+
+
+parse_existing_atom (String)
+		when is_list (String) ->
+	try
+		{ok, erlang:list_to_existing_atom (String)}
+	catch
+		error : badarg ->
+			{error, {inexistent_atom, String}}
+	end.
+
+parse_integer (String)
+		when is_list (String) ->
+	try
+		{ok, erlang:list_to_integer (String)}
+	catch
+		error : badarg ->
+			{error, {invalid_integer, String}}
+	end.
+
+parse_float (String)
+		when is_list (String) ->
+	try
+		{ok, erlang:list_to_float (String)}
+	catch
+		error : badarg ->
+			{error, {invalid_float, String}}
+	end.
+
+parse_hex_binary_key (String)
+		when is_list (String) ->
+	try
+		Integer = erlang:list_to_integer (String, 16),
+		Binary = binary:encode_unsigned (Integer),
+		PaddingSize = erlang:max (160 - erlang:bit_size (Binary), 0),
+		BinaryPadded = <<0 : PaddingSize, Binary / binary>>,
+		{ok, BinaryPadded}
+	catch
+		error : _ ->
+			{error, {invalid_key, String}}
+	end.
+
+parse_json (String)
+		when is_list (String) ->
+	try
+		{ok, mochijson2:decode (String)}
+	catch
+		error : _ ->
+			{error, {invalid_json, String}}
+	end.
+
+
+format_atom (Atom)
+		when is_atom (Atom) ->
+	erlang:iolist_to_binary (erlang:atom_to_list (Atom)).
+
+format_numeric_key (Key)
+		when is_integer (Key), (Key >= 0), (Key < 1461501637330902918203684832716283019655932542976) ->
+	KeyHex = string:to_lower (erlang:integer_to_list (Key, 16)),
+	KeyHexPadded = lists:duplicate (40 - erlang:length (KeyHex), $0) ++ KeyHex,
+	erlang:list_to_binary (KeyHexPadded).
+
+format_binary_key (Key)
+		when is_binary (Key), (bit_size (Key) =:= 160) ->
+	erlang:iolist_to_binary (lists:flatten ([io_lib:format ("~2.16.0b", [Byte]) || Byte <- erlang:binary_to_list (Key)])).
+
+format_json (Json) ->
+	mochijson2:encode (Json).
+
+format_reason (Reason) ->
+	erlang:iolist_to_binary (io_lib:format ("~76p", [Reason])).

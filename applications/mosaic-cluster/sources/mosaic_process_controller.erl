@@ -6,7 +6,7 @@
 -export ([start/0, start/1, start/2, start_link/0, start_link/1, start_link/2]).
 -export ([start_supervised/0, start_supervised/1, start_supervised/2, start_supervised/3]).
 -export ([stop/1, stop/2]).
--export ([create/4, migrate/3, migrate/4, migrate/5, migrate/6, fold/3, count/1]).
+-export ([resolve/2, create/4, migrate/3, migrate/4, migrate/5, migrate/6, fold/3, count/1]).
 -export ([init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2, handle_info/2]).
 
 
@@ -57,6 +57,11 @@ stop (Controller) ->
 stop (Controller, Signal)
 		when (is_atom (Controller) or is_pid (Controller)) ->
 	gen_server:call (Controller, {stop, Signal}).
+
+
+resolve (Controller, Key)
+		when (is_pid (Controller) or is_atom (Controller)) ->
+	gen_server:call (Controller, {resolve, Key}).
 
 
 create (Controller, Key, Module, CreateArguments)
@@ -299,6 +304,16 @@ handle_call (
 			end;
 		true ->
 			{reply, {error, source_does_not_exist}, OldState}
+	end;
+	
+handle_call (
+			{resolve, Key}, _Sender,
+			State = #state{processes = Processes}) ->
+	case orddict:find (Key, Processes) of
+		{ok, #process_state{process = Process}} ->
+			{reply, {ok, Process}, State};
+		error ->
+			{reply, {error, process_does_not_exist}, State}
 	end;
 	
 handle_call (
