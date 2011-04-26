@@ -25,6 +25,8 @@
 		<script>$(\"ul#output>li\").remove();</script>
 		<script>
 			
+			$info = this.info
+			
 			function $get (_url, _query) {
 				_settings = {};
 				_settings.url = _url;
@@ -34,13 +36,9 @@
 			}
 			
 			function _execute_ajax (_settings) {
-				try {
-					_settings.async = false;
-					_ajax = $.ajax (_settings);
-					return (_handle_ajax (_ajax));
-				} catch (exception) {
-					return (exception[2]);
-				}
+				_settings.async = false;
+				_ajax = $.ajax (_settings);
+				return (_handle_ajax (_ajax));
 			}
 			
 			function _handle_ajax (_ajax) {
@@ -49,62 +47,94 @@
 				_content_data = _ajax.responseText;
 				if (_content_type == \"application/json\")
 					_content_data = $.parseJSON (_content_data);
-				if ((_status != 200) || (_content_type != \"application/json\"))
-					throw ([_status, _content_type, _content_data]);
+				if ((_status != 200) || (_content_type != \"application/json\")) {
+					if ((_content_type == \"application/json\") && (_content_data.error != undefined))
+						$info (\"error: \" + _content_data.error);
+					else
+						$info (_ajax.responseText);
+					return (undefined);
+				}
+				if (_content_data.error != undefined)
+					$info (\"error: \" + _content_data.error);
 				return (_content_data);
+			}
+			
+			function _wrapped_0 (_function) {
+				return (function () {
+					try {
+						return (_function ());
+					} catch (_exception) {
+						return (undefined);
+					}
+				});
+			}
+			
+			function _wrapped_1 (_function) {
+				return (function (_argument_1) {
+					try {
+						return (_function (_argument_1));
+					} catch (_exception) {
+						return (undefined);
+					}
+				});
 			}
 			
 			var $mosaic = function () {};
 			$mosaic.cluster = function () {};
 			$mosaic.services = function () {};
 			
-			$mosaic.cluster.nodes = function () {
-				return ($get (\"cluster/nodes\"));
-			};
-			$mosaic.cluster.nodes.self = function () {
+			$mosaic.cluster.nodes = _wrapped_0 (function () {
+				_outcome = $get (\"cluster/nodes\");
+				_nodes = _outcome.nodes;
+				_nodes.push (_outcome.self);
+				return (_nodes);
+			});
+			$mosaic.cluster.nodes.self = _wrapped_0 (function () {
 				return ($get (\"cluster/nodes\") .self);
-			};
-			$mosaic.cluster.nodes.peers = function () {
+			});
+			$mosaic.cluster.nodes.self.peers = _wrapped_0 (function () {
 				return ($get (\"cluster/nodes\") .peers);
-			};
-			$mosaic.cluster.nodes.self.activate = function () {
-				return ($get (\"cluster/nodes/self/activate\"));
-			};
-			$mosaic.cluster.nodes.self.deactivate = function () {
-				return ($get (\"cluster/nodes/self/deactivate\"));
-			};
-			$mosaic.cluster.ring = function () {
-				return ($get (\"cluster/ring\"));
-			};
-			$mosaic.cluster.ring.nodes = function () {
+			});
+			$mosaic.cluster.nodes.self.activate = _wrapped_0 (function () {
+				return ($get (\"cluster/nodes/self/activate\") .ok);
+			});
+			$mosaic.cluster.nodes.self.deactivate = _wrapped_0 (function () {
+				return ($get (\"cluster/nodes/self/deactivate\") .ok);
+			});
+			$mosaic.cluster.ring = _wrapped_0 (function () {
+				_outcome = $get (\"cluster/ring\");
+				return ({nodes : _outcome.nodes, partitions : _outcome.partitions});
+			});
+			$mosaic.cluster.ring.nodes = _wrapped_0 (function () {
 				return ($get (\"cluster/ring\") .nodes);
-			};
-			$mosaic.cluster.ring.partitions = function () {
+			});
+			$mosaic.cluster.ring.partitions = _wrapped_0 (function () {
 				return ($get (\"cluster/ring\") .partitions);
-			};
-			$mosaic.cluster.ring.include = function (_node) {
-				return ($get (\"cluster/ring/include\", {node : _node}));
-			};
-			$mosaic.cluster.ring.exclude = function (_node) {
-				return ($get (\"cluster/ring/exclude\", {node : _node}));
-			};
+			});
+			$mosaic.cluster.ring.include = _wrapped_1 (function (_node) {
+				return ($get (\"cluster/ring/include\", {node : _node}) .ok);
+			});
+			$mosaic.cluster.ring.exclude = _wrapped_1 (function (_node) {
+				return ($get (\"cluster/ring/exclude\", {node : _node}) .ok);
+			});
 			
 			$mosaic.services.executor = function () {};
-			$mosaic.services.executor.nodes = function () {
-				return ($get (\"services/executor/nodes\"));
-			};
+			$mosaic.services.executor.nodes = _wrapped_0 (function () {
+				return ($get (\"services/executor/nodes\") .nodes);
+			});
 			$mosaic.services.executor.nodes.self = function () {};
-			$mosaic.services.executor.nodes.self.activate = function () {
-				return ($get (\"services/executor/nodes/self/activate\"));
-			};
-			$mosaic.services.executor.nodes.self.deactivate = function () {
-				return ($get (\"services/executor/nodes/self/deactivate\"));
-			};
-			$mosaic.services.executor.ping = function (_count) {
+			$mosaic.services.executor.nodes.self.activate = _wrapped_0 (function () {
+				return ($get (\"services/executor/nodes/self/activate\") .ok);
+			});
+			$mosaic.services.executor.nodes.self.deactivate = _wrapped_0 (function () {
+				return ($get (\"services/executor/nodes/self/deactivate\") .ok);
+			});
+			$mosaic.services.executor.ping = _wrapped_1 (function (_count) {
 				if (_count == undefined)
 					_count = 4;
-				return ($get (\"services/executor/ping\", {count : _count}));
-			};
+				_outcome = $get (\"services/executor/ping\", {count : _count});
+				return ({pongs : _outcome.pongs, pangs : _outcome.pangs});
+			});
 			
 		</script>
 	</body>

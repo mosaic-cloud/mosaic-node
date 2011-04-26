@@ -6,20 +6,26 @@
 
 test () ->
 	ok = mosaic_cluster:boot (),
+	ScenariosProfile = normal,
 	{ok, Scenarios} = case erlang:node () of
 		'nonode@nohost' ->
-			{ok, [{wm}, {up}, {define_and_create_dummy_processes, 16}]};
+			{ok, [{wm}, {up}]};
 		Node ->
 			case application:get_env (mosaic_cluster, nodes) of
 				{ok, Nodes} ->
-					case Nodes of
-						[Node | _] ->
-							{ok, [{wm}, {up}, {define_and_create_dummy_processes, 32}, {sleep, 6 * 1000}, {join, Nodes}]};
-						_ ->
-							{ok, [{wm}, {up}, {sleep, 3 * 1000}, {join, Nodes}, {sleep, 12 * 1000}, {down}, {sleep, 3 * 1000}, {up}]}
+					case ScenariosProfile of
+						normal ->
+							{ok, [{wm}, {up}]};
+						fuzzy ->
+							case Nodes of
+								[Node | _] ->
+									{ok, [{wm}, {up}, {define_and_create_dummy_processes, 32}, {sleep, 6 * 1000}, {join, Nodes}]};
+								_ ->
+									{ok, [{wm}, {up}, {sleep, 3 * 1000}, {join, Nodes}, {sleep, 12 * 1000}, {down}, {sleep, 3 * 1000}, {up}]}
+							end
 					end;
 				undefined ->
-					{ok, []}
+					{ok, [{wm}, {up}]}
 			end
 	end,
 	ok = lists:foreach (
