@@ -16,7 +16,7 @@ test () ->
 						[Node | _] ->
 							{ok, [{wm}, {up}, {define_and_create_dummy_processes, 32}, {sleep, 6 * 1000}, {join, Nodes}]};
 						_ ->
-							{ok, [{wm}, {up}, {sleep, 3 * 1000}, {join, Nodes}, {sleep, 12 * 1000}]}
+							{ok, [{wm}, {up}, {sleep, 3 * 1000}, {join, Nodes}, {sleep, 12 * 1000}, {down}, {sleep, 3 * 1000}, {up}]}
 					end;
 				undefined ->
 					{ok, []}
@@ -35,8 +35,13 @@ test ({define_and_create_dummy_processes, Count}) ->
 	ok;
 	
 test ({up}) ->
-	ok = mosaic_executor_vnode:service_up (),
-	ok = riak_core_node_watcher:node_up (),
+	ok = mosaic_executor:service_activate (),
+	ok = mosaic_cluster:node_activate (),
+	ok;
+	
+test ({down}) ->
+	ok = mosaic_executor:service_deactivate (),
+	ok = mosaic_cluster:node_deactivate (),
 	ok;
 	
 test ({wm}) ->

@@ -2,7 +2,9 @@
 -module (mosaic_webmachine).
 
 -export ([start_link/2, enforce_start/0]).
+-export ([return_with_outcome/3, respond_with_outcome/3]).
 -export ([return_with_content/5, respond_with_content/4]).
+-export ([enforce_request/3]).
 
 
 start_link (QualifiedName = {local, LocalName}, Options)
@@ -17,7 +19,7 @@ start_link (QualifiedName = {local, LocalName}, Options)
 
 enforce_start () ->
 	QualifiedName = {local, mosaic_webmachine},
-	{ok, Dispatches} = dispatches ([mosaic_console_wm, mosaic_cluster_wm]),
+	{ok, Dispatches} = dispatches ([mosaic_console_wm, mosaic_cluster_wm, mosaic_executor_wm]),
 	ok = case application:get_env (mosaic_cluster, webmachine_listen) of
 		undefined ->
 			{error, webmachine_unconfigured};
@@ -85,6 +87,27 @@ dispatches ([Module | Modules], Accumulator) ->
 	end.
 
 
+return_with_outcome (Outcome, Request, State) ->
+	case Outcome of
+		{ok, Return} ->
+			{Return, Request, State};
+		{ok, Return, NewState} ->
+			{Return, Request, NewState};
+		{error, Reason} ->
+			mosaic_webmachine:return_with_content (true, error, Reason, Request, State)
+	end.
+
+respond_with_outcome (Outcome, Request, State) ->
+	case Outcome of
+		ok ->
+			mosaic_webmachine:respond_with_content (json, {struct, [{ok, true}]}, Request, State);
+		{ok, json_struct, AttributeTerms} ->
+			mosaic_webmachine:respond_with_content (json, {struct, [{ok, true} | AttributeTerms]}, Request, State);
+		{error, Reason} ->
+			mosaic_webmachine:respond_with_content (error, Reason, Request, State)
+	end.
+
+
 return_with_content (Return, Type, ContentTerm, Request, State) ->
 	{ok, ContentType, Content} = encode_content (Type, ContentTerm),
 	Response = wrq:set_resp_body (Content, wrq:set_resp_header ("Content-Type", ContentType, Request)),
@@ -95,9 +118,31 @@ respond_with_content (Type, ContentTerm, Request, State) ->
 	Response = wrq:set_resp_header ("Content-Type", ContentType, Request),
 	{Content, Response, State}.
 
+
 encode_content (json, ContentTerm) ->
 	{ok, "application/json", mochijson2:encode (ContentTerm)};
 	
 encode_content (error, ReasonTerm) ->
 	ReasonString = erlang:iolist_to_binary (io_lib:format ("~76p", [ReasonTerm])),
 	encode_content (json, {struct, [{ok, false}, {error, ReasonString}]}).
+
+
+enforce_request (Method, ArgumentNames, Request)
+		when is_atom (Method), is_list (ArgumentNames) ->
+	case wrq:method (Request) of
+		Method ->
+			case lists:sort (lists:map (fun ({Name, _Value}) -> Name end, wrq:req_qs (Request))) of
+				ArgumentNames ->
+					case ArgumentNames of
+						[] ->
+							{ok, false};
+						_ ->
+							ArgumentValues = lists:map (fun (Name) -> wrq:get_qs_value (Name, Request) end, ArgumentNames),
+							{ok, false, ArgumentValues}
+						end;
+				OtherArgumentNames ->
+					{error, {invalid_query, {invalid_arguments, OtherArgumentNames}}}
+			end;
+		OtherMethod ->
+			{error, {invalid_method, OtherMethod}}
+	end.

@@ -1,11 +1,25 @@
 
 -module (mosaic_executor).
 
+-export ([nodes/0]).
+-export ([service_activate/0, service_deactivate/0]).
 -export ([define_and_create_process/2, define_and_create_processes/3]).
 -export ([define_process/2, define_processes/3, define_processes/4]).
 -export ([create_process/1, create_processes/1, create_processes/2]).
 -export ([stop_process/1, stop_process/2, stop_processes/2, stop_processes/3]).
 -export ([ping/0, ping/1, ping/2]).
+
+
+nodes () ->
+	Nodes = riak_core_node_watcher:nodes (mosaic_executor),
+	{ok, Nodes}.
+
+
+service_activate () ->
+	mosaic_executor_vnode:service_activate ().
+
+service_deactivate () ->
+	mosaic_executor_vnode:service_deactivate ().
 
 
 define_and_create_process (Module, Arguments)
@@ -53,9 +67,10 @@ define_processes (Module, Arguments, Count, Retries)
 	{ok, _, {Keys, Reasons}, _} = sync_command (
 			fun (Index) ->
 				Key = chash:key_of (term_to_binary ({Fuzz, Index})),
-				{ok, Key, {define_process, Key, Module, Arguments}, 1, Service, Master, Index + 1}
+				{ok, Targets} = mosaic_cluster:targets (Key, mosaic_executor, 1, active_without_fallbacks),
+				{ok, Key, {define_process, Key, Module, Arguments}, Service, Master, Targets, Index + 1}
 			end, 0,
-			fun ({Key, {define_process, Key, _, _}, 1, _, _}, [{_, Reply}], {Keys, Reasons}) ->
+			fun ({Key, {define_process, Key, _, _}, _, _, _}, [{_, Reply}], {Keys, Reasons}) ->
 				case Reply of
 					{ok, Key} ->
 						{ok, {[Key | Keys], Reasons}};
@@ -89,9 +104,10 @@ create_processes (Keys, Retries)
 	Master = riak_core_vnode_master:reg_name (mosaic_executor_vnode),
 	{ok, _, {SuccessfullKeys, Reasons}, _} = sync_command (
 			fun ([Key | RemainingKeys]) ->
-				{ok, Key, {create_process, Key}, 1, Service, Master, RemainingKeys}
+				{ok, Targets} = mosaic_cluster:targets (Key, mosaic_executor, 1, active_without_fallbacks),
+				{ok, Key, {create_process, Key}, Service, Master, Targets, RemainingKeys}
 			end, Keys,
-			fun ({Key, {create_process, Key}, 1, _, _}, [{_, Reply}], {SuccessfullKeys, Reasons}) ->
+			fun ({Key, {create_process, Key}, _, _, _}, [{_, Reply}], {SuccessfullKeys, Reasons}) ->
 				case Reply of
 					{ok, Process} ->
 						{ok, {[{Key, Process} | SuccessfullKeys], Reasons}};
@@ -128,9 +144,10 @@ stop_processes (Keys, Signal, Retries)
 	Master = riak_core_vnode_master:reg_name (mosaic_executor_vnode),
 	{ok, _, {SuccessfullKeys, Reasons}, _} = sync_command (
 			fun ([Key | RemainingKeys]) ->
-				{ok, Key, {stop_process, Key, Signal}, 1, Service, Master, RemainingKeys}
+				{ok, Targets} = mosaic_cluster:targets (Key, mosaic_executor, 1, active_without_fallbacks),
+				{ok, Key, {stop_process, Key, Signal}, Service, Master, Targets, RemainingKeys}
 			end, Keys,
-			fun ({Key, {stop_process, Key, _}, 1, _, _}, [{_, Reply}], {SuccessfullKeys, Reasons}) ->
+			fun ({Key, {stop_process, Key, _}, _, _, _}, [{_, Reply}], {SuccessfullKeys, Reasons}) ->
 				case Reply of
 					ok ->
 						{ok, {[Key | SuccessfullKeys], Reasons}};
@@ -159,9 +176,10 @@ ping (Count, Retries)
 	{ok, _, {PingCount, Outcomes}, _} = sync_command (
 			fun (Index) ->
 				Key = chash:key_of (term_to_binary ({Fuzz, Index})),
-				{ok, Key, {ping, Key}, 1, Service, Master, Index + 1}
+				{ok, Targets} = mosaic_cluster:targets (Key, mosaic_executor, 1, primaries),
+				{ok, Key, {ping, Key}, Service, Master, Targets, Index + 1}
 			end, 0,
-			fun ({Key, {ping, Key}, 1, _, _}, [{Target, Reply}], {PingCount, Outcomes}) ->
+			fun ({Key, {ping, Key}, _, _, _}, [{Target, Reply}], {PingCount, Outcomes}) ->
 				Outcome = case Reply of
 					{pong, Key, Target} ->
 						{pong, Target};
@@ -197,15 +215,22 @@ sync_command1 (_RequestFun, RequestState, _RepliesFun, RepliesState, PendingRequ
 	{ok, RequestState, RepliesState, PendingRequest};
 	
 sync_command1 (RequestFun, OldRequestState, RepliesFun, RepliesState, undefined, Count, Retries) ->
-	{ok, Key, Command, Fanout, Service, Master, NewRequestState} = RequestFun (OldRequestState),
-	sync_command1 (RequestFun, NewRequestState, RepliesFun, RepliesState, {Key, Command, Fanout, Service, Master}, Count, Retries);
+	{ok, Key, Command, Service, Master, Targets, NewRequestState} = RequestFun (OldRequestState),
+	sync_command1 (RequestFun, NewRequestState, RepliesFun, RepliesState, {Key, Command, Service, Master, Targets}, Count, Retries);
 	
-sync_command1 (RequestFun, RequestState, RepliesFun, OldRepliesState, PendingRequest = {Key, Command, Fanout, Service, Master}, Count, Retries) ->
-	case riak_core_apl:get_apl (Key, Fanout, Service) of
-		Targets when is_list (Targets), length (Targets) =:= Fanout ->
+sync_command1 (RequestFun, RequestState, RepliesFun, OldRepliesState, PendingRequest = {Key, Command, Service, Master, Targets}, Count, Retries) ->
+	case Targets of
+		Targets when is_list (Targets) ->
 			Replies = lists:map (
-					fun (Target) -> {Target, riak_core_vnode_master:sync_command (Target, Command, Master)} end,
-					Targets),
+					fun (Target) ->
+						Outcome = try
+							riak_core_vnode_master:sync_command (Target, Command, Master)
+						catch
+							exit : {Reason, _Call} ->
+								{error, Reason}
+						end,
+						{Target, Outcome}
+					end, Targets),
 			{ok, NewRepliesState} = RepliesFun (PendingRequest, Replies, OldRepliesState),
 			sync_command1 (RequestFun, RequestState, RepliesFun, NewRepliesState, undefined, Count - 1, Retries);
 		[] ->

@@ -5,16 +5,19 @@
 
 
 -dispatch ({["cluster", "nodes"], {nodes}}).
+-dispatch ({["cluster", "nodes", "self", "activate"], {nodes, self, activate}}).
+-dispatch ({["cluster", "nodes", "self", "deactivate"], {nodes, self, deactivate}}).
+
 -dispatch ({["cluster", "ring"], {ring}}).
--dispatch ({["cluster", "ring", "include", node], {ring, include}}).
--dispatch ({["cluster", "ring", "exclude", node], {ring, exclude}}).
+-dispatch ({["cluster", "ring", "include"], {ring, include}}).
+-dispatch ({["cluster", "ring", "exclude"], {ring, exclude}}).
 
 
--record (state, {target}).
+-record (state, {target, arguments}).
 
 
 init (Target) ->
-	{ok, #state{target = Target}}.
+	{ok, #state{target = Target, arguments = none}}.
 
 ping(Request, State = #state{}) ->
     {pong, Request, State}.
@@ -26,67 +29,76 @@ content_types_provided (Request, State = #state{}) ->
 	{[{"application/json", handle_as_json}], Request, State}.
 
 
-malformed_request (Request, State = #state{target = Target}) ->
+malformed_request (Request, State = #state{target = Target, arguments = none}) ->
 	Outcome = case Target of
 		{nodes} ->
-			ok;
+			mosaic_webmachine:enforce_request ('GET', [], Request);
+		{nodes, self, Operation} when ((Operation =:= activate) orelse (Operation =:= deactivate)) ->
+			mosaic_webmachine:enforce_request ('GET', [], Request);
 		{ring} ->
-			ok;
+			mosaic_webmachine:enforce_request ('GET', [], Request);
 		{ring, Operation} when ((Operation =:= include) orelse (Operation =:= exclude)) ->
-			case wrq:path_info (node, Request) of
-				Node when is_list (Node) ->
+			case mosaic_webmachine:enforce_request ('GET', ["node"], Request) of
+				{ok, false, [NodeString]} ->
 					try
-						_ = erlang:list_to_existing_atom (Node),
-						ok
+						Node = erlang:list_to_existing_atom (NodeString),
+						{ok, false, State#state{arguments = dict:from_list ([{node, Node}])}}
 					catch
 						error : badarg ->
-							{error, {invalid_node, Node}}
-					end
+							{error, {invalid_query, {invalid_node, NodeString}}}
+					end;
+				Error = {error, _Reason} ->
+					Error
 			end
 	end,
-	case Outcome of
-		ok ->
-			{false, Request, State};
-		{error, Reason} ->
-			mosaic_webmachine:return_with_content (true, error, Reason, Request, State)
-	end.
+	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
 
-handle_as_json (Request, State = #state{target = Target}) ->
+handle_as_json (Request, State = #state{target = Target, arguments = Arguments}) ->
 	Outcome = case Target of
 		{nodes} ->
-			{ok, json, {struct, [{ok, true}, {self, erlang:node ()}, {peers, erlang:nodes ()}]}};
+			Self = erlang:node (),
+			Peers = erlang:nodes (),
+			Nodes = [Self | Peers],
+			{ok, json_struct, [{self, Self}, {peers, Peers}, {nodes, Nodes}]};
+		{nodes, self, activate} ->
+			case mosaic_cluster:node_activate () of
+				ok ->
+					ok;
+				Error = {error, _Reason} ->
+					Error
+			end;
+		{nodes, self, deactivate} ->
+			case mosaic_cluster:node_deactivate () of
+				ok ->
+					ok;
+				Error = {error, _Reason} ->
+					Error
+			end;
 		{ring} ->
-			{ok, Ring} = riak_core_ring_manager:get_my_ring (),
-			RingNodes = riak_core_ring:all_members (Ring),
-			RingPartitions = riak_core_ring:all_owners (Ring),
-			{ok, json, {struct, [
-					{ok, true},
-					{nodes, RingNodes},
+			{ok, Nodes} = mosaic_cluster:nodes (),
+			{ok, Partitions} = mosaic_cluster:partitions (),
+			{ok, json_struct, [
+					{nodes, Nodes},
 					{partitions, lists:map (
 							fun ({Key, Node}) ->
 								{struct, [{key, erlang:list_to_binary (erlang:integer_to_list (Key))}, {node, Node}]}
-							end, RingPartitions)}]}};
+							end, Partitions)}]};
 		{ring, include} ->
-			Node = erlang:list_to_existing_atom (wrq:path_info (node, Request)),
+			Node = dict:fetch (node, Arguments),
 			case mosaic_cluster:ring_include (Node) of
 				ok ->
-					{ok, json, {struct, [{ok, true}]}};
+					ok;
 				Error = {error, _Reason} ->
 					Error
 			end;
 		{ring, exclude} ->
-			Node = erlang:list_to_existing_atom (wrq:path_info (node, Request)),
+			Node = dict:fetch (node, Arguments),
 			case mosaic_cluster:ring_exclude (Node) of
 				ok ->
-					{ok, json, {struct, [{ok, true}]}};
+					ok;
 				Error = {error, _Reason} ->
 					Error
 			end
 	end,
-	case Outcome of
-		{ok, json, ContentTerm} ->
-			mosaic_webmachine:respond_with_content (json, ContentTerm, Request, State);
-		{error, Reason} ->
-			mosaic_webmachine:respond_with_content (error, Reason, Request, State)
-	end.
+	mosaic_webmachine:respond_with_outcome (Outcome, Request, State).

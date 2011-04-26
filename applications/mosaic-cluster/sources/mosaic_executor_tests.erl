@@ -14,7 +14,9 @@
 
 
 test () ->
-	ok = mosaic_cluster_app:boot (),
+	ok = mosaic_cluster:boot (),
+	ok = mosaic_cluster:node_activate (),
+	ok = mosaic_executor:service_activate (),
 	ok = mosaic_tests:test_module (mosaic_executor_tests),
 	ok.
 

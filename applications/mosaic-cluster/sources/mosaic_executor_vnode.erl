@@ -3,7 +3,7 @@
 
 -behaviour (riak_core_vnode).
 
--export ([service_up/0]).
+-export ([service_activate/0, service_deactivate/0]).
 -export ([
 		start_vnode/1, init/1, terminate/2, delete/1,
 		handle_command/3, is_empty/1,
@@ -13,13 +13,30 @@
 
 -record (state, {qualified_name, partition, object_store, process_controller}).
 
-service_up () ->
+service_activate () ->
 	case mosaic_cluster_sup:start_child_vnode_master (mosaic_executor_vnode) of
-		{ok, Master} ->
+		{ok, Master} when is_pid (Master) ->
 			ok = riak_core:register_vnode_module (mosaic_executor_vnode),
 			ok = riak_core_node_watcher:service_up (mosaic_executor, Master),
 			ok;
-		Error = {error, _Reason1} ->
+		{error, already_started} ->
+			MasterName = riak_core_vnode_master:reg_name (mosaic_executor_vnode),
+			case erlang:whereis (MasterName) of
+				Master when is_pid (Master) ->
+					ok = riak_core_node_watcher:service_up (mosaic_executor, Master),
+					ok;
+				undefined ->
+					{error, vnode_master_not_started}
+			end;
+		Error = {error, _Reason} ->
+			Error
+	end.
+
+service_deactivate () ->
+	case riak_core_node_watcher:service_down (mosaic_executor) of
+		ok ->
+			ok;
+		Error = {error, _Reason} ->
 			Error
 	end.
 
