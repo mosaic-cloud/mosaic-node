@@ -2,7 +2,7 @@
 -module (mosaic_cluster).
 
 -export ([ring_include/1, ring_exclude/1]).
--export ([test/0, boot/0, join/0, leave/0]).
+-export ([boot/0]).
 
 
 ring_include (Node)
@@ -28,59 +28,6 @@ ring_exclude (Node)
 		error : badarg ->
 			ok
 	end.
-
-
-test () ->
-	ok = boot (),
-	{ok, Scenarios} = case erlang:node () of
-		'nonode@nohost' ->
-			{ok, [{define_and_create_dummy_processes, 16}]};
-		Node ->
-			case application:get_env (mosaic_cluster, nodes) of
-				{ok, Nodes} ->
-					case Nodes of
-						[Node | _] ->
-							%{ok, [{wm}, {up}, {define_and_create_dummy_processes, 32}, {sleep, 6 * 1000}, {join, Nodes}]};
-							{ok, [{wm}, {up}]};
-						_ ->
-							%{ok, [{wm}, {up}, {sleep, 3 * 1000}, {join, Nodes}, {sleep, 12 * 1000}, {leave}]}
-							{ok, [{wm}, {up}]}
-					end;
-				undefined ->
-					{ok, []}
-			end
-	end,
-	ok = lists:foreach (
-			fun (Scenario) ->
-				ok = mosaic_tools:report_info (mosaic_cluster, test, scenario, Scenario),
-				ok = test (Scenario)
-			end, Scenarios),
-	ok.
-
-test ({define_and_create_dummy_processes, Count}) ->
-	{ok, _, _} = mosaic_executor:define_and_create_processes (mosaic_dummy_process, defaults, Count),
-	ok;
-	
-test ({up}) ->
-	ok = mosaic_executor_vnode:service_up (),
-	ok = riak_core_node_watcher:node_up (),
-	ok;
-	
-test ({wm}) ->
-	ok = mosaic_webmachine:enforce_start (),
-	ok;
-	
-test ({join, Nodes}) ->
-	ok = join (Nodes),
-	ok;
-	
-test ({leave}) ->
-	ok = leave (),
-	ok;
-	
-test ({sleep, Timeout}) ->
-	ok = timer:sleep (Timeout),
-	ok.
 
 
 boot () ->
@@ -124,25 +71,3 @@ boot (App)
 		undefined ->
 			{error, {undefined_dependencies, App}}
 	end.
-
-
-join () ->
-	{ok, Nodes} = application:get_env (mosaic_cluster, nodes),
-	join (Nodes).
-
-join (Nodes) ->
-	ok = lists:foreach (
-			fun (Node) ->
-				case net_adm:ping (Node) of
-					pong ->
-						ok = riak_core_gossip:send_ring (Node);
-					pang ->
-						ok
-				end
-			end, Nodes),
-	ok.
-
-
-leave () ->
-	_ = riak_core_gossip:remove_from_cluster (erlang:node ()),
-	ok.
