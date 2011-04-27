@@ -122,6 +122,8 @@
 				return ($get (\"/cluster/ring/include\", {node : _node}) .ok);
 			});
 			$mosaic.cluster.ring.nodes.exclude = _wrapped_1 (function (_node) {
+				if (_node == undefined)
+					_node = $get (\"/cluster/nodes\") .self;
 				return ($get (\"/cluster/ring/exclude\", {node : _node}) .ok);
 			});
 			$mosaic.cluster.ring.partitions = _wrapped_0 (function () {

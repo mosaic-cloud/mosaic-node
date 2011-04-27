@@ -16,10 +16,10 @@ test () ->
 					case ScenariosProfile of
 						normal ->
 							{ok, [
-									{wm}, {up}, {ping, 16},
+									{wm}, {up}, {da}, {ping, 16},
 									{define_and_create_dummy_processes, 4}
 								]};
-						fuzzy ->
+						join_leave ->
 							case Nodes of
 								[Node | _] ->
 									{ok, [
@@ -62,7 +62,24 @@ test () ->
 
 
 test ({wm}) ->
-	ok = mosaic_webmachine:enforce_start (),
+	ok = mosaic_webmachine:enforce_started (),
+	ok;
+	
+test ({da}) ->
+	{ok, _} = mosaic_discovery_events:start_supervised (),
+	JoinFun = fun (Message, void) ->
+			case Message of
+				{broadcasted, {mosaic_cluster, {join, Node}}} when is_atom (Node) ->
+					% ok = mosaic_tools:report_info (mosaic_cluster_tests, test, join, {Node}),
+					ok = mosaic_cluster:ring_include (Node),
+					{ok, void};
+				_ ->
+					{ok, void}
+			end
+	end,
+	ok = mosaic_discovery_events:register_handler (mosaic_discovery_events, {JoinFun, void}),
+	{ok, _} = mosaic_discovery_agent:start_supervised (),
+	ok = mosaic_discovery_agent:broadcast ({mosaic_cluster, {join, erlang:node ()}}),
 	ok;
 	
 test ({up}) ->

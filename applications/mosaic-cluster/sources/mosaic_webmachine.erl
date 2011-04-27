@@ -1,13 +1,24 @@
 
 -module (mosaic_webmachine).
 
--export ([start_link/2, enforce_start/0]).
+-export ([start_link/0, start_link/1, start_link/2, enforce_started/0]).
 -export ([return_with_outcome/3, respond_with_outcome/3]).
 -export ([return_with_content/5, respond_with_content/4]).
 -export ([enforce_request/3]).
 -export ([parse_existing_atom/1, parse_integer/1, parse_float/1, parse_hex_binary_key/1, parse_json/1]).
 -export ([format_atom/1, format_numeric_key/1, format_binary_key/1, format_term/1]).
 
+
+start_link () ->
+	case options () of
+		{ok, Options} ->
+			start_link (Options);
+		Error = {error, _Reason} ->
+			Error
+	end.
+
+start_link (Options) ->
+	start_link ({local, mosaic_webmachine}, Options).
 
 start_link (QualifiedName = {local, LocalName}, Options)
 		when is_atom (LocalName), is_list (Options) ->
@@ -19,29 +30,42 @@ start_link (QualifiedName = {local, LocalName}, Options)
 			Error
 	end.
 
-enforce_start () ->
-	QualifiedName = {local, mosaic_webmachine},
-	{ok, Dispatches} = dispatches ([mosaic_console_wm, mosaic_cluster_wm, mosaic_executor_wm]),
-	ok = case application:get_env (mosaic_cluster, webmachine_listen) of
-		undefined ->
-			{error, webmachine_unconfigured};
-		{ok, {Address, Port}} when is_list (Address), is_number (Port), (Port >= 0), (Port < 65536) ->
-			Options = [
-					{ip, Address},
-					{port, Port},
-					{dispatch, Dispatches},
-					{error_handler, webmachine_error_handler},
-					{enable_perf_logger, false},
-					{log_dir, undefined}],
+enforce_started () ->
+	Outcome = case options () of
+		{ok, Options} ->
+			QualifiedName = {local, mosaic_webmachine},
 			case mosaic_cluster_sup:start_child_daemon (QualifiedName, mosaic_webmachine, [Options], permanent) of
 				{ok, Server} when is_pid (Server) ->
 					true = erlang:unlink (Server),
 					ok;
 				Error = {error, _Reason} ->
 					Error
-			end
+			end;
+		Error = {error, _Reason} ->
+			Error
 	end,
+	ok = Outcome,
 	ok.
+
+options () ->
+	case application:get_env (mosaic_cluster, webmachine_listen) of
+		{ok, {Address, Port}} when is_list (Address), is_number (Port), (Port >= 0), (Port < 65536) ->
+			case dispatches ([mosaic_console_wm, mosaic_cluster_wm, mosaic_executor_wm]) of
+				{ok, Dispatches} ->
+					Options = [
+							{ip, Address},
+							{port, Port},
+							{dispatch, Dispatches},
+							{error_handler, webmachine_error_handler},
+							{enable_perf_logger, false},
+							{log_dir, undefined}],
+					{ok, Options};
+				Error = {error, _Reason} ->
+					Error
+			end;
+		undefined ->
+			{error, unconfigured}
+	end.
 
 
 dispatches (Modules)

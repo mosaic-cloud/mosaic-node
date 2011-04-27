@@ -8,7 +8,7 @@
 		start_child_process_controller/2, start_child_process_controller/3,
 		start_child_process/3, start_child_process/4,
 		start_child_object_store/2, start_child_object_store/3,
-		start_child_daemon/4, start_child_daemon/5,
+		start_child_daemon/4, start_child_daemon/5, start_child_daemon/6,
 		start_child_vnode_master/1]).
 -export ([init/1]).
 
@@ -60,8 +60,11 @@ start_child_object_store (Supervisor, QualifiedName, Configuration)
 start_child_daemon (QualifiedName, Module, Arguments, Policy) ->
 	start_child_daemon (mosaic_daemon_sup, QualifiedName, Module, Arguments, Policy).
 
-start_child_daemon (Supervisor, QualifiedName, Module, Arguments, Policy)
-		when (is_pid (Supervisor) orelse is_atom (Supervisor)), is_atom (Module), is_list (Arguments),
+start_child_daemon (Supervisor, QualifiedName, Module, Arguments, Policy) ->
+	start_child_daemon (Supervisor, QualifiedName, Module, start_link, Arguments, Policy).
+
+start_child_daemon (Supervisor, QualifiedName, Module, StartLinkFunction, Arguments, Policy)
+		when (is_pid (Supervisor) orelse is_atom (Supervisor)), is_atom (Module), is_atom (StartLinkFunction), is_list (Arguments),
 				((QualifiedName =:= noname) orelse (is_record (QualifiedName, local, 2) andalso is_atom (element (2, QualifiedName)))),
 				(Policy =:= permanent) orelse (Policy =:= transient) orelse (Policy =:= temporary) ->
 	{ok, StartLinkArguments} = if
@@ -70,7 +73,7 @@ start_child_daemon (Supervisor, QualifiedName, Module, Arguments, Policy)
 		true ->
 			{ok, [QualifiedName | Arguments]}
 	end,
-	case child_spec ({worker, Policy}, QualifiedName, Module, start_link, StartLinkArguments) of
+	case child_spec ({worker, Policy}, QualifiedName, Module, StartLinkFunction, StartLinkArguments) of
 		{ok, Specification} ->
 			start_child (Supervisor, Specification);
 		Error = {error, _Reason} ->
@@ -101,8 +104,10 @@ start_child (Supervisor, Specification) ->
 			{error, already_started};
 		{error, already_present} ->
 			{error, already_started};
-		{error, {Error, Specification}} ->
-			{error, Error};
+		{error, {Error = {error, _Reason}, _Specification}} ->
+			Error;
+		{error, {Outcome, _Specification}} ->
+			{error, {invalid_return, Outcome}};
 		Error = {error, _Reason} ->
 			Error
 	end.

@@ -96,7 +96,12 @@ handle_command ({ping, Key}, _Sender, State) ->
 	
 handle_command ({define_process, Key, Module, Arguments}, _Sender, State = #state{object_store = ObjectStore})
 		when is_atom (Module) ->
-	ok = mosaic_object_store:include (ObjectStore, Key, none, {Module, Arguments}),
+	case {Module, Arguments} of
+		{mosaic_dummy_process, defaults} ->
+			ok = mosaic_object_store:include (ObjectStore, Key, none, {Module, [{key, Key}]});
+		_ ->
+			ok = mosaic_object_store:include (ObjectStore, Key, none, {Module, Arguments})
+	end,
 	{reply, {ok, Key}, State};
 	
 handle_command ({create_process, Key}, _Sender, State = #state{object_store = ObjectStore, process_controller = ProcessController}) ->
