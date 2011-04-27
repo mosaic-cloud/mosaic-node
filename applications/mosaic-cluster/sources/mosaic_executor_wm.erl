@@ -4,12 +4,13 @@
 -export ([init/1, allowed_methods/2, content_types_provided/2, malformed_request/2, handle_as_json/2, ping/2]).
 
 
--dispatch ({["services", "executor", "nodes"], {nodes}}).
--dispatch ({["services", "executor", "nodes", "self", "activate"], {nodes, self, activate}}).
--dispatch ({["services", "executor", "nodes", "self", "deactivate"], {nodes, self, deactivate}}).
--dispatch ({["services", "executor", "processes", "create"], {processes, create}}).
--dispatch ({["services", "executor", "processes", "stop"], {processes, stop}}).
--dispatch ({["services", "executor", "ping"], {ping}}).
+-dispatch ({["executor", "nodes"], {nodes}}).
+-dispatch ({["executor", "nodes", "self", "activate"], {nodes, self, activate}}).
+-dispatch ({["executor", "nodes", "self", "deactivate"], {nodes, self, deactivate}}).
+-dispatch ({["executor", "processes"], {processes}}).
+-dispatch ({["executor", "processes", "create"], {processes, create}}).
+-dispatch ({["executor", "processes", "stop"], {processes, stop}}).
+-dispatch ({["executor", "ping"], {ping}}).
 
 
 -record (state, {target, arguments}).
@@ -33,6 +34,8 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 		{nodes} ->
 			mosaic_webmachine:enforce_request ('GET', [], Request);
 		{nodes, self, Operation} when ((Operation =:= activate) orelse (Operation =:= deactivate)) ->
+			mosaic_webmachine:enforce_request ('GET', [], Request);
+		{processes} ->
 			mosaic_webmachine:enforce_request ('GET', [], Request);
 		{processes, create} ->
 			case mosaic_webmachine:enforce_request ('GET',
@@ -106,6 +109,18 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 				Error = {error, _Reason} ->
 					Error
 			end;
+		{processes} ->
+			case mosaic_executor:select_processes () of
+				{ok, Keys, []} ->
+					{ok, json_struct, [
+							{keys, lists:map (fun mosaic_webmachine:format_binary_key/1, Keys)}]};
+				{ok, Keys, Reasons} ->
+					{ok, json_struct, [
+							{keys, lists:map (fun mosaic_webmachine:format_binary_key/1, Keys)},
+							{error, lists:map (fun mosaic_webmachine:format_term/1, Reasons)}]};
+				Error = {error, _Reason} ->
+					Error
+			end;
 		{processes, create} ->
 			Module = dict:fetch (module, Arguments),
 			CreateArguments = dict:fetch (create_arguments, Arguments),
@@ -127,22 +142,22 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 		{ping} ->
 			Count = dict:fetch (count, Arguments),
 			case mosaic_executor:ping (Count) of
-				{ok, _Count, Pings} ->
-					Pongs = lists:filter (fun ({pong, _}) -> true; ({pang, _, _}) -> false end, Pings),
-					Pangs = lists:filter (fun ({pang, _, _}) -> true; ({pong, _}) -> false end, Pings),
+				{ok, Pongs, Pangs} ->
 					{ok, json_struct, [
 							{pongs, lists:map (
-									fun ({pong, {Key, Node}}) ->
+									fun ({pong, Key, {Partition, Node}}) ->
 										{struct, [
-												{key, mosaic_webmachine:format_numeric_key (Key)},
+												{key, mosaic_webmachine:format_binary_key (Key)},
+												{partition, mosaic_webmachine:format_numeric_key (Partition)},
 												{node, mosaic_webmachine:format_atom (Node)}]}
 									end, Pongs)},
 							{pangs, lists:map (
-									fun ({pang, {Key, Node}, Reason}) ->
+									fun ({pang, Key, {Partition, Node}, Reason}) ->
 										{struct, [
-												{key, mosaic_webmachine:format_numeric_key (Key)},
+												{key, mosaic_webmachine:format_binary_key (Key)},
+												{partition, mosaic_webmachine:format_numeric_key (Partition)},
 												{node, mosaic_webmachine:format_atom (Node)},
-												{reason, mosaic_webmachine:format_reason (Reason)}]}
+												{reason, mosaic_webmachine:format_term (Reason)}]}
 									end, Pangs)}]};
 				Error = {error, _Reason} ->
 					Error

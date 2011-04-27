@@ -6,7 +6,7 @@
 -export ([return_with_content/5, respond_with_content/4]).
 -export ([enforce_request/3]).
 -export ([parse_existing_atom/1, parse_integer/1, parse_float/1, parse_hex_binary_key/1, parse_json/1]).
--export ([format_atom/1, format_numeric_key/1, format_binary_key/1, format_reason/1]).
+-export ([format_atom/1, format_numeric_key/1, format_binary_key/1, format_term/1]).
 
 
 start_link (QualifiedName = {local, LocalName}, Options)
@@ -125,7 +125,7 @@ encode_content (json, Content) ->
 	{ok, "application/json", format_json (Content)};
 	
 encode_content (error, Reason) ->
-	encode_content (json, {struct, [{ok, false}, {error, format_reason (Reason)}]}).
+	encode_content (json, {struct, [{ok, false}, {error, format_term (Reason)}]}).
 
 
 enforce_request (Method, Arguments, Request)
@@ -223,9 +223,15 @@ parse_hex_binary_key (String)
 	try
 		Integer = erlang:list_to_integer (String, 16),
 		Binary = binary:encode_unsigned (Integer),
-		PaddingSize = erlang:max (160 - erlang:bit_size (Binary), 0),
-		BinaryPadded = <<0 : PaddingSize, Binary / binary>>,
-		{ok, BinaryPadded}
+		BinarySize = erlang:bit_size (Binary),
+		if
+			BinarySize =:= 160 ->
+				{ok, Binary};
+			BinarySize < 160 ->
+				{ok, <<0 : (erlang:max (160 - BinarySize)), Binary / binary>>};
+			true ->
+				{error, {invalid_key_size, BinarySize}}
+		end
 	catch
 		error : _ ->
 			{error, {invalid_key, String}}
@@ -258,5 +264,35 @@ format_binary_key (Key)
 format_json (Json) ->
 	mochijson2:encode (Json).
 
-format_reason (Reason) ->
-	erlang:iolist_to_binary (io_lib:format ("~76p", [Reason])).
+format_term (Term) ->
+	erlang:iolist_to_binary (format_term_ (Term)).
+
+format_term_ (Atom)
+		when is_atom (Atom) ->
+	[$', erlang:atom_to_list (Atom), $'];
+	
+format_term_ (Integer)
+		when is_integer (Integer) ->
+	erlang:integer_to_list (Integer);
+	
+format_term_ (Float)
+		when is_float (Float) ->
+	erlang:float_to_list (Float);
+	
+format_term_ (List)
+		when is_list (List) ->
+	Ascii = lists:all (fun (Byte) when is_integer (Byte), (Byte >= 32), (Byte =< 127) -> true; (_) -> false end, List),
+	if
+		Ascii ->
+			[$", io_lib:format ("~s", [List]), $"];
+		true ->
+			[$[, string:join ([format_term_ (Element) || Element <- List], ", "), $]]
+	end;
+	
+format_term_ (Tuple)
+		when is_tuple (Tuple) ->
+	[${, string:join ([format_term_ (Element) || Element <- erlang:tuple_to_list (Tuple)], ", "), $}];
+	
+format_term_ (Binary)
+		when is_binary (Binary) ->
+	["<<16#", [io_lib:format ("~2.16.0b", [Byte]) || Byte <- binary:bin_to_list (Binary)], ":", erlang:integer_to_list (erlang:bit_size (Binary)), ">>"].

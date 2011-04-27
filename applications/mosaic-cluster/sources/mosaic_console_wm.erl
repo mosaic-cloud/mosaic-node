@@ -91,70 +91,69 @@
 			}
 			
 			var $mosaic = function () {};
-			$mosaic.cluster = function () {};
-			$mosaic.services = function () {};
 			
+			$mosaic.cluster = function () {};
 			$mosaic.cluster.nodes = _wrapped_0 (function () {
-				_outcome = $get (\"cluster/nodes\");
+				_outcome = $get (\"/cluster/nodes\");
 				_nodes = _outcome.nodes;
 				_nodes.push (_outcome.self);
 				return (_nodes);
 			});
 			$mosaic.cluster.nodes.self = _wrapped_0 (function () {
-				return ($get (\"cluster/nodes\") .self);
+				return ($get (\"/cluster/nodes\") .self);
 			});
 			$mosaic.cluster.nodes.self.peers = _wrapped_0 (function () {
-				return ($get (\"cluster/nodes\") .peers);
+				return ($get (\"/cluster/nodes\") .peers);
 			});
 			$mosaic.cluster.nodes.self.activate = _wrapped_0 (function () {
-				return ($get (\"cluster/nodes/self/activate\") .ok);
+				return ($get (\"/cluster/nodes/self/activate\") .ok);
 			});
 			$mosaic.cluster.nodes.self.deactivate = _wrapped_0 (function () {
-				return ($get (\"cluster/nodes/self/deactivate\") .ok);
+				return ($get (\"/cluster/nodes/self/deactivate\") .ok);
 			});
 			$mosaic.cluster.ring = _wrapped_0 (function () {
-				_outcome = $get (\"cluster/ring\");
+				_outcome = $get (\"/cluster/ring\");
 				return ({nodes : _outcome.nodes, partitions : _outcome.partitions});
 			});
 			$mosaic.cluster.ring.nodes = _wrapped_0 (function () {
-				return ($get (\"cluster/ring\") .nodes);
+				return ($get (\"/cluster/ring\") .nodes);
 			});
 			$mosaic.cluster.ring.nodes.include = _wrapped_1 (function (_node) {
-				return ($get (\"cluster/ring/include\", {node : _node}) .ok);
+				return ($get (\"/cluster/ring/include\", {node : _node}) .ok);
 			});
 			$mosaic.cluster.ring.nodes.exclude = _wrapped_1 (function (_node) {
-				return ($get (\"cluster/ring/exclude\", {node : _node}) .ok);
+				return ($get (\"/cluster/ring/exclude\", {node : _node}) .ok);
 			});
 			$mosaic.cluster.ring.partitions = _wrapped_0 (function () {
-				return ($get (\"cluster/ring\") .partitions);
+				return ($get (\"/cluster/ring\") .partitions);
 			});
 			
-			$mosaic.services.executor = function () {};
-			$mosaic.services.executor.nodes = _wrapped_0 (function () {
-				return ($get (\"services/executor/nodes\") .nodes);
+			$mosaic.executor = function () {};
+			$mosaic.executor.nodes = _wrapped_0 (function () {
+				return ($get (\"/executor/nodes\") .nodes);
 			});
-			$mosaic.services.executor.nodes.self = function () {};
-			$mosaic.services.executor.nodes.self.activate = _wrapped_0 (function () {
-				return ($get (\"services/executor/nodes/self/activate\") .ok);
+			$mosaic.executor.nodes.self = function () {};
+			$mosaic.executor.nodes.self.activate = _wrapped_0 (function () {
+				return ($get (\"/executor/nodes/self/activate\") .ok);
 			});
-			$mosaic.services.executor.nodes.self.deactivate = _wrapped_0 (function () {
-				return ($get (\"services/executor/nodes/self/deactivate\") .ok);
+			$mosaic.executor.nodes.self.deactivate = _wrapped_0 (function () {
+				return ($get (\"/executor/nodes/self/deactivate\") .ok);
 			});
-			$mosaic.services.executor.ping = _wrapped_1 (function (_count) {
+			$mosaic.executor.ping = _wrapped_1 (function (_count) {
 				if (_count == undefined)
 					_count = 4;
-				_outcome = $get (\"services/executor/ping\", {count : _count});
+				_outcome = $get (\"/executor/ping\", {count : _count});
 				return ({pongs : _outcome.pongs, pangs : _outcome.pangs});
 			});
-			$mosaic.services.executor.processes = _wrapped_0 (function () {
-				return ($get (\"services/executor/processes\") .processes);
+			$mosaic.executor.processes = _wrapped_0 (function () {
+				return ($get (\"/executor/processes\") .keys);
 			});
-			$mosaic.services.executor.processes.create = _wrapped_2 (function (_type, _arguments) {
+			$mosaic.executor.processes.create = _wrapped_2 (function (_type, _arguments) {
 				_arguments = JSON.stringify (_arguments);
-				return ($get (\"services/executor/processes/create\", {type : _type, arguments : _arguments}) .key);
+				return ($get (\"/executor/processes/create\", {type : _type, arguments : _arguments}) .key);
 			});
-			$mosaic.services.executor.processes.stop = _wrapped_1 (function (_key) {
-				return ($get (\"services/executor/processes/stop\", {key : _key}) .ok);
+			$mosaic.executor.processes.stop = _wrapped_1 (function (_key) {
+				return ($get (\"/executor/processes/stop\", {key : _key}) .ok);
 			});
 			
 		</script>

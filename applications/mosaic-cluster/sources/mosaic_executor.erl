@@ -4,10 +4,12 @@
 -export ([nodes/0]).
 -export ([service_activate/0, service_deactivate/0]).
 -export ([define_and_create_process/2, define_and_create_processes/3]).
--export ([define_process/2, define_processes/3, define_processes/4]).
--export ([create_process/1, create_processes/1, create_processes/2]).
--export ([stop_process/1, stop_process/2, stop_processes/2, stop_processes/3]).
--export ([ping/0, ping/1, ping/2]).
+-export ([define_process/2, define_processes/3]).
+-export ([create_process/1, create_processes/1]).
+-export ([resolve_process/1, resolve_processes/1]).
+-export ([stop_process/1, stop_process/2, stop_processes/1, stop_processes/2]).
+-export ([select_processes/0]).
+-export ([ping/0, ping/1]).
 
 
 nodes () ->
@@ -36,89 +38,109 @@ define_and_create_process (Module, Arguments)
 			Error
 	end.
 
-
 define_and_create_processes (Module, Arguments, Count)
 		when is_atom (Module), is_integer (Count), (Count > 0) ->
-	{ok, Keys, DefineReasons} = define_processes (Module, Arguments, Count),
-	{ok, Processes, CreateReasons} = create_processes (Keys),
-	{ok, Processes, DefineReasons ++ CreateReasons}.
+	case define_processes (Module, Arguments, Count) of
+		{ok, [], DefineReasons} ->
+			{ok, [], [], DefineReasons};
+		{ok, DefineKeys, DefineReasons} when is_list (DefineKeys) ->
+			case create_processes (DefineKeys) of
+				{ok, CreateProcesses, CreateReasons} ->
+					{ok, DefineKeys, CreateProcesses, DefineReasons ++ CreateReasons}
+			end
+	end.
 
 
 define_process (Module, Arguments)
 		when is_atom (Module) ->
 	case define_processes (Module, Arguments, 1) of
 		{ok, [], []} ->
-			{error, vnode_unreachable};
+			{error, unreachable_vnode};
 		{ok, [Key], []} ->
 			{ok, Key};
-		{ok, [], [{_Key, Reason}]} ->
+		{ok, [], [{_Target, _Key, Reason}]} ->
 			{error, Reason}
 	end.
 
 define_processes (Module, Arguments, Count)
-		when is_atom (Module), is_integer (Count), Count > 0 ->
-	define_processes (Module, Arguments, Count, Count * 2).
-
-define_processes (Module, Arguments, Count, Retries)
-		when is_atom (Module), is_integer (Count), is_integer (Retries), Count > 0, Retries >= Count ->
-	Service = mosaic_executor,
-	Master = riak_core_vnode_master:reg_name (mosaic_executor_vnode),
-	Fuzz = erlang:make_ref (),
-	{ok, _, {Keys, Reasons}, _} = sync_command (
-			fun (Index) ->
-				Key = chash:key_of (term_to_binary ({Fuzz, Index})),
-				{ok, Targets = [_]} = mosaic_cluster:targets (Key, mosaic_executor, 1, active_without_fallbacks),
-				{ok, Key, {define_process, Key, Module, Arguments}, Service, Master, Targets, Index + 1}
-			end, 0,
-			fun ({Key, {define_process, Key, _, _}, _, _, _}, [{_, Reply}], {Keys, Reasons}) ->
+		when is_atom (Module), is_integer (Count), (Count > 0) ->
+	{ok, Keys} = mosaic_cluster:keys (Count),
+	request_reply_sync_command (
+			fun (Key) -> {define_process, Key, Module, Arguments} end,
+			fun (Key, _, Reply) ->
 				case Reply of
 					{ok, Key} ->
-						{ok, {[Key | Keys], Reasons}};
-					{error, Reason} ->
-						{ok, {Keys, [{Key, Reason} | Reasons]}};
+						{outcome, Key};
+					Error = {error, _Reason} ->
+						Error;
 					_ ->
-						{ok, {Keys, [{Key, {invalid_reply, Reply}} | Reasons]}}
+						{error, {invalid_reply, Reply}}
 				end
-			end, {[], []},
-			Count, Retries),
-	{ok, lists:reverse (Keys), lists:reverse (Reasons)}.
+			end,
+			Keys,
+			mosaic_executor,
+			riak_core_vnode_master:reg_name (mosaic_executor_vnode),
+			1).
 
 
 create_process (Key) ->
 	case create_processes ([Key]) of
 		{ok, [], []} ->
-			{error, vnode_unreachable};
+			{error, unreachable_vnode};
 		{ok, [{Key, Process}], []} ->
 			{ok, Process};
-		{ok, [], [{Key, Reason}]} ->
+		{ok, [], [{_Target, Key, Reason}]} ->
 			{error, Reason}
 	end.
 
 create_processes (Keys)
 		when is_list (Keys), (Keys =/= []) ->
-	create_processes (Keys, erlang:length (Keys) * 2).
-
-create_processes (Keys, Retries)
-		when is_list (Keys), is_integer (Retries), Retries > 0, Retries >= length (Keys) ->
-	Service = mosaic_executor,
-	Master = riak_core_vnode_master:reg_name (mosaic_executor_vnode),
-	{ok, _, {SuccessfullKeys, Reasons}, _} = sync_command (
-			fun ([Key | RemainingKeys]) ->
-				{ok, Targets = [_]} = mosaic_cluster:targets (Key, mosaic_executor, 1, active_without_fallbacks),
-				{ok, Key, {create_process, Key}, Service, Master, Targets, RemainingKeys}
-			end, Keys,
-			fun ({Key, {create_process, Key}, _, _, _}, [{_, Reply}], {SuccessfullKeys, Reasons}) ->
+	request_reply_sync_command (
+			fun (Key) -> {create_process, Key} end,
+			fun (Key, _, Reply) ->
 				case Reply of
 					{ok, Process} ->
-						{ok, {[{Key, Process} | SuccessfullKeys], Reasons}};
-					{error, Reason} ->
-						{ok, {SuccessfullKeys, [{Key, Reason} | Reasons]}};
+						{outcome, {Key, Process}};
+					Error = {error, _Reason} ->
+						Error;
 					_ ->
-						{ok, {SuccessfullKeys, [{Key, {invalid_reply, Reply}} | Reasons]}}
+						{error, {invalid_reply, Reply}}
 				end
-			end, {[], []},
-			erlang:length (Keys), Retries),
-	{ok, lists:reverse (SuccessfullKeys), lists:reverse (Reasons)}.
+			end,
+			Keys,
+			mosaic_executor,
+			riak_core_vnode_master:reg_name (mosaic_executor_vnode),
+			1).
+
+
+resolve_process (Key) ->
+	case resolve_processes ([Key]) of
+		{ok, [], []} ->
+			{error, unreachable_vnode};
+		{ok, [{Key, Process}], []} ->
+			{ok, Process};
+		{ok, [], [{_Target, Key, Reason}]} ->
+			{error, Reason}
+	end.
+
+resolve_processes (Keys)
+		when is_list (Keys), (Keys =/= []) ->
+	request_reply_sync_command (
+			fun (Key) -> {resolve_process, Key} end,
+			fun (Key, _, Reply) ->
+				case Reply of
+					{ok, Process} ->
+						{outcome, {Key, Process}};
+					Error = {error, _Reason} ->
+						Error;
+					_ ->
+						{error, {invalid_reply, Reply}}
+				end
+			end,
+			Keys,
+			mosaic_executor,
+			riak_core_vnode_master:reg_name (mosaic_executor_vnode),
+			1).
 
 
 stop_process (Key) ->
@@ -127,38 +149,56 @@ stop_process (Key) ->
 stop_process (Key, Signal) ->
 	case stop_processes ([Key], Signal) of
 		{ok, [], []} ->
-			{error, vnode_unreachable};
+			{error, unreachable_vnode};
 		{ok, [Key], []} ->
 			ok;
-		{ok, [], [{Key, Reason}]} ->
+		{ok, [], [{_Target, Key, Reason}]} ->
 			{error, Reason}
 	end.
 
+stop_processes (Keys) ->
+	stop_processes (Keys, normal).
+
 stop_processes (Keys, Signal)
 		when is_list (Keys), (Keys =/= []) ->
-	stop_processes (Keys, Signal, erlang:length (Keys) * 2).
-
-stop_processes (Keys, Signal, Retries)
-		when is_list (Keys), is_integer (Retries), Retries > 0, Retries >= length (Keys) ->
-	Service = mosaic_executor,
-	Master = riak_core_vnode_master:reg_name (mosaic_executor_vnode),
-	{ok, _, {SuccessfullKeys, Reasons}, _} = sync_command (
-			fun ([Key | RemainingKeys]) ->
-				{ok, Targets = [_]} = mosaic_cluster:targets (Key, mosaic_executor, 1, active_without_fallbacks),
-				{ok, Key, {stop_process, Key, Signal}, Service, Master, Targets, RemainingKeys}
-			end, Keys,
-			fun ({Key, {stop_process, Key, _}, _, _, _}, [{_, Reply}], {SuccessfullKeys, Reasons}) ->
+	request_reply_sync_command (
+			fun (Key) -> {stop_process, Key, Signal} end,
+			fun (Key, _, Reply) ->
 				case Reply of
 					ok ->
-						{ok, {[Key | SuccessfullKeys], Reasons}};
-					{error, Reason} ->
-						{ok, {SuccessfullKeys, [{Key, Reason} | Reasons]}};
+						{outcome, Key};
+					Error = {error, _Reason} ->
+						Error;
 					_ ->
-						{ok, {SuccessfullKeys, [{Key, {invalid_reply, Reply}} | Reasons]}}
+						{error, {invalid_reply, Reply}}
 				end
-			end, {[], []},
-			erlang:length (Keys), Retries),
-	{ok, lists:reverse (SuccessfullKeys), lists:reverse (Reasons)}.
+			end,
+			Keys,
+			mosaic_executor,
+			riak_core_vnode_master:reg_name (mosaic_executor_vnode),
+			1).
+
+
+select_processes () ->
+	{ok, Targets} = mosaic_cluster:targets (mosaic_executor, primaries),
+	TargetKeys = lists:map (fun ({Partition, _Node}) -> <<(Partition - 1):160>> end, Targets),
+	{ok, ProcessKeys, Reasons} = request_reply_sync_command (
+			fun (_TargetKey) -> {select_processes} end,
+			fun (_TargetKey, _, Reply) ->
+				case Reply of
+					{ok, Keys} ->
+						{outcome, Keys};
+					Error = {error, _Reason} ->
+						Error;
+					_ ->
+						{error, {invalid_reply, Reply}}
+				end
+			end,
+			TargetKeys,
+			mosaic_executor,
+			riak_core_vnode_master:reg_name (mosaic_executor_vnode),
+			1),
+	{ok, lists:usort (lists:flatten (ProcessKeys)), Reasons}.
 
 
 ping () ->
@@ -166,73 +206,106 @@ ping () ->
 
 ping (Count)
 		when is_integer (Count), (Count > 0) ->
-	ping (Count, Count * 2).
-
-ping (Count, Retries)
-		when is_integer (Count), is_integer (Retries), (Count > 0), (Retries >= Count) ->
 	Service = mosaic_executor,
 	Master = riak_core_vnode_master:reg_name (mosaic_executor_vnode),
-	Fuzz = erlang:make_ref (),
-	{ok, _, {PingCount, Outcomes}, _} = sync_command (
-			fun (Index) ->
-				Key = chash:key_of (term_to_binary ({Fuzz, Index})),
-				{ok, Targets = [_]} = mosaic_cluster:targets (Key, mosaic_executor, 1, primaries),
-				{ok, Key, {ping, Key}, Service, Master, Targets, Index + 1}
-			end, 0,
-			fun ({Key, {ping, Key}, _, _, _}, [{Target, Reply}], {PingCount, Outcomes}) ->
-				Outcome = case Reply of
-					{pong, Key, Target} ->
-						{pong, Target};
-					{pong, OtherKey, Target} ->
-						{pang, Target, {mismatched_key, OtherKey, Target}};
-					{pong, _, OtherTarget} ->
-						{pang, Target, {mismatched_target, OtherTarget, Target}};
-					{error, Reason} ->
-						{pang, Target, Reason};
-					_ ->
-						{pang, Target, {invalid_reply, Reply}}
-				end,
-				case Outcome of
-					{pong, _} ->
-						{ok, {PingCount + 1, [Outcome | Outcomes]}};
-					_ ->
-						{ok, {PingCount, [Outcome | Outcomes]}}
-				end
-			end, {0, []},
-			Count, Retries),
-	{ok, PingCount, lists:reverse (Outcomes)}.
+	{ok, Keys} = mosaic_cluster:keys (Count),
+	{ok, [], {Pongs, Pangs}} = sync_command (
+			fun
+				([]) ->
+					{finish, []};
+				([Key | PendingKeys]) ->
+					{ok, Targets} = mosaic_cluster:targets (Key, mosaic_executor, 1, primaries),
+					Command = {ping, Key},
+					Request = {Key, Command, Service, Master, Targets},
+					{continue, Request, PendingKeys}
+			end, Keys,
+			fun ({Key, {ping, Key}, _, _, _}, Replies, {CollectedPongs, CollectedPangs}) ->
+				Outcomes = lists:map (
+						fun ({Target, Reply}) ->
+							case Reply of
+								Pong = {pong, Key, Target} ->
+									Pong;
+								{pong, OtherKey, Target} ->
+									{pang, Key, Target, {mismatched_key, OtherKey}};
+								{pong, _, OtherTarget} ->
+									{pang, Key, Target, {mismatched_target, OtherTarget}};
+								{error, Reason} ->
+									{pang, Key, Target, Reason};
+								_ ->
+									{pang, Key, Target, {invalid_reply, Reply}}
+							end
+						end,
+						Replies),
+				Pongs = lists:filter (fun ({pong, _, _}) -> true; ({pang, _, _, _}) -> false end, Outcomes),
+				Pangs = lists:filter (fun ({pang, _, _, _}) -> true; ({pong, _, _}) -> false end, Outcomes),
+				{continue, {Pongs ++ CollectedPongs, Pangs ++ CollectedPangs}}
+			end, {[], []}),
+	{ok, lists:reverse (Pongs), lists:reverse (Pangs)}.
 
 
-sync_command (RequestFun, RequestState, RepliesFun, RepliesState, Count, Retries)
-		when is_function (RequestFun, 1), is_function (RepliesFun, 3),
-				is_integer (Count), is_integer (Retries), Count >= 0, Retries >= Count ->
-	sync_command1 (RequestFun, RequestState, RepliesFun, RepliesState, undefined, Count, Retries).
+request_reply_sync_command (CommandFunction, OutcomeFunction, Keys, Service, Master, Fanout) ->
+	{ok, [], {Outcomes, Reasons}} = sync_command (
+			requests_generator (CommandFunction, Service, Master, Fanout), Keys,
+			replies_collector (OutcomeFunction), {[], []}),
+	{ok, lists:reverse (Outcomes), lists:reverse (Reasons)}.
 
-sync_command1 (_RequestFun, RequestState, _RepliesFun, RepliesState, PendingRequest, 0, _Retries) ->
-	{ok, RequestState, RepliesState, PendingRequest};
-	
-sync_command1 (_RequestFun, RequestState, _RepliesFun, RepliesState, PendingRequest, _Count, 0) ->
-	{ok, RequestState, RepliesState, PendingRequest};
-	
-sync_command1 (RequestFun, OldRequestState, RepliesFun, RepliesState, undefined, Count, Retries) ->
-	{ok, Key, Command, Service, Master, Targets, NewRequestState} = RequestFun (OldRequestState),
-	sync_command1 (RequestFun, NewRequestState, RepliesFun, RepliesState, {Key, Command, Service, Master, Targets}, Count, Retries);
-	
-sync_command1 (RequestFun, RequestState, RepliesFun, OldRepliesState, PendingRequest = {_Key, Command, _Service, Master, Targets}, Count, Retries) ->
-	case Targets of
-		Targets when is_list (Targets) ->
-			Replies = lists:map (
-					fun (Target) ->
-						Outcome = try
+requests_generator (CommandFunction, Service, Master, Fanout)
+		when is_function (CommandFunction, 1), is_atom (Service), is_atom (Master), is_integer (Fanout), (Fanout > 0) ->
+	fun
+		([]) ->
+			{finish, []};
+		([Key | PendingKeys]) ->
+			{ok, Targets} = mosaic_cluster:targets (Key, mosaic_executor, Fanout, active_without_fallbacks),
+			Command = CommandFunction (Key),
+			Request = {Key, Command, Service, Master, Targets},
+			{continue, Request, PendingKeys}
+	end.
+
+replies_collector (OutcomeFunction)
+		when is_function (OutcomeFunction, 3) ->
+	fun ({Key, Command, _Service, _Master, _Targets}, TargetReplies, {CollectedOutcomes, CollectedReasons}) ->
+		Values = lists:map (
+				fun ({Target, Reply}) ->
+					case OutcomeFunction (Key, Command, Reply) of
+						Value = {outcome, _Outcome} ->
+							Value;
+						{error, Reason} ->
+							{error, Target, Key, Reason}
+					end
+				end, TargetReplies),
+		Outcomes = lists:map (
+				fun ({outcome, Outcome}) -> Outcome end,
+				lists:filter (fun ({outcome, _}) -> true; ({error, _, _, _}) -> false end, Values)),
+		Reasons = lists:map (
+				fun ({error, Target, Key_, Reason}) when Key_ =:= Key -> {Target, Key_, Reason} end,
+				lists:filter (fun ({error, _, _, _}) -> true; ({outcome, _}) -> false end, Values)),
+		{continue, {Outcomes ++ CollectedOutcomes, Reasons ++ CollectedReasons}}
+	end.
+
+
+sync_command (RequestFunction, RequestInputState, RepliesFunction, RepliesInputState)
+		when is_function (RequestFunction, 1), is_function (RepliesFunction, 3) ->
+	case RequestFunction (RequestInputState) of
+		{continue, Request = {Key, Command, Service, Master, Targets}, RequestOutputState}
+				when is_binary (Key), (bit_size (Key) =:= 160), is_atom (Service), is_atom (Master), is_list (Targets) ->
+			TargetReplies = lists:map (
+					fun (Target = {Partition, Node})
+							when is_atom (Node), is_integer (Partition),
+									(Partition >= 0), (Partition < 1461501637330902918203684832716283019655932542975) ->
+						Reply = try
 							riak_core_vnode_master:sync_command (Target, Command, Master)
 						catch
 							exit : {Reason, _Call} ->
 								{error, Reason}
 						end,
-						{Target, Outcome}
+						{Target, Reply}
 					end, Targets),
-			{ok, NewRepliesState} = RepliesFun (PendingRequest, Replies, OldRepliesState),
-			sync_command1 (RequestFun, RequestState, RepliesFun, NewRepliesState, undefined, Count - 1, Retries);
-		[] ->
-			sync_command1 (RequestFun, RequestState, RepliesFun, OldRepliesState, PendingRequest, Count, Retries - 1)
+			case RepliesFunction (Request, TargetReplies, RepliesInputState) of
+				{continue, RepliesOutputState} ->
+					sync_command (RequestFunction, RequestOutputState, RepliesFunction, RepliesOutputState);
+				{finish, RepliesOutputState} ->
+					{ok, RequestOutputState, RepliesOutputState}
+			end;
+		{finish, RequestOutputState} ->
+			{ok, RequestOutputState, RepliesInputState}
 	end.

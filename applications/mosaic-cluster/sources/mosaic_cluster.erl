@@ -1,39 +1,53 @@
 
 -module (mosaic_cluster).
 
--export ([nodes/0, partitions/0, targets/4]).
+-export ([key/0, key/1, key/2, keys/1, keys/2]).
+-export ([targets/2, targets/4]).
+-export ([nodes/0, partitions/0]).
 -export ([node_activate/0, node_deactivate/0]).
--export ([ring_include/1, ring_exclude/1]).
+-export ([ring_include/1, ring_exclude/1, ring_prune/0, ring_fresh/0]).
 -export ([boot/0]).
 
 
-nodes () ->
-	case riak_core_ring_manager:get_my_ring () of
-		{ok, Ring} ->
-			Nodes = riak_core_ring:all_members (Ring),
-			{ok, Nodes};
-		Error = {error, _Reason} ->
-			Error
-	end.
+key () ->
+	key (erlang:make_ref ()).
+
+key (Token) ->
+	Key = chash:key_of (term_to_binary (Token)),
+	{ok, Key}.
+
+key (Token, Index)
+		when is_integer (Index), (Index >= 0) ->
+	key ({Token, Index}).
+
+keys (Count)
+		when is_integer (Count), (Count > 0) ->
+	keys (erlang:make_ref (), Count).
+
+keys (Token, Count)
+		when is_integer (Count), (Count > 0) ->
+	Keys = lists:map (
+			fun (Index) -> {ok, Key} = key (Token, Index), Key end,
+			lists:seq (0, Count - 1)),
+	{ok, Keys}.
 
 
-partitions () ->
-	case riak_core_ring_manager:get_my_ring () of
-		{ok, Ring} ->
-			Partitions = riak_core_ring:all_owners (Ring),
-			{ok, Partitions};
-		Error = {error, _Reason} ->
-			Error
-	end.
-
+targets (Service, Type) ->
+	targets (<<1461501637330902918203684832716283019655932542975:160>>, Service, all, Type).
 
 targets (Key, Service, Count, Type)
-		when is_binary (Key), (bit_size (Key) =:= 160), is_atom (Service), is_integer (Count), (Count > 0),
+		when is_binary (Key), (bit_size (Key) =:= 160), is_atom (Service),
+				((Count =:= all) orelse (is_integer (Count) andalso (Count > 0))),
 				((Type =:= primaries) orelse (Type =:= active_without_fallbacks) orelse (Type =:= active_with_fallbacks)) ->
 	Nodes = riak_core_node_watcher:nodes (Service),
 	Outcome = case riak_core_ring_manager:get_my_ring () of
 		{ok, Ring} ->
-			MaxCount = min (Count, riak_core_ring:num_partitions (Ring)),
+			{ok, MaxCount} = case Count of
+				all ->
+					{ok, riak_core_ring:num_partitions (Ring)};
+				_ ->
+					{ok, min (Count, riak_core_ring:num_partitions (Ring))}
+			end,
 			case Type of
 				primaries ->
 					{Targets_, _} = lists:split (MaxCount, riak_core_ring:preflist (Key, Ring)),
@@ -53,6 +67,25 @@ targets (Key, Service, Count, Type)
 			Outcome;
 		{error, _Reason2} ->
 			Outcome
+	end.
+
+
+nodes () ->
+	case riak_core_ring_manager:get_my_ring () of
+		{ok, Ring} ->
+			Nodes = riak_core_ring:all_members (Ring),
+			{ok, Nodes};
+		Error = {error, _Reason} ->
+			Error
+	end.
+
+partitions () ->
+	case riak_core_ring_manager:get_my_ring () of
+		{ok, Ring} ->
+			Partitions = riak_core_ring:all_owners (Ring),
+			{ok, Partitions};
+		Error = {error, _Reason} ->
+			Error
 	end.
 
 
@@ -96,6 +129,20 @@ ring_exclude (Node)
 		error : badarg ->
 			ok
 	end.
+
+ring_fresh () ->
+	NewRing = riak_core_ring:fresh (),
+	ok = riak_core_ring_manager:set_my_ring (NewRing),
+	ok.
+
+ring_prune () ->
+	{ok, OldRing} = riak_core_ring_manager:get_my_ring (),
+	{chstate, Self, OldVclock, Partitions = {_PartitionCount, PartitionTargets}, MetaData} = OldRing,
+	PartitionNodes = lists:usort (lists:map (fun ({_, Node}) -> Node end, PartitionTargets)),
+	NewVclock = lists:filter (fun ({Node, _}) -> lists:member (Node, PartitionNodes) end, OldVclock),
+	NewRing = {chstate, Self, NewVclock, Partitions, MetaData},
+	ok = riak_core_ring_manager:set_my_ring (NewRing),
+	ok.
 
 
 boot () ->
