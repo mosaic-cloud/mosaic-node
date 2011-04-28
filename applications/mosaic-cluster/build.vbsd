@@ -13,6 +13,7 @@
 (vbs:define-gcc-application 'mosaic_dummy_process
 	c: "\\./sources/mosaic_dummy_process.c")
 
-(vbs:define-gcc-application 'mosaic_component_process
-	c: "\\./sources/mosaic_component_process.c"
+(vbs:define-gcc-application 'mosaic_component_harness
+	c: "\\./sources/mosaic_component_harness.c"
+	cflags: '("-g")
 	ldflags: '("-ljansson"))
