@@ -6,7 +6,7 @@
 
 test () ->
 	ok = mosaic_cluster:boot (),
-	ScenariosProfile = normal,
+	ScenariosProfile = discover,
 	{ok, Scenarios} = case erlang:node () of
 		'nonode@nohost' ->
 			{ok, [{wm}, {up}, {ping, 16}]};
@@ -14,10 +14,13 @@ test () ->
 			case application:get_env (mosaic_cluster, nodes) of
 				{ok, Nodes} ->
 					case ScenariosProfile of
-						normal ->
+						single ->
 							{ok, [
-									{wm}, {up}, {da}, {ping, 16},
-									{define_and_create_dummy_processes, 4}
+									{wm}, {up}, {ping, 16}
+								]};
+						discover ->
+							{ok, [
+									{wm}, {up}, {da}, {ping, 16}
 								]};
 						join_leave ->
 							case Nodes of
@@ -48,7 +51,8 @@ test () ->
 						fun (Scenario) ->
 							ok = mosaic_tools:report_info (mosaic_cluster, test, scenario, Scenario),
 							ok = test (Scenario)
-						end, Scenarios)
+						end,
+						lists:flatten (Scenarios))
 			end),
 	ok = receive
 		{'EXIT', Slave, normal} ->

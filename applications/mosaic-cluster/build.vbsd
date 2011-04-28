@@ -7,3 +7,12 @@
 	hrl: "\\./sources/.*\\.hrl"
 	additional-ebin: "\\./sources/.*\\.app"
 	additional-priv: "\\./sources/.*\\.config")
+
+(vbs:require-gcc)
+
+(vbs:define-gcc-application 'mosaic_dummy_process
+	c: "\\./sources/mosaic_dummy_process.c")
+
+(vbs:define-gcc-application 'mosaic_component_process
+	c: "\\./sources/mosaic_component_process.c"
+	ldflags: '("-ljansson"))
