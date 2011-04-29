@@ -106,8 +106,6 @@ start_child (Supervisor, Specification) ->
 			{error, already_started};
 		{error, {Error = {error, _Reason}, _Specification}} ->
 			Error;
-		{error, {Outcome, _Specification}} ->
-			{error, {invalid_return, Outcome}};
 		Error = {error, _Reason} ->
 			Error
 	end.

@@ -56,10 +56,10 @@ execute_tests ([Test = {Module, Function, Arguments, Timeout} | RemainingTests])
 
 
 join (Process) ->
-	join (Process, any).
+	join (Process, normal).
 
 join (Process, Reasons)
-		when (is_pid (Process) or is_port (Process)), ((Reasons =:= any) or is_list (Reasons)) ->
+		when (is_pid (Process) or is_port (Process)), ((Reasons =:= any) orelse (Reasons =:= normal) orelse is_list (Reasons)) ->
 	Monitor = erlang:monitor (process, Process),
 	ok = receive
 		{'DOWN', Monitor, process, Process, noproc} ->
@@ -86,10 +86,17 @@ join (Process, Reasons)
 			after 0 ->
 				ok
 			end,
-			if
-				Reasons =:= any ->
+			case Reasons of
+				any ->
 					{ok, Reason};
-				is_list (Reasons) ->
+				normal ->
+					case Reason of
+						normal ->
+							ok;
+						_ ->
+							{error, {unexpected_reason, Reason}}
+					end;
+				_ ->
 					case lists:member (Reason, Reasons) of
 						true ->
 							{ok, Reason};

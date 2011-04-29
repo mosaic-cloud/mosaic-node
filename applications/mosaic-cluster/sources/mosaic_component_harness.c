@@ -1,19 +1,18 @@
 
-
 // ----------------------------------------
 
 #define TRACE_LEVEL _trace_event_information
 #define TRACE_SOURCE 0
 
-enum _exit_code {
-	_exit_code_succeeded = 0,
-	_exit_code_failed_assertion,
-	_exit_code_invalid_arguments,
-	_exit_code_invalid_packet_action,
-	_exit_code_invalid_packet_json,
-	_exit_code_error_eio,
-	_exit_code_error_enomem,
-	_exit_code_max,
+enum _exit_status {
+	_exit_status_succeeded = 0,
+	_exit_status_failed_assertion,
+	_exit_status_invalid_arguments,
+	_exit_status_invalid_packet_type,
+	_exit_status_invalid_packet_json,
+	_exit_status_error_eio,
+	_exit_status_error_enomem,
+	_exit_status_max,
 };
 
 enum _context_state {
@@ -65,13 +64,14 @@ enum _packet_state {
 	_packet_state_max,
 };
 
-enum _packet_action {
-	_packet_action_undefined = 0,
-	_packet_action_invalid,
-	_packet_action_exchange,
-	_packet_action_execute,
-	_packet_action_signal,
-	_packet_action_max,
+enum _packet_type {
+	_packet_type_undefined = 0,
+	_packet_type_invalid,
+	_packet_type_terminate,
+	_packet_type_exchange,
+	_packet_type_execute,
+	_packet_type_signal,
+	_packet_type_max,
 };
 
 enum _trace_event {
@@ -122,7 +122,7 @@ struct _process {
 	struct _packet_stream * input_stream;
 	struct _packet_stream * output_stream;
 	unsigned int descriptor;
-	unsigned int exit_code;
+	unsigned int exit_status;
 	struct _cleanup * cleanup;
 };
 
@@ -150,7 +150,7 @@ struct _packet_stream {
 struct _packet {
 	struct _packet * chained;
 	enum _packet_state state;
-	enum _packet_action action;
+	enum _packet_type type;
 	unsigned int size;
 	struct _buffer * buffer;
 	json_t * json;
@@ -282,7 +282,7 @@ static void _packet_parse (
 static void _packet_parse_json (
 		struct _packet * const _packet);
 
-static void _packet_parse_action (
+static void _packet_parse_type (
 		struct _packet * const _packet);
 
 static void _packet_input (
@@ -332,18 +332,18 @@ static void _buffer_deallocate (
 // ----------------------------------------
 
 static void __terminate (
-		enum _exit_code const _exit_code,
+		enum _exit_status const _exit_status,
 		unsigned char const * const _source_file,
 		unsigned int const _source_line);
 
 static void __terminate_with_reason_1 (
-		enum _exit_code const _exit_code,
+		enum _exit_status const _exit_status,
 		unsigned char const * const _source_file,
 		unsigned int const _source_line,
 		unsigned char const * const _reason);
 
 static void __terminate_with_reason_2 (
-		enum _exit_code const _exit_code,
+		enum _exit_status const _exit_status,
 		unsigned char const * const _source_file,
 		unsigned int const _source_line,
 		unsigned char const * const _reason_1,
@@ -400,7 +400,7 @@ unsigned int main (
 	_cleanup_register_close (&_output_cleanup, 1);
 	
 	if (_argument_count != 1)
-		__terminate (_exit_code_invalid_arguments, __func__, __LINE__);
+		__terminate (_exit_status_invalid_arguments, __func__, __LINE__);
 	
 	_context = 0;
 	_context_create (&_context, 0, 1);
@@ -433,12 +433,12 @@ extern unsigned char const * const * const environ;
 
 // ----------------------------------------
 
-#define _terminate(_exit_code) \
-		__terminate_with_reason_1 ((_exit_code), __func__, __LINE__, #_exit_code);
-#define _terminate_with_reason_1(_exit_code, _reason_1) \
-		__terminate_with_reason_1 ((_exit_code), __func__, __LINE__, (_reason_1))
-#define _terminate_with_reason_2(_exit_code, _reason_1, _reason_2) \
-		__terminate_with_reason_2 ((_exit_code), __func__, __LINE__, (_reason_1), (_reason_2))
+#define _terminate(_exit_status) \
+		__terminate_with_reason_1 ((_exit_status), __func__, __LINE__, #_exit_status);
+#define _terminate_with_reason_1(_exit_status, _reason_1) \
+		__terminate_with_reason_1 ((_exit_status), __func__, __LINE__, (_reason_1))
+#define _terminate_with_reason_2(_exit_status, _reason_1, _reason_2) \
+		__terminate_with_reason_2 ((_exit_status), __func__, __LINE__, (_reason_1), (_reason_2))
 
 #define _enforce(_condition) \
 		__enforce ((_condition), #_condition, __func__, __LINE__)
@@ -478,7 +478,7 @@ static void _context_handle_execute_packet (
 	_packet = *_packet_; *_packet_ = 0;
 	_assert ((_context->state == _context_state_active) || (_context->state == _context_state_flushing));
 	_assert (_packet->state == _packet_state_parsed);
-	_assert (_packet->action == _packet_action_execute);
+	_assert (_packet->type == _packet_type_execute);
 	
 	_enforce (_context->process == 0);
 	_enforce (_context->state == _context_state_active);
@@ -503,7 +503,7 @@ static void _context_handle_signal_packet (
 	_packet = *_packet_; *_packet_ = 0;
 	_assert ((_context->state == _context_state_active) || (_context->state == _context_state_flushing));
 	_assert (_packet->state == _packet_state_parsed);
-	_assert (_packet->action == _packet_action_signal);
+	_assert (_packet->type == _packet_type_signal);
 	
 	_enforce (_context->process != 0);
 	
@@ -536,7 +536,7 @@ static void _context_check (
 						json_t * _packet_json;
 						unsigned char * _packet_payload;
 						unsigned int _packet_payload_size;
-						_packet_json = json_pack ("{s:s,s:i}", "__action__", "exited", "exit-code", _context->process->exit_code);
+						_packet_json = json_pack ("{s:s,s:i}", "__type__", "exit", "exit-status", _context->process->exit_status);
 						_enforce (_packet_json != 0);
 						_packet_payload = json_dumps (_packet_json, JSON_COMPACT);
 						_enforce (_packet_payload != 0);
@@ -647,8 +647,13 @@ static void _context_handle_controller_packet (
 	_assert ((_context->state == _context_state_active) || (_context->state == _context_state_flushing));
 	_assert (_packet->state == _packet_state_inputed);
 	_packet_parse (_packet);
-	switch (_packet->action) {
-		case _packet_action_exchange :
+	switch (_packet->type) {
+		case _packet_type_terminate :
+			_trace_information ("terminating...");
+			_context->state = _context_state_flushing;
+			_packet_deallocate (&_packet);
+			break;
+		case _packet_type_exchange :
 			if ((_context->process != 0) && (_context->process->output_stream != 0)) {
 				_trace_debugging ("transferring inbound packet from controller to component...");
 				_packet->state = _packet_state_output_ready;
@@ -659,14 +664,14 @@ static void _context_handle_controller_packet (
 				_packet_deallocate (&_packet);
 			}
 			break;
-		case _packet_action_execute :
+		case _packet_type_execute :
 			_context_handle_execute_packet (_context, &_packet);
 			break;
-		case _packet_action_signal :
+		case _packet_type_signal :
 			_context_handle_signal_packet (_context, &_packet);
 			break;
 		default :
-			_trace_error ("dropped inbound packet from controller due to invalid action...");
+			_trace_error ("dropped inbound packet from controller due to invalid type...");
 			_packet_deallocate (&_packet);
 			break;
 	}
@@ -685,8 +690,8 @@ static void _context_handle_component_packet (
 	_assert ((_context->state == _context_state_active) || (_context->state == _context_state_flushing));
 	_assert (_packet->state == _packet_state_inputed);
 	_packet_parse (_packet);
-	switch (_packet->action) {
-		case _packet_action_exchange :
+	switch (_packet->type) {
+		case _packet_type_exchange :
 			if (_context->controller_output_stream != 0) {
 				_trace_debugging ("transferring inbound packet from component to controller...");
 				_packet->state = _packet_state_output_ready;
@@ -698,7 +703,7 @@ static void _context_handle_component_packet (
 			}
 			break;
 		default :
-			_trace_error ("dropped inbound packet from component due to invalid action...");
+			_trace_error ("dropped inbound packet from component due to invalid type...");
 			_packet_deallocate (&_packet);
 			break;
 	}
@@ -978,7 +983,7 @@ static void _process_poll (
 	if (_outcome == _process->descriptor) {
 		_trace_information ("process exited...");
 		_process->descriptor = 0;
-		_process->exit_code = _status;
+		_process->exit_status = _status;
 		_process->state = _process_state_exited;
 		_process->cleanup->action = _cleanup_action_canceled;
 		_process->cleanup = 0;
@@ -1138,14 +1143,14 @@ static void _process_destroy (
 		_outcome = waitpid (_process->descriptor, &_status, WNOHANG);
 		if (_outcome == _process->descriptor) {
 			_trace_information ("process exited...");
-			_process->exit_code = _status;
+			_process->exit_status = _status;
 		} else if (_outcome == 0) {
 			_trace_warning ("killing process...");
 			kill (_process->descriptor, SIGTERM);
 			for (_timeout = 0; _timeout < 6000; _timeout += _timeout_slice) {
 				_outcome = waitpid (_process->descriptor, &_status, WNOHANG);
 				if (_outcome == _process->descriptor) {
-					_process->exit_code = _status;
+					_process->exit_status = _status;
 					break;
 				} else if (_outcome == 0)
 					;
@@ -1156,7 +1161,7 @@ static void _process_destroy (
 			if (_outcome != _process->descriptor) {
 				kill (_process->descriptor, SIGKILL);
 				waitpid (_process->descriptor, 0, WNOHANG);
-				_process->exit_code = ~0;
+				_process->exit_status = ~0;
 			}
 			_trace_warning ("process killed...");
 		} else
@@ -1211,12 +1216,12 @@ static void _process_configuration_create (
 			"executable", &_executable_json, "arguments", &_arguments_json, "environment", &_environment_json,
 			"working-directory", &_working_directory_json);
 	if (_json_outcome != 0)
-		_terminate_with_reason_1 (_exit_code_invalid_packet_json, _json_error.text);
+		_terminate_with_reason_1 (_exit_status_invalid_packet_json, _json_error.text);
 	
 	if (json_is_string (_executable_json))
 		_buffer_malloc_strdup (&_configuration->executable, json_string_value (_executable_json), _malloc);
 	else
-		_terminate (_exit_code_invalid_packet_json);
+		_terminate (_exit_status_invalid_packet_json);
 	
 	if (json_is_array (_arguments_json) && (json_array_size (_arguments_json) != 0)) {
 		_count = json_array_size (_arguments_json);
@@ -1226,7 +1231,7 @@ static void _process_configuration_create (
 			if (json_is_string (_temporary_json))
 				_buffer_malloc_strdup (&_configuration->argument_values[_index], json_string_value (_temporary_json), _malloc);
 			else
-				_terminate (_exit_code_invalid_packet_json);
+				_terminate (_exit_status_invalid_packet_json);
 		}
 		_configuration->argument_values[_count] = 0;
 		_configuration->argument_count = _count;
@@ -1236,7 +1241,7 @@ static void _process_configuration_create (
 		_configuration->argument_values[1] = 0;
 		_configuration->argument_count = 1;
 	} else
-		_terminate (_exit_code_invalid_packet_json);
+		_terminate (_exit_status_invalid_packet_json);
 	
 	if (json_is_object (_environment_json)) {
 		_count = json_object_size (_environment_json);
@@ -1256,7 +1261,7 @@ static void _process_configuration_create (
 				strncat (_configuration->environment_values[_index], json_string_value (_temporary_json), _size - 1);
 				_configuration->environment_values[_index][_size] = 0;
 			} else
-				_terminate (_exit_code_invalid_packet_json);
+				_terminate (_exit_status_invalid_packet_json);
 		}
 		_configuration->environment_values[_count] = 0;
 		_configuration->environment_count = _count;
@@ -1270,14 +1275,14 @@ static void _process_configuration_create (
 		_configuration->environment_values[_count] = 0;
 		_configuration->environment_count = _count;
 	} else
-		_terminate (_exit_code_invalid_packet_json);
+		_terminate (_exit_status_invalid_packet_json);
 	
 	if (json_is_string (_working_directory_json))
 		_buffer_malloc_strdup (&_configuration->working_directory, json_string_value (_working_directory_json), _malloc);
 	else if (json_is_null (_working_directory_json))
 		;
 	else
-		_terminate (_exit_code_invalid_packet_json);
+		_terminate (_exit_status_invalid_packet_json);
 	
 	*_configuration_ = _configuration;
 }
@@ -1307,7 +1312,7 @@ static void _process_signal_parse (
 	_assert (_json != 0);
 	_json_outcome = json_unpack_ex (_json, &_json_error, JSON_STRICT, "{s:s}", "signal", &_signal_name);
 	if (_json_outcome != 0)
-		_terminate_with_reason_1 (_exit_code_invalid_packet_json, _json_error.text);
+		_terminate_with_reason_1 (_exit_status_invalid_packet_json, _json_error.text);
 	if (_signal_name == 0)
 		*_signal = _process_signal_invalid;
 	else if (strcmp (_signal_name, "terminate") == 0)
@@ -1326,7 +1331,7 @@ static void _packet_parse (
 	_assert (_packet != 0);
 	_assert (_packet->state == _packet_state_inputed);
 	_packet_parse_json (_packet);
-	_packet_parse_action (_packet);
+	_packet_parse_type (_packet);
 	_packet->state = _packet_state_parsed;
 }
 
@@ -1344,30 +1349,32 @@ static void _packet_parse_json (
 	_buffer_parse_json (&_packet->json, _packet->buffer);
 }
 
-static void _packet_parse_action (
+static void _packet_parse_type (
 		struct _packet * const _packet)
 {
 	json_error_t _json_error;
 	signed int _json_outcome;
-	char * const _action_name;
+	char * const _type_name;
 	_assert (_packet != 0);
 	_assert (_packet->state == _packet_state_inputed);
 	_assert (_packet->json != 0);
-	_assert (_packet->action == _packet_action_undefined);
-	_json_outcome = json_unpack_ex (_packet->json, &_json_error, JSON_STRICT, "{s:s*}", "__action__", &_action_name);
+	_assert (_packet->type == _packet_type_undefined);
+	_json_outcome = json_unpack_ex (_packet->json, &_json_error, JSON_STRICT, "{s:s*}", "__type__", &_type_name);
 	if (_json_outcome != 0)
-		_terminate_with_reason_1 (_exit_code_invalid_packet_action, _json_error.text);
-	if (_action_name == 0)
-		_packet->action = _packet_action_invalid;
-	else if (strcmp (_action_name, "exchange") == 0)
-		_packet->action = _packet_action_exchange;
-	else if (strcmp (_action_name, "execute") == 0)
-		_packet->action = _packet_action_execute;
-	else if (strcmp (_action_name, "signal") == 0)
-		_packet->action = _packet_action_signal;
+		_terminate_with_reason_1 (_exit_status_invalid_packet_type, _json_error.text);
+	if (_type_name == 0)
+		_packet->type = _packet_type_invalid;
+	else if (strcmp (_type_name, "terminate") == 0)
+		_packet->type = _packet_type_terminate;
+	else if (strcmp (_type_name, "exchange") == 0)
+		_packet->type = _packet_type_exchange;
+	else if (strcmp (_type_name, "execute") == 0)
+		_packet->type = _packet_type_execute;
+	else if (strcmp (_type_name, "signal") == 0)
+		_packet->type = _packet_type_signal;
 	else
-		_packet->action = _packet_action_invalid;
-	_json_outcome = json_object_del (_packet->json, "__action__");
+		_packet->type = _packet_type_invalid;
+	_json_outcome = json_object_del (_packet->json, "__type__");
 	_assert (_json_outcome == 0);
 }
 
@@ -1677,7 +1684,7 @@ static void _packet_allocate (
 	_enforce (_packet != 0);
 	memset (_packet, 0x00, sizeof (struct _packet));
 	_packet->state = _packet_state_input_ready;
-	_packet->action = _packet_action_undefined;
+	_packet->type = _packet_type_undefined;
 	_buffer_allocate (&_packet->buffer, _size + 4);
 	*_packet_ = _packet;
 }
@@ -1712,7 +1719,7 @@ static void _buffer_parse_json (
 	_buffer->data[_buffer->available] = '\0';
 	_json_ = json_loads (_buffer->data + _buffer->offset, 0, &_json_error);
 	if (_json_ == 0)
-		_terminate_with_reason_1 (_exit_code_invalid_packet_json, _json_error.text);
+		_terminate_with_reason_1 (_exit_status_invalid_packet_json, _json_error.text);
 	*_json = _json_;
 }
 
@@ -1818,48 +1825,48 @@ static void _buffer_deallocate (
 // ----------------------------------------
 
 static void __terminate (
-		enum _exit_code const _exit_code,
+		enum _exit_status const _exit_status,
 		unsigned char const * const _source_file,
 		unsigned int const _source_line)
 {
 	if (TRACE_SOURCE)
-		fprintf (stderr, "[!!] terminated with %d @@ `%s`/%d\n", _exit_code, _source_file, _source_line);
+		fprintf (stderr, "[!!] terminated with %d @@ `%s`/%d\n", _exit_status, _source_file, _source_line);
 	else
-		fprintf (stderr, "[!!] terminated with %d\n", _exit_code);
+		fprintf (stderr, "[!!] terminated with %d\n", _exit_status);
 	fflush (stderr);
 	_cleanup_execute ();
-	exit (_exit_code);
+	exit (_exit_status);
 }
 
 static void __terminate_with_reason_1 (
-		enum _exit_code const _exit_code,
+		enum _exit_status const _exit_status,
 		unsigned char const * const _source_file,
 		unsigned int const _source_line,
 		unsigned char const * const _reason)
 {
 	if (TRACE_SOURCE)
-		fprintf (stderr, "[!!] terminated with %d: %s @@ `%s`/%d\n", _exit_code, _reason, _source_file, _source_line);
+		fprintf (stderr, "[!!] terminated with %d: %s @@ `%s`/%d\n", _exit_status, _reason, _source_file, _source_line);
 	else
-		fprintf (stderr, "[!!] terminated with %d: %s\n", _exit_code, _reason);
+		fprintf (stderr, "[!!] terminated with %d: %s\n", _exit_status, _reason);
 	fflush (stderr);
 	_cleanup_execute ();
-	exit (_exit_code);
+	exit (_exit_status);
 }
 
 static void __terminate_with_reason_2 (
-		enum _exit_code const _exit_code,
+		enum _exit_status const _exit_status,
 		unsigned char const * const _source_file,
 		unsigned int const _source_line,
 		unsigned char const * const _reason_1,
 		unsigned char const * const _reason_2)
 {
 	if (TRACE_SOURCE)
-		fprintf (stderr, "[!!] terminated with %d: %s / %s @@ `%s`/%d\n", _exit_code, _reason_1, _reason_2, _source_file, _source_line);
+		fprintf (stderr, "[!!] terminated with %d: %s / %s @@ `%s`/%d\n", _exit_status, _reason_1, _reason_2, _source_file, _source_line);
 	else
-		fprintf (stderr, "[!!] terminated with %d: %s / %s\n", _exit_code, _reason_1, _reason_2);
+		fprintf (stderr, "[!!] terminated with %d: %s / %s\n", _exit_status, _reason_1, _reason_2);
 	fflush (stderr);
 	_cleanup_execute ();
-	exit (_exit_code);
+	exit (_exit_status);
 }
 
 static void __enforce (
@@ -1872,7 +1879,7 @@ static void __enforce (
 		fprintf (stderr, "[!!] enforcement failed for `%s` @@ `%s`/%d\n", _condition_expression, _source_file, _source_line);
 		fflush (stderr);
 		_cleanup_execute ();
-		exit (_exit_code_failed_assertion);
+		exit (_exit_status_failed_assertion);
 	}
 }
 
@@ -1886,7 +1893,7 @@ static void __assert (
 		fprintf (stderr, "[!!] assertion failed for `%s` @@ `%s`/%d\n", _condition_expression, _source_file, _source_line);
 		fflush (stderr);
 		_cleanup_execute ();
-		exit (_exit_code_failed_assertion);
+		exit (_exit_status_failed_assertion);
 	}
 }
 

@@ -84,10 +84,6 @@
 -endif.
 
 
-test () ->
-	mosaic_tests:test_module (mosaic_process_tests).
-
-
 process_tester__start_stop ([{stop_method, StopMethod}, {stop_signal, reference}]) ->
 	process_tester__start_stop ([{stop_method, StopMethod}, {stop_signal, erlang:make_ref ()}]);
 	
@@ -238,6 +234,7 @@ process_controller__start_stop (defaults) ->
 	{ok, Controller} = start_link_process_controller (noname, defaults),
 	ok = stop_and_join_process_controller (Controller),
 	true = erlang:exit (Supervisor, normal),
+	ok = mosaic_tests:join (Supervisor),
 	ok.
 
 process_controller__start_error (defaults) ->
@@ -263,6 +260,7 @@ process_controller__create (Outcome) ->
 	end,
 	ok = stop_and_join_process_controller (Controller),
 	true = erlang:exit (Supervisor, normal),
+	ok = mosaic_tests:join (Supervisor),
 	ok.
 
 process_controller__migrate (once) ->
@@ -279,6 +277,7 @@ process_controller__migrate (once) ->
 	ok = stop_and_join_process_controller (SourceController),
 	ok = stop_and_join_process_controller (TargetController),
 	true = erlang:exit (Supervisor, normal),
+	ok = mosaic_tests:join (Supervisor),
 	ok;
 	
 process_controller__migrate (twice) ->
@@ -299,6 +298,7 @@ process_controller__migrate (twice) ->
 	ok = stop_and_join_process_controller (SourceController),
 	ok = stop_and_join_process_controller (TargetController),
 	true = erlang:exit (Supervisor, normal),
+	ok = mosaic_tests:join (Supervisor),
 	ok.
 
 
@@ -441,3 +441,7 @@ receive_unexpected () ->
 	after 0 ->
 		timeout
 	end.
+
+
+test () ->
+	mosaic_tests:test_module (mosaic_process_tests).
