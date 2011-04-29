@@ -10,11 +10,10 @@ process.on ("SIGTERM", function () {
 });
 
 process.stdin.on ("data", function (_data) {
-	console.error ("-> input" + _data);
-	process.stdout.write (new Buffer ([0, 0, 0, 37]));
-	process.stdout.write (new Buffer ('{"__type__":"exchange","key":"value"}'))
+	console.error ("-> exchange");
+	process.stdout.write (_data);
 });
 
 process.stdin.on ("end", function () {
-	console.error ("-> end");
+	console.error ("-> eos");
 });

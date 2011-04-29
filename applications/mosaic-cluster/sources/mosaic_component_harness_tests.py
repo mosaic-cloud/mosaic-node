@@ -60,12 +60,15 @@ def _nodejs () :
 			"working-directory" : None,
 	})
 	for i in xrange (0, 10) :
-		_output ({
+		_output_message = {
 				"__type__" : "exchange",
 				"index" : i,
-		})
+		}
+		_output (_output_message)
+		_input_message = _input ()
+		print >> sys.stderr, _output_message
+		print >> sys.stderr, _input_message
 		_sleep (0.1)
-	print >> sys.stderr, _input ()
 	_output_close ()
 	_input_close ()
 
@@ -89,9 +92,10 @@ import time
 def _input () :
 	_header = _harness_input.read (4)
 	(_size,) = struct.unpack (">l", _header)
-	print >> sys.stderr, _size
 	_data = _harness_input.read (_size)
-	_message = _data
+	if _data[-1] != chr (0) :
+		raise Exception ()
+	_message = _data[:-1]
 	_message = _message.decode ("utf-8")
 	_object = json.loads (_message)
 	return _message
@@ -101,7 +105,7 @@ def _input_close () :
 
 def _output (_object) :
 	_message = json.dumps (_object)
-	_message = _message.encode ("utf-8")
+	_message = _message.encode ("utf-8") + chr (0)
 	_size = len (_message)
 	_header = struct.pack (">l", _size)
 	_data = _message

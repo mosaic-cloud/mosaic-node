@@ -536,7 +536,8 @@ parse_signal_specification (Specification) ->
 
 encode_packet (json, PacketJson) ->
 	try begin
-		PacketData = erlang:iolist_to_binary (mochijson2:encode (PacketJson)),
+		PacketJsonData = erlang:iolist_to_binary (mochijson2:encode (PacketJson)),
+		PacketData = <<PacketJsonData / binary, 0 : 8>>,
 		{ok, PacketData}
 	end catch
 		throw : Reason ->
@@ -545,13 +546,19 @@ encode_packet (json, PacketJson) ->
 			{error, {invalid_packet, Reason}}
 	end.
 
-decode_packet (PacketData) ->
-	try begin
-		PacketJson = mochijson2:decode (PacketData),
-		{ok, json, PacketJson}
-	end catch
-		throw : Reason ->
-			{error, {invalid_packet, Reason}};
-		exit : Reason ->
-			{error, {invalid_packet, Reason}}
+decode_packet (PacketData)
+		when is_binary (PacketData) ->
+	case binary:split (PacketData, <<0 : 8>>) of
+		[PacketJsonData, <<>>] ->
+			try begin
+				PacketJson = mochijson2:decode (PacketJsonData),
+				{ok, json, PacketJson}
+			end catch
+				throw : Reason ->
+					{error, {invalid_packet, Reason}};
+				exit : Reason ->
+					{error, {invalid_packet, Reason}}
+			end;
+		_ ->
+			{error, invalid_packet_framing}
 	end.

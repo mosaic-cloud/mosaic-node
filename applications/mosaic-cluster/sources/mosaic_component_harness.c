@@ -541,11 +541,12 @@ static void _context_check (
 						_packet_payload = json_dumps (_packet_json, JSON_COMPACT);
 						_enforce (_packet_payload != 0);
 						json_decref (_packet_json);
-						_packet_payload_size = strlen (_packet_payload);
+						_packet_payload_size = strlen (_packet_payload) + 1;
 						_packet = 0;
 						_packet_allocate (&_packet, _packet_payload_size);
 						*((unsigned int *) _packet->buffer->data) = htonl (_packet_payload_size);
-						memcpy (_packet->buffer->data + 4, _packet_payload, _packet_payload_size);
+						memcpy (_packet->buffer->data + 4, _packet_payload, _packet_payload_size - 1);
+						_packet->buffer->data[4 + _packet_payload_size] = '\0';
 						free (_packet_payload);
 						_packet->size = _packet_payload_size;
 						_packet->state = _packet_state_output_ready;
@@ -1712,11 +1713,14 @@ static void _buffer_parse_json (
 		json_t * * const _json,
 		struct _buffer * const _buffer)
 {
+	unsigned int _limit;
 	json_t * _json_;
 	json_error_t _json_error;
 	_assert (_json != 0); _assert (*_json == 0); _assert (_buffer != 0);
 	_assert (_buffer->offset < _buffer->available);
-	_buffer->data[_buffer->available] = '\0';
+	for (_limit = _buffer->offset; ((_limit < _buffer->available) && (_buffer->data[_limit] != '\0')); _limit++);
+	if (_limit == _buffer->available)
+		_terminate_with_reason_1 (_exit_status_invalid_packet_json, "missing null terminator");
 	_json_ = json_loads (_buffer->data + _buffer->offset, 0, &_json_error);
 	if (_json_ == 0)
 		_terminate_with_reason_1 (_exit_status_invalid_packet_json, _json_error.text);
@@ -1744,9 +1748,6 @@ static void _buffer_malloc_block (
 		_aligned_size = _unaligned_size;
 	else
 		_aligned_size = (_unaligned_size | 0x07) + 1;
-	//___ui(_buffer->offset)
-	//___ui(_unaligned_size)
-	//___ui(_aligned_size)
 	_enforce (_aligned_size <= (_buffer->available - _buffer->offset));
 	_block = _buffer->data + _buffer->offset;
 	_buffer->offset += _aligned_size;
@@ -1779,7 +1780,7 @@ static void _buffer_allocate (
 	struct _buffer * _buffer;
 	_assert (_buffer_ != 0);
 	_assert (*_buffer_ == 0);
-	_buffer = malloc (((sizeof (struct _buffer) | 0x07) + 1) + ((_capacity | 0x07) + 1) + 1);
+	_buffer = malloc (((sizeof (struct _buffer) | 0x07) + 1) + ((_capacity | 0x07) + 1));
 	_enforce (_buffer != 0);
 	memset (_buffer, 0x00, sizeof (struct _buffer));
 	_buffer->data = (unsigned char *) _buffer + ((sizeof (struct _buffer) | 0x07) + 1);
@@ -1800,7 +1801,7 @@ static void _buffer_reallocate (
 	_assert (_buffer->offset <= _buffer->available);
 	_assert (_buffer->available <= _buffer->capacity);
 	_assert (_buffer->capacity < _capacity);
-	_buffer = realloc (_buffer, ((sizeof (struct _buffer) | 0x07) + 1) + ((_capacity | 0x07) + 1) + 1);
+	_buffer = realloc (_buffer, ((sizeof (struct _buffer) | 0x07) + 1) + ((_capacity | 0x07) + 1));
 	_enforce (_buffer != 0);
 	_buffer->data = (unsigned char *) _buffer + ((sizeof (struct _buffer) | 0x07) + 1);
 	_buffer->capacity = _capacity;
