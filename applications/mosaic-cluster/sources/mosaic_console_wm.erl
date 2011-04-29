@@ -129,6 +129,9 @@
 			$mosaic.cluster.ring.partitions = _wrapped_0 (function () {
 				return ($get (\"/cluster/ring\") .partitions);
 			});
+			$mosaic.cluster.ring.reboot = _wrapped_0 (function () {
+				return ($get (\"/cluster/ring/reboot\") .ok);
+			});
 			
 			$mosaic.executor = function () {};
 			$mosaic.executor.nodes = _wrapped_0 (function () {

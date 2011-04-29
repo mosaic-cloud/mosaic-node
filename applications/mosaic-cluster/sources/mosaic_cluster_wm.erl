@@ -11,6 +11,7 @@
 -dispatch ({["cluster", "ring"], {ring}}).
 -dispatch ({["cluster", "ring", "include"], {ring, include}}).
 -dispatch ({["cluster", "ring", "exclude"], {ring, exclude}}).
+-dispatch ({["cluster", "ring", "reboot"], {ring, reboot}}).
 
 
 -record (state, {target, arguments}).
@@ -43,7 +44,9 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 					{ok, false, State#state{arguments = dict:from_list ([{node, Node}])}};
 				Error = {error, _Reason} ->
 					Error
-			end
+			end;
+		{ring, reboot} ->
+			mosaic_webmachine:enforce_request ('GET', [], Request)
 	end,
 	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
@@ -94,6 +97,13 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 		{ring, exclude} ->
 			Node = dict:fetch (node, Arguments),
 			case mosaic_cluster:ring_exclude (Node) of
+				ok ->
+					ok;
+				Error = {error, _Reason} ->
+					Error
+			end;
+		{ring, reboot} ->
+			case mosaic_cluster:ring_reboot () of
 				ok ->
 					ok;
 				Error = {error, _Reason} ->

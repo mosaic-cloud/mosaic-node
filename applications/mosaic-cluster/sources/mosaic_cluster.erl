@@ -5,7 +5,7 @@
 -export ([targets/2, targets/4]).
 -export ([nodes/0, partitions/0]).
 -export ([node_activate/0, node_deactivate/0]).
--export ([ring_include/1, ring_exclude/1, ring_prune/0, ring_fresh/0]).
+-export ([ring_include/1, ring_exclude/1, ring_reboot/0]).
 -export ([boot/0]).
 
 
@@ -130,17 +130,9 @@ ring_exclude (Node)
 			ok
 	end.
 
-ring_fresh () ->
+ring_reboot () ->
 	NewRing = riak_core_ring:fresh (),
-	ok = riak_core_ring_manager:set_my_ring (NewRing),
-	ok.
-
-ring_prune () ->
-	{ok, OldRing} = riak_core_ring_manager:get_my_ring (),
-	{chstate, Self, OldVclock, Partitions = {_PartitionCount, PartitionTargets}, MetaData} = OldRing,
-	PartitionNodes = lists:usort (lists:map (fun ({_, Node}) -> Node end, PartitionTargets)),
-	NewVclock = lists:filter (fun ({Node, _}) -> lists:member (Node, PartitionNodes) end, OldVclock),
-	NewRing = {chstate, Self, NewVclock, Partitions, MetaData},
+	ok = application:set_env (riak_core, wants_claim_fun, {riak_core_claim, default_wants_claim}),
 	ok = riak_core_ring_manager:set_my_ring (NewRing),
 	ok.
 
