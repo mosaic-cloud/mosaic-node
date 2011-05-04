@@ -5,117 +5,147 @@
 
 
 test () ->
-	ok = mosaic_cluster:boot (),
-	ScenariosProfile = discover,
-	{ok, Scenarios} = case erlang:node () of
-		'nonode@nohost' ->
-			{ok, [{wm}, {up}, {ping, 16}]};
-		Node ->
-			case application:get_env (mosaic_cluster, nodes) of
-				{ok, Nodes} ->
-					case ScenariosProfile of
-						single ->
-							{ok, [
-									{wm}, {up}, {ping, 16}
-								]};
-						discover ->
-							{ok, [
-									{wm}, {up}, {da}, {ping, 16}
-								]};
-						join_leave ->
-							case Nodes of
-								[Node | _] ->
-									{ok, [
-											{wm}, {up}, {ping, 16},
-											{sleep, 2 * 1000}, {join, Nodes},
-											{sleep, 2 * 10}, {ping, 16}
-										]};
-								_ ->
-									{ok, [
-											{wm}, {up}, {ping, 16},
-											{sleep, 2 * 1000}, {join, Nodes},
-											{sleep, 2 * 10}, {ping, 16},
-											{sleep, 2 * 1000}, {leave},
-											{sleep, 2 * 10}, {ping, 16},
-											{sleep, 2 * 1000}, {exit}]}
-							end
-					end;
-				undefined ->
-					{ok, [{wm}, {up}]}
-			end
+	ok = try begin
+		ok = case application:load (mosaic_cluster) of
+			ok ->
+				ok;
+			Error = {error, _Reason} ->
+				throw (Error)
+		end,
+		{ok, Actions} = case application:get_env (mosaic_cluster, tests_scenario) of
+			{ok, normal} ->
+				{ok, [
+						{boot}, {ping, 4},
+						{define_and_create_processes, dummy, term, defaults, 2}]};
+			{ok, ring_join_leave} ->
+				Self = erlang:node (),
+				case application:get_env (mosaic_cluster, tests_nodes) of
+					{ok, [Self | _Peers]} ->
+						{ok, [
+								{boot}, {ping, 4}]};
+					{ok, Nodes} ->
+						Peers = lists:delete (Self, Nodes),
+						{ok, [
+								{boot}, {ping, 4},
+								{sleep, 2 * 1000}, {ring, include, Peers},
+								{sleep, 2 * 10}, {ping, 4},
+								{sleep, 2 * 1000}, {ring, exclude, Self},
+								{sleep, 2 * 10}, {ping, 4},
+								{sleep, 2 * 1000}]};
+					undefined ->
+						throw ({error, undefined_nodes})
+				end;
+			{ok, Scenario} ->
+				throw ({error, {invalid_scenario, Scenario}});
+			undefined ->
+				throw ({error, undefined_scenario})
+		end,
+		ok = test (Actions),
+		ok
+	end catch
+		throw : {error, Reason} ->
+			ok = mosaic_tools:report_error (mosaic_cluster, test, error, Reason),
+			ok
 	end,
+	ok.
+
+
+test (Actions)
+		when is_list (Actions) ->
 	OldTrapExit = erlang:process_flag (trap_exit, true),
 	Slave = erlang:spawn_link (
 			fun () ->
 				ok = lists:foreach (
-						fun (Scenario) ->
-							ok = mosaic_tools:report_info (mosaic_cluster, test, scenario, Scenario),
-							ok = test (Scenario)
+						fun (Action) ->
+							ok = mosaic_tools:report_info (mosaic_cluster, test, action, Action),
+							ok = execute (Action),
+							ok
 						end,
-						lists:flatten (Scenarios))
+						lists:flatten (Actions))
 			end),
-	ok = receive
+	Outcome = receive
 		{'EXIT', Slave, normal} ->
 			ok;
-		{'EXIT', Slave, Reason} ->
-			ok = mosaic_tools:report_error (mosaic_cluster, test, error, Reason),
-			ok
+		{'EXIT', Slave, Error1 = {error, _Reason1}} ->
+			Error1;
+		{'EXIT', Slave, Reason1} ->
+			{error, Reason1}
 	end,
 	true = erlang:process_flag (trap_exit, OldTrapExit),
-	ok.
+	case Outcome of
+		ok ->
+			ok;
+		Error2 = {error, _Reason2} ->
+			throw (Error2)
+	end.
 
 
-test ({wm}) ->
-	ok = mosaic_webmachine:enforce_started (),
+execute ({boot}) ->
+	ok = mosaic_cluster:boot (),
 	ok;
 	
-test ({da}) ->
-	{ok, _} = mosaic_discovery_events:start_supervised (),
-	JoinFun = fun (Message, void) ->
-			case Message of
-				{broadcasted, {mosaic_cluster, {join, Node}}} when is_atom (Node) ->
-					% ok = mosaic_tools:report_info (mosaic_cluster_tests, test, join, {Node}),
-					ok = mosaic_cluster:ring_include (Node),
-					{ok, void};
-				_ ->
-					{ok, void}
-			end
-	end,
-	ok = mosaic_discovery_events:register_handler (mosaic_discovery_events, {JoinFun, void}),
-	{ok, _} = mosaic_discovery_agent:start_supervised (),
-	ok = mosaic_discovery_agent:broadcast ({mosaic_cluster, {join, erlang:node ()}}),
-	ok;
-	
-test ({up}) ->
+execute ({activate}) ->
 	ok = mosaic_executor:service_activate (),
 	ok = mosaic_cluster:node_activate (),
 	ok;
 	
-test ({down}) ->
+execute ({deactivate}) ->
 	ok = mosaic_executor:service_deactivate (),
 	ok = mosaic_cluster:node_deactivate (),
 	ok;
 	
-test ({join, Nodes}) ->
-	ok = lists:foreach (fun (Node) -> _ = mosaic_cluster:ring_include (Node) end, Nodes),
+execute ({ring, include, Node})
+		when is_atom (Node) ->
+	ok = mosaic_cluster:ring_include (Node),
 	ok;
 	
-test ({leave}) ->
-	ok = mosaic_cluster:ring_exclude (erlang:node ()),
+execute ({ring, include, []}) ->
 	ok;
 	
-test ({ping, Count}) ->
-	{ok, _, _} = mosaic_executor:ping (Count),
+execute ({ring, include, [Node | Nodes]})
+		when is_atom (Node), is_list (Nodes) ->
+	ok = execute ({ring, include, Node}),
+	execute ({ring, include, Nodes});
+	
+execute ({ring, exclude, Node})
+		when is_atom (Node) ->
+	ok = mosaic_cluster:ring_exclude (Node),
 	ok;
 	
-test ({define_and_create_dummy_processes, Count}) ->
-	{ok, _, _, _} = mosaic_executor:define_and_create_processes (mosaic_dummy_process, defaults, Count),
+execute ({ring, exclude, [Node | Nodes]})
+		when is_atom (Node), is_list (Nodes) ->
+	ok = execute ({ring, exclude, Node}),
+	execute ({ring, exclude, Nodes});
+	
+execute ({ring, exclude, self}) ->
+	execute ({ring, exclude, erlang:node ()});
+	
+execute ({ring, reboot}) ->
+	ok = mosaic_cluster:ring_reboot (),
 	ok;
 	
-test ({sleep, Timeout}) ->
+execute ({ping, Count}) ->
+	ok = case mosaic_executor:ping (Count) of
+		{ok, _, []} ->
+			ok;
+		{ok, _, Reasons} ->
+			erlang:exit ({error, Reasons})
+	end,
+	ok;
+	
+execute ({define_and_create_processes, Type, ArgumentsEncoding, ArgumentsContent, Count}) ->
+	ok = case mosaic_executor:define_and_create_processes (Type, ArgumentsEncoding, ArgumentsContent, Count) of
+		{ok, _, _, []} ->
+			ok;
+		{ok, _, _, Reasons} ->
+			erlang:exit ({error, Reasons})
+	end,
+	ok;
+	
+execute ({sleep, Timeout}) ->
 	ok = timer:sleep (Timeout),
 	ok;
 	
-test ({exit}) ->
+execute ({exit}) ->
 	ok = init:stop (),
 	ok.

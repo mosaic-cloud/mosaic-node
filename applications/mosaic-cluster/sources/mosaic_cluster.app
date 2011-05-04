@@ -4,7 +4,7 @@
 	{vsn, "1"},
 	{applications, [kernel, stdlib, riak_core, mochiweb, webmachine]},
 	{modules, []},
-	{registered, [mosaic_cluster_sup]},
+	{registered, [mosaic_sup]},
 	{mod, {mosaic_cluster_app, defaults}},
 	{env, []}
 ]}.

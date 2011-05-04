@@ -16,12 +16,8 @@ start () ->
 start (Configuration) ->
 	start (noname, Configuration).
 
-start (QualifiedName = {local, LocalName}, Configuration)
-		when is_atom (LocalName) ->
-	gen_fsm:start (QualifiedName, mosaic_component_harness, {QualifiedName, Configuration}, []);
-	
-start (QualifiedName = noname, Configuration) ->
-	gen_fsm:start (mosaic_component_harness, {QualifiedName, Configuration}, []).
+start (QualifiedName, Configuration) ->
+	mosaic_tools:start (gen_fsm, mosaic_component_harness, QualifiedName, Configuration).
 
 
 start_link () ->
@@ -30,29 +26,25 @@ start_link () ->
 start_link (Configuration) ->
 	start_link (noname, Configuration).
 
-start_link (QualifiedName = {local, LocalName}, Configuration)
-		when is_atom (LocalName) ->
-	gen_fsm:start_link (QualifiedName, mosaic_component_harness, {QualifiedName, Configuration}, []);
-	
-start_link (QualifiedName = noname, Configuration) ->
-	gen_fsm:start_link (mosaic_component_harness, {QualifiedName, Configuration}, []).
+start_link (QualifiedName, Configuration) ->
+	mosaic_tools:start_link (gen_fsm, mosaic_component_harness, QualifiedName, Configuration).
 
 
 stop (Harness) ->
 	stop (Harness, normal).
 
 stop (Harness, Signal)
-		when (is_atom (Harness) orelse is_pid (Harness)) ->
+		when (is_pid (Harness) orelse is_atom (Harness)) ->
 	gen_fsm:sync_send_event (Harness, {stop, Signal}).
 
 
 execute (Harness, Specification)
-		when (is_atom (Harness) orelse is_pid (Harness)) ->
+		when (is_pid (Harness) orelse is_atom (Harness)) ->
 	gen_fsm:sync_send_event (Harness, {execute, Specification}).
 
 
 signal (Harness, Specification)
-		when (is_atom (Harness) orelse is_pid (Harness)) ->
+		when (is_pid (Harness) orelse is_atom (Harness)) ->
 	gen_fsm:sync_send_event (Harness, {signal, Specification}).
 
 

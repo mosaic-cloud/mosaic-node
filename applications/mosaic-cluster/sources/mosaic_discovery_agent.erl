@@ -1,9 +1,11 @@
 
 -module (mosaic_discovery_agent).
 
+-behaviour (gen_server).
+
 -export ([start/0, start/1, start/2, start_link/0, start_link/1, start_link/2]).
--export ([start_supervised/0, start_supervised/1, start_supervised/2, start_supervised/3]).
--export ([stop/1, stop/2]).
+-export ([start_supervised/0, start_supervised/1]).
+-export ([stop/0, stop/1, stop/2]).
 -export ([broadcast/1, broadcast/2, broadcast/3, broadcast/4]).
 -export ([init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2, handle_info/2]).
 
@@ -14,12 +16,8 @@ start () ->
 start (Configuration) ->
 	start (noname, Configuration).
 
-start (QualifiedName = {local, LocalName}, Configuration)
-		when is_atom (LocalName) ->
-	gen_server:start (QualifiedName, mosaic_discovery_agent, {QualifiedName, Configuration}, []);
-	
-start (QualifiedName = noname, Configuration) ->
-	gen_server:start (mosaic_discovery_agent, {QualifiedName, Configuration}, []).
+start (QualifiedName, Configuration) ->
+	mosaic_tools:start (gen_server, mosaic_discovery_agent, QualifiedName, Configuration).
 
 
 start_link () ->
@@ -28,26 +26,19 @@ start_link () ->
 start_link (Configuration) ->
 	start_link (noname, Configuration).
 
-start_link (QualifiedName = {local, LocalName}, Configuration)
-		when is_atom (LocalName) ->
-	gen_server:start_link (QualifiedName, mosaic_discovery_agent, {QualifiedName, Configuration}, []);
-	
-start_link (QualifiedName = noname, Configuration) ->
-	gen_server:start_link (mosaic_discovery_agent, {QualifiedName, Configuration}, []).
+start_link (QualifiedName, Configuration) ->
+	mosaic_tools:start_link (gen_server, mosaic_discovery_agent, QualifiedName, Configuration).
 
 
 start_supervised () ->
 	start_supervised (defaults).
 
 start_supervised (Configuration) ->
-	start_supervised ({local, mosaic_discovery_agent}, Configuration).
+	mosaic_sup:start_child_daemon (mosaic_discovery_agent, {local, mosaic_discovery_agent}, [Configuration], permanent).
 
-start_supervised (QualifiedName, Configuration) ->
-	start_supervised (mosaic_daemon_sup, QualifiedName, Configuration).
 
-start_supervised (Supervisor, QualifiedName, Configuration) ->
-	mosaic_cluster_sup:start_child_daemon (Supervisor, QualifiedName, mosaic_discovery_agent, [Configuration], permanent).
-
+stop () ->
+	stop (mosaic_discovery_agent).
 
 stop (Agent) ->
 	stop (Agent, normal).

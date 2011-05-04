@@ -3,8 +3,8 @@
 
 -export ([nodes/0]).
 -export ([service_activate/0, service_deactivate/0]).
--export ([define_and_create_process/2, define_and_create_processes/3]).
--export ([define_process/2, define_processes/3]).
+-export ([define_and_create_process/3, define_and_create_processes/4]).
+-export ([define_process/3, define_processes/4]).
 -export ([create_process/1, create_processes/1]).
 -export ([resolve_process/1, resolve_processes/1]).
 -export ([stop_process/1, stop_process/2, stop_processes/1, stop_processes/2]).
@@ -24,9 +24,9 @@ service_deactivate () ->
 	mosaic_executor_vnode:service_deactivate ().
 
 
-define_and_create_process (Module, Arguments)
-		when is_atom (Module) ->
-	case define_process (Module, Arguments) of
+define_and_create_process (Type, ArgumentsEncoding, ArgumentsContent)
+		when is_atom (Type), is_atom (ArgumentsEncoding) ->
+	case define_process (Type, ArgumentsEncoding, ArgumentsContent) of
 		{ok, Key} ->
 			case create_process (Key) of
 				{ok, Process} ->
@@ -38,9 +38,9 @@ define_and_create_process (Module, Arguments)
 			Error
 	end.
 
-define_and_create_processes (Module, Arguments, Count)
-		when is_atom (Module), is_integer (Count), (Count > 0) ->
-	case define_processes (Module, Arguments, Count) of
+define_and_create_processes (Type, ArgumentsEncoding, ArgumentsContent, Count)
+		when is_atom (Type), is_atom (ArgumentsEncoding), is_integer (Count), (Count > 0) ->
+	case define_processes (Type, ArgumentsEncoding, ArgumentsContent, Count) of
 		{ok, [], DefineReasons} ->
 			{ok, [], [], DefineReasons};
 		{ok, DefineKeys, DefineReasons} when is_list (DefineKeys) ->
@@ -51,9 +51,9 @@ define_and_create_processes (Module, Arguments, Count)
 	end.
 
 
-define_process (Module, Arguments)
-		when is_atom (Module) ->
-	case define_processes (Module, Arguments, 1) of
+define_process (Type, ArgumentsEncoding, ArgumentsContent)
+		when is_atom (Type), is_atom (ArgumentsEncoding) ->
+	case define_processes (Type, ArgumentsEncoding, ArgumentsContent, 1) of
 		{ok, [], []} ->
 			{error, unreachable_vnode};
 		{ok, [Key], []} ->
@@ -62,11 +62,11 @@ define_process (Module, Arguments)
 			{error, Reason}
 	end.
 
-define_processes (Module, Arguments, Count)
-		when is_atom (Module), is_integer (Count), (Count > 0) ->
+define_processes (Type, ArgumentsEncoding, ArgumentsContent, Count)
+		when is_atom (Type), is_atom (ArgumentsEncoding), is_integer (Count), (Count > 0) ->
 	{ok, Keys} = mosaic_cluster:keys (Count),
 	request_reply_sync_command (
-			fun (Key) -> {define_process, Key, Module, Arguments} end,
+			fun (Key) -> {define_process, Key, Type, ArgumentsEncoding, ArgumentsContent} end,
 			fun (Key, _, Reply) ->
 				case Reply of
 					{ok, Key} ->

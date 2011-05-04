@@ -14,17 +14,17 @@ init ({create, defaults}) ->
 	Token = erlang:phash2 (erlang:now (), 1 bsl 32),
 	TokenHex = string:to_lower (string:right (erlang:integer_to_list (Token, 16), 8, $0)),
 	Arg0 = "[mosaic_dummy_process#" ++ TokenHex ++ "]",
-	init ({create, [{arg0, Arg0}]});
+	init ({create, {arg0, Arg0}});
 	
-init ({create, [{key, Key}]})
-		when is_binary (Key), bit_size (Key) =:= 160 ->
-	Arg0 = "[mosaic_dummy_process#" ++ lists:flatten ([io_lib:format ("~2.16.0b", [Byte]) || Byte <- erlang:binary_to_list (Key)]) ++ "]",
-	init ({create, [{arg0, Arg0}]});
+init ({create, {identifier, Identifier}})
+		when is_binary (Identifier), bit_size (Identifier) =:= 160 ->
+	Arg0 = "[mosaic_dummy_process#" ++ lists:flatten ([io_lib:format ("~2.16.0b", [Byte]) || Byte <- erlang:binary_to_list (Identifier)]) ++ "]",
+	init ({create, {arg0, Arg0}});
 	
-init ({create, [{arg0, Arg0}]})
+init ({create, {arg0, Arg0}})
 		when is_list (Arg0) ->
 	Arguments = {
-			{spawn_executable, "/bin/cat"},
+			{spawn_executable, "./.outputs/gcc/applications-elf/mosaic_dummy_process.elf"},
 			[{arg0, Arg0}]},
 	mosaic_port_process:init ({create, Arguments});
 	

@@ -41,23 +41,15 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 			case mosaic_webmachine:enforce_request ('GET',
 					[
 						{"type", fun mosaic_webmachine:parse_existing_atom/1},
-						{"arguments", fun mosaic_webmachine:parse_json/1}],
+						{"arguments", fun mosaic_webmachine:parse_json/1},
+						{"count", fun mosaic_webmachine:parse_integer/1}],
 					Request) of
-				{ok, false, [Type, ArgumentsJson]} ->
-					Outcome_ = case Type of
-						dummy ->
-							case mosaic_dummy_process:parse_arguments_from_json (ArgumentsJson) of
-								{ok, ArgumentsTerm} ->
-									{ok, mosaic_dummy_process, ArgumentsTerm};
-								Error_ = {error, _Reason_} ->
-									Error_
-							end
-					end,
-					case Outcome_ of
-						{ok, Module, CreateArguments} ->
-							{ok, false, State#state{arguments = dict:from_list ([{module, Module}, {create_arguments, CreateArguments}])}};
-						Error = {error, _Reason} ->
-							Error
+				{ok, false, [Type, Arguments, Count]} ->
+					if
+						(Count > 0), (Count =< 128) ->
+							{ok, false, State#state{arguments = dict:from_list ([{type, Type}, {arguments, Arguments}, {count, Count}])}};
+						true ->
+							{error, {invalid_argument, "count", {out_of_range, 1, 128}}}
 					end;
 				Error = {error, _Reason} ->
 					Error
@@ -122,12 +114,17 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 					Error
 			end;
 		{processes, create} ->
-			Module = dict:fetch (module, Arguments),
-			CreateArguments = dict:fetch (create_arguments, Arguments),
-			case mosaic_executor:define_and_create_process (Module, CreateArguments) of
-				{ok, Key, _Process} ->
+			ProcessType = dict:fetch (type, Arguments),
+			ProcessArgumentsContent = dict:fetch (arguments, Arguments),
+			Count = dict:fetch (count, Arguments),
+			case mosaic_executor:define_and_create_processes (ProcessType, json, ProcessArgumentsContent, Count) of
+				{ok, Keys, _Processes, []} ->
 					{ok, json_struct, [
-							{key, mosaic_webmachine:format_binary_key (Key)}]};
+							{keys, lists:map (fun mosaic_webmachine:format_binary_key/1, Keys)}]};
+				{ok, Keys, _Processes, Reasons} ->
+					{ok, json_struct, [
+							{keys, lists:map (fun mosaic_webmachine:format_binary_key/1, Keys)},
+							{errors, lists:map (fun mosaic_webmachine:format_term/1, Reasons)}]};
 				Error = {error, _Reason} ->
 					Error
 			end;

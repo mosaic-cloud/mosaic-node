@@ -3,19 +3,35 @@
 
 -behaviour (gen_server).
 
--export ([start/2, start_link/2, start_supervised/2]).
+-export ([start/0, start/1, start/2, start_link/0, start_link/1, start_link/2]).
+-export ([start_supervised/1, start_supervised/2]).
 -export ([stop/1, stop/2]).
 -export ([select/2, include/4, replace/5, exclude/3, fold/3, count/1]).
 -export ([init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2, handle_info/2]).
 
-start (QualifiedName = {local, LocalName}, Configuration) when is_atom (LocalName) ->
-	gen_server:start (QualifiedName, mosaic_object_store, {QualifiedName, Configuration}, []).
+start () ->
+	start (defaults).
 
-start_link (QualifiedName = {local, LocalName}, Configuration) when is_atom (LocalName) ->
-	gen_server:start_link (QualifiedName, mosaic_object_store, {QualifiedName, Configuration}, []).
+start (Configuration) ->
+	start (noname, Configuration).
+
+start (QualifiedName, Configuration) ->
+	mosaic_tools:start (gen_server, mosaic_object_store, QualifiedName, Configuration).
+
+start_link () ->
+	start_link (defaults).
+
+start_link (Configuration) ->
+	start_link (noname, Configuration).
+
+start_link (QualifiedName, Configuration) ->
+	mosaic_tools:start_link (gen_server, mosaic_object_store, QualifiedName, Configuration).
+
+start_supervised (QualifiedName) ->
+	start_supervised (QualifiedName, defaults).
 
 start_supervised (QualifiedName, Configuration) ->
-	mosaic_cluster_sup:start_child_object_store (QualifiedName, Configuration).
+	mosaic_sup:start_child_object_store (QualifiedName, Configuration).
 
 stop (Store) ->
 	stop (Store, normal).

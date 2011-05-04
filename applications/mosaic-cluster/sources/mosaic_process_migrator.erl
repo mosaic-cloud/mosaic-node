@@ -20,33 +20,19 @@
 start (Source, SourceToken, Target, TargetToken, Observer, ObserverToken) ->
 	start (noname, Source, SourceToken, Target, TargetToken, Observer, ObserverToken).
 
-start (QualifiedName = {local, LocalName}, Source, SourceToken, Target, TargetToken, Observer, ObserverToken)
-		when is_atom (LocalName), is_pid (Source), is_pid (Target), is_pid (Observer),
-				(Source =/= Target), (Source =/= Observer), (Target =/= Observer),
+start (QualifiedName, Source, SourceToken, Target, TargetToken, Observer, ObserverToken)
+		when is_pid (Source), is_pid (Target), is_pid (Observer), (Source =/= Target), (Source =/= Observer), (Target =/= Observer),
 				(SourceToken =/= TargetToken), (SourceToken =/= ObserverToken), (TargetToken =/= ObserverToken) ->
-	gen_fsm:start (QualifiedName, mosaic_process_migrator, {QualifiedName, Source, SourceToken, Target, TargetToken, Observer, ObserverToken}, []);
-	
-start (QualifiedName = noname, Source, SourceToken, Target, TargetToken, Observer, ObserverToken)
-		when is_pid (Source), is_pid (Target), is_pid (Observer),
-				(Source =/= Target), (Source =/= Observer), (Target =/= Observer),
-				(SourceToken =/= TargetToken), (SourceToken =/= ObserverToken), (TargetToken =/= ObserverToken) ->
-	gen_fsm:start (mosaic_process_migrator, {QualifiedName, Source, SourceToken, Target, TargetToken, Observer, ObserverToken}, []).
+	mosaic_tools:start (gen_fsm, mosaic_process_migrator, QualifiedName, {Source, SourceToken, Target, TargetToken, Observer, ObserverToken}).
 
 
 start_link (Source, SourceToken, Target, TargetToken, Observer, ObserverToken) ->
 	start_link (noname, Source, SourceToken, Target, TargetToken, Observer, ObserverToken).
 
-start_link (QualifiedName = {local, LocalName}, Source, SourceToken, Target, TargetToken, Observer, ObserverToken)
-		when is_atom (LocalName), is_pid (Source), is_pid (Target), is_pid (Observer),
-				(Source =/= Target), (Source =/= Observer), (Target =/= Observer),
+start_link (QualifiedName, Source, SourceToken, Target, TargetToken, Observer, ObserverToken)
+		when is_pid (Source), is_pid (Target), is_pid (Observer), (Source =/= Target), (Source =/= Observer), (Target =/= Observer),
 				(SourceToken =/= TargetToken), (SourceToken =/= ObserverToken), (TargetToken =/= ObserverToken) ->
-	gen_fsm:start_link (QualifiedName, mosaic_process_migrator, {QualifiedName, Source, SourceToken, Target, TargetToken, Observer, ObserverToken}, []);
-	
-start_link (QualifiedName = noname, Source, SourceToken, Target, TargetToken, Observer, ObserverToken)
-		when is_pid (Source), is_pid (Target), is_pid (Observer),
-				(Source =/= Target), (Source =/= Observer), (Target =/= Observer),
-				(SourceToken =/= TargetToken), (SourceToken =/= ObserverToken), (TargetToken =/= ObserverToken) ->
-	gen_fsm:start_link (mosaic_process_migrator, {QualifiedName, Source, SourceToken, Target, TargetToken, Observer, ObserverToken}, []).
+	mosaic_tools:start (gen_fsm, mosaic_process_migrator, QualifiedName, {Source, SourceToken, Target, TargetToken, Observer, ObserverToken}).
 
 
 migrate (Migrator, Arguments)
@@ -57,7 +43,7 @@ migrate (Migrator, Arguments)
 -record (state, {source, source_token, target, target_token, observer, observer_token, source_completed, target_completed}).
 
 
-init ({QualifiedName, Source, SourceToken, Target, TargetToken, Observer, ObserverToken})
+init ({QualifiedName, {Source, SourceToken, Target, TargetToken, Observer, ObserverToken}})
 		when is_pid (Source), is_pid (Target), is_pid (Observer), (Source =/= Target), (Source =/= Observer), (Target =/= Observer),
 				(SourceToken =/= TargetToken), (SourceToken =/= ObserverToken), (TargetToken =/= ObserverToken) ->
 	case mosaic_tools:ensure_registered (QualifiedName) of

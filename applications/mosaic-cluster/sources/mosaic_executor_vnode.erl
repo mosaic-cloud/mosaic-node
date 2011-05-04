@@ -14,7 +14,7 @@
 -record (state, {qualified_name, partition, object_store, process_controller}).
 
 service_activate () ->
-	case mosaic_cluster_sup:start_child_vnode_master (mosaic_executor_vnode) of
+	case mosaic_sup:start_child_vnode_master (mosaic_executor_vnode) of
 		{ok, Master} when is_pid (Master) ->
 			ok = riak_core:register_vnode_module (mosaic_executor_vnode),
 			ok = riak_core_node_watcher:service_up (mosaic_executor, Master),
@@ -94,15 +94,15 @@ is_empty (State = #state{object_store = ObjectStore, process_controller = Proces
 handle_command ({ping, Key}, _Sender, State) ->
 	{reply, {pong, Key, {State#state.partition, erlang:node ()}}, State};
 	
-handle_command ({define_process, Key, Module, Arguments}, _Sender, State = #state{object_store = ObjectStore})
-		when is_atom (Module) ->
-	case {Module, Arguments} of
-		{mosaic_dummy_process, defaults} ->
-			ok = mosaic_object_store:include (ObjectStore, Key, none, {Module, [{key, Key}]});
-		_ ->
-			ok = mosaic_object_store:include (ObjectStore, Key, none, {Module, Arguments})
-	end,
-	{reply, {ok, Key}, State};
+handle_command ({define_process, Key, Type, ArgumentsEncoding, ArgumentsContent}, _Sender, State = #state{object_store = ObjectStore})
+		when is_atom (Type), is_atom (ArgumentsEncoding) ->
+	case mosaic_process_configurator:configure (Type, Key, ArgumentsEncoding, ArgumentsContent) of
+		{ok, Module, Arguments} ->
+			ok = mosaic_object_store:include (ObjectStore, Key, none, {Module, Arguments}),
+			{reply, {ok, Key}, State};
+		Error = {error, _Reason} ->
+			{reply, Error, State}
+	end;
 	
 handle_command ({create_process, Key}, _Sender, State = #state{object_store = ObjectStore, process_controller = ProcessController}) ->
 	{ok, {Key, none, {Module, Arguments}}} = mosaic_object_store:select (ObjectStore, Key),

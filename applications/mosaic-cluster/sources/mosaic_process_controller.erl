@@ -4,9 +4,10 @@
 -behaviour (gen_server).
 
 -export ([start/0, start/1, start/2, start_link/0, start_link/1, start_link/2]).
--export ([start_supervised/0, start_supervised/1, start_supervised/2, start_supervised/3]).
+-export ([start_supervised/1, start_supervised/2]).
 -export ([stop/1, stop/2]).
--export ([resolve/2, create/4, migrate/3, migrate/4, migrate/5, migrate/6, fold/3, count/1]).
+-export ([resolve/2, fold/3, count/1]).
+-export ([create/4, migrate/3, migrate/4, migrate/5, migrate/6]).
 -export ([init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2, handle_info/2]).
 
 
@@ -16,12 +17,8 @@ start () ->
 start (Configuration) ->
 	start (noname, Configuration).
 
-start (QualifiedName = {local, LocalName}, Configuration)
-		when is_atom (LocalName) ->
-	gen_server:start (QualifiedName, mosaic_process_controller, {QualifiedName, Configuration}, []);
-	
-start (QualifiedName = noname, Configuration) ->
-	gen_server:start (mosaic_process_controller, {QualifiedName, Configuration}, []).
+start (QualifiedName, Configuration) ->
+	mosaic_tools:start (gen_server, mosaic_process_controller, QualifiedName, Configuration).
 
 
 start_link () ->
@@ -30,71 +27,61 @@ start_link () ->
 start_link (Configuration) ->
 	start_link (noname, Configuration).
 
-start_link (QualifiedName = {local, LocalName}, Configuration)
-		when is_atom (LocalName) ->
-	gen_server:start_link (QualifiedName, mosaic_process_controller, {QualifiedName, Configuration}, []);
-	
-start_link (QualifiedName = noname, Configuration) ->
-	gen_server:start_link (mosaic_process_controller, {QualifiedName, Configuration}, []).
+start_link (QualifiedName, Configuration) ->
+	mosaic_tools:start_link (gen_server, mosaic_process_controller, QualifiedName, Configuration).
 
 
-start_supervised () ->
+start_supervised (QualifiedName) ->
 	start_supervised (defaults).
 
-start_supervised (Configuration) ->
-	start_supervised (noname, Configuration).
-
 start_supervised (QualifiedName, Configuration) ->
-	start_supervised (mosaic_process_controller_sup, QualifiedName, Configuration).
-
-start_supervised (Supervisor, QualifiedName, Configuration) ->
-	mosaic_cluster_sup:start_child_process_controller (Supervisor, QualifiedName, Configuration).
+	mosaic_sup:start_child_process_controller (QualifiedName, Configuration).
 
 
 stop (Controller) ->
 	stop (Controller, normal).
 
 stop (Controller, Signal)
-		when (is_atom (Controller) or is_pid (Controller)) ->
+		when (is_pid (Controller) orelse is_atom (Controller)) ->
 	gen_server:call (Controller, {stop, Signal}).
 
 
 resolve (Controller, Key)
-		when (is_pid (Controller) or is_atom (Controller)) ->
+		when (is_pid (Controller) orelse is_atom (Controller)) ->
 	gen_server:call (Controller, {resolve, Key}).
 
 
-create (Controller, Key, Module, CreateArguments)
-		when (is_pid (Controller) or is_atom (Controller)), is_atom (Module) ->
-	gen_server:call (Controller, {create, Key, Module, CreateArguments}).
+fold (Controller, Function, InputAccumulator)
+		when (is_pid (Controller) orelse is_atom (Controller)), is_function (Function, 2) ->
+	gen_server:call (Controller, {fold, Function, InputAccumulator}).
+
+count (Controller)
+		when (is_pid (Controller) orelse is_atom (Controller)) ->
+	gen_server:call (Controller, {count}).
+
+
+create (Controller, Key, Module, Arguments)
+		when (is_pid (Controller) orelse is_atom (Controller)), is_atom (Module) ->
+	gen_server:call (Controller, {create, Key, Module, Arguments}).
 
 
 migrate (SourceController, TargetController, Key) ->
 	migrate (SourceController, TargetController, Key, defaults).
 
-migrate (SourceController, TargetController, Key, MigrateArguments)
+migrate (SourceController, TargetController, Key, Arguments)
 		when is_pid (SourceController), is_pid (TargetController), (SourceController =/= TargetController) ->
-	gen_server:call (TargetController, {migrate_as_target, SourceController, Key, MigrateArguments}).
+	gen_server:call (TargetController, {migrate_as_target, SourceController, Key, Arguments}).
 
 migrate (SourceController, TargetController, Key, Observer, ObserverToken) ->
 	migrate (SourceController, TargetController, Key, defaults, Observer, ObserverToken).
 
-migrate (SourceController, TargetController, Key, MigrateArguments, Observer, ObserverToken)
+migrate (SourceController, TargetController, Key, Arguments, Observer, ObserverToken)
 		when is_pid (SourceController), is_pid (TargetController), is_pid (Observer),
 				(SourceController =/= TargetController), (SourceController =/= Observer), (TargetController =/= Observer) ->
-	gen_server:call (TargetController, {migrate_as_target, SourceController, Key, MigrateArguments, Observer, ObserverToken}).
+	gen_server:call (TargetController, {migrate_as_target, SourceController, Key, Arguments, Observer, ObserverToken}).
 
 
-fold (Controller, Function, InputAccumulator)
-		when is_pid (Controller), is_function (Function, 2) ->
-	gen_server:call (Controller, {fold, Function, InputAccumulator}).
-
-count (Controller)
-		when is_pid (Controller) ->
-	gen_server:call (Controller, {count}).
-
-
--record (state, {qualified_name, processes, link_mapping, link_pending, migrations, migration_mapping, process_supervisor}).
+-record (state, {qualified_name, processes, link_mapping, link_pending, migrations, migration_mapping}).
 -record (process_state, {module, process}).
 -record (migration_as_target_state, {migrator, migrator_token, observer, observer_token}).
 -record (migration_as_source_state, {migrator, migrator_token}).
@@ -104,19 +91,11 @@ init ({QualifiedName, defaults}) ->
 	false = erlang:process_flag (trap_exit, true),
 	case mosaic_tools:ensure_registered (QualifiedName) of
 		ok ->
-			case erlang:whereis (mosaic_process_sup) of
-				ProcessSupervisor when is_pid (ProcessSupervisor) ->
-					State = #state{
-							qualified_name = QualifiedName,
-							processes = orddict:new (), link_mapping = orddict:new (), link_pending = ordsets:new (),
-							migrations = orddict:new (), migration_mapping = orddict:new (),
-							process_supervisor = ProcessSupervisor},
-					{ok, State};
-				Port when is_port (Port) ->
-					{stop, process_supervisor_is_invalid};
-				undefined ->
-					{stop, process_supervisor_does_not_exist}
-			end;
+			State = #state{
+					qualified_name = QualifiedName,
+					processes = orddict:new (), link_mapping = orddict:new (), link_pending = ordsets:new (),
+					migrations = orddict:new (), migration_mapping = orddict:new ()},
+			{ok, State};
 		{error, Reason} ->
 			{stop, Reason}
 	end.
@@ -139,14 +118,13 @@ handle_call ({stop, Signal}, _Sender, State) ->
 	end;
 	
 handle_call (
-			{create, Key, Module, CreateArguments}, _Sender,
-			OldState = #state{processes = OldProcesses, link_mapping = OldLinkMapping,
-			process_supervisor = ProcessSupervisor})
+			{create, Key, Module, Arguments}, _Sender,
+			OldState = #state{processes = OldProcesses, link_mapping = OldLinkMapping})
 		when is_atom (Module) ->
 	ProcessExists = orddict:is_key (Key, OldProcesses),
 	if
 		not ProcessExists ->
-			case mosaic_process:start_supervised (ProcessSupervisor, noname, Module, {create, CreateArguments}) of
+			case mosaic_process:start_supervised (noname, Module, {create, Arguments}) of
 				{ok, Process} ->
 					true = erlang:link (Process),
 					ProcessState = #process_state{module = Module, process = Process},
@@ -162,7 +140,7 @@ handle_call (
 	end;
 	
 handle_call (
-			{migrate_as_target, SourceController, Key, MigrateArguments}, Sender,
+			{migrate_as_target, SourceController, Key, Arguments}, Sender,
 			OldState)
 		when is_pid (SourceController) ->
 	WaiterToken = erlang:make_ref (),
@@ -190,7 +168,7 @@ handle_call (
 				true = erlang:unlink (Migrator),
 				erlang:exit (normal)
 			end),
-	case handle_call ({migrate_as_target, SourceController, Key, MigrateArguments, Waiter, WaiterToken}, undefined, OldState) of
+	case handle_call ({migrate_as_target, SourceController, Key, Arguments, Waiter, WaiterToken}, undefined, OldState) of
 		{reply, {ok, Migrator, Target}, NewState} ->
 			true = erlang:unlink (Waiter),
 			Waiter ! {'begin', Migrator, Target, WaiterToken},
@@ -201,11 +179,10 @@ handle_call (
 	end;
 	
 handle_call (
-			{migrate_as_target, SourceController, Key, MigrateArguments, Observer, ObserverToken}, _Sender,
+			{migrate_as_target, SourceController, Key, Arguments, Observer, ObserverToken}, _Sender,
 			OldState = #state{
 					processes = OldProcesses, link_mapping = OldLinkMapping,
-					migrations = OldMigrations, migration_mapping = OldMigrationMapping,
-					process_supervisor = ProcessSupervisor})
+					migrations = OldMigrations, migration_mapping = OldMigrationMapping})
 		when is_pid (SourceController), is_pid (Observer), (SourceController =/= self ()), (Observer =/= self ()) ->
 	ProcessExists = orddict:is_key (Key, OldProcesses),
 	if
@@ -215,13 +192,13 @@ handle_call (
 			TargetToken = erlang:make_ref (),
 			case gen_server:call (SourceController, {migrate_as_source, Key}) of
 				{ok, Module, Source} ->
-					case mosaic_process:start_supervised (ProcessSupervisor, noname, Module, {migrate, TargetToken}) of
+					case mosaic_process:start_supervised (noname, Module, {migrate, TargetToken}) of
 						{ok, Target} ->
 							case mosaic_process_migrator:start (Source, SourceToken, Target, TargetToken, Observer, ObserverToken) of
 								{ok, Migrator} ->
 									case gen_server:call (SourceController, {migrate_as_source, Key, Migrator, MigratorToken}) of
 										ok ->
-											case mosaic_process_migrator:migrate (Migrator, MigrateArguments) of
+											case mosaic_process_migrator:migrate (Migrator, Arguments) of
 												ok ->
 													true = erlang:link (Migrator),
 													true = erlang:link (Target),
@@ -343,9 +320,6 @@ handle_cast (Request, State) ->
 	{noreply, State}.
 
 
-handle_info ({'EXIT', ProcessSupervisor, _Reason}, State = #state{process_supervisor = ProcessSupervisor}) ->
-	{stop, process_supervisor_exited, State};
-	
 handle_info (
 			{'EXIT', Link, Reason},
 			OldState = #state{

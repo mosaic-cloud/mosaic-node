@@ -3,61 +3,66 @@
 
 -behaviour (gen_event).
 
--export ([start/0, start/1, start_link/0, start_link/1]).
--export ([start_supervised/0, start_supervised/1, start_supervised/2]).
+-export ([start/0, start/1, start_link/0, start_link/1, start_link/2]).
+-export ([start_supervised/0]).
+-export ([stop/0, stop/1, stop/2]).
 -export ([register_handler/2, register_handler/3]).
--export ([stop/1]).
--export ([broadcasted/2]).
+-export ([broadcasted/1, broadcasted/2]).
 -export ([init/1, terminate/2, code_change/3, handle_event/2, handle_call/2, handle_info/2]).
 
 
 start () ->
 	start (noname).
 
-start (QualifiedName = {local, LocalName})
-		when is_atom (LocalName) ->
-	gen_event:start (QualifiedName);
-	
-start (noname) ->
-	gen_event:start ().
+start (QualifiedName) ->
+	mosaic_tools:start (gen_event, none, QualifiedName, void).
 
 
 start_link () ->
 	start_link (noname).
 
-start_link (QualifiedName = {local, LocalName})
-		when is_atom (LocalName) ->
-	gen_event:start_link (QualifiedName);
-	
-start_link (noname) ->
-	gen_event:start_link ().
+start_link (QualifiedName) ->
+	mosaic_tools:start_link (gen_event, none, QualifiedName, void).
+
+start_link (QualifiedName, void) ->
+	start_link (QualifiedName).
 
 
 start_supervised () ->
-	start_supervised ({local, mosaic_discovery_events}).
+	mosaic_sup:start_child_daemon (mosaic_discovery_events, {local, mosaic_discovery_events}, [void], permanent).
 
-start_supervised (QualifiedName) ->
-	start_supervised (mosaic_daemon_sup, QualifiedName).
 
-start_supervised (Supervisor, QualifiedName) ->
-	mosaic_cluster_sup:start_child_daemon (Supervisor, QualifiedName, mosaic_discovery_events, [], permanent).
+stop () ->
+	stop (mosaic_discovery_events).
+
+stop (Events) ->
+	stop (Events, normal).
+
+stop (Events, Signal)
+		when (is_pid (Events) orelse is_atom (Events)) ->
+	gen_event:call (Events, {stop, Signal}).
 
 
 register_handler (Module, Arguments) ->
 	register_handler (mosaic_discovery_events, Module, Arguments).
 
 register_handler (Events, Module, Arguments)
-		when (is_atom (Events) orelse is_pid (Events)), is_atom (Module) ->
-	gen_event:add_handler (Events, Module, Arguments).
+		when (is_pid (Events) orelse is_atom (Events)), is_atom (Module) ->
+	case gen_event:add_handler (Events, Module, Arguments) of
+		ok ->
+			ok;
+		{'EXIT', Reason} ->
+			{error, Reason};
+		Outcome ->
+			{error, {invalid_outcome, Outcome}}
+	end.
 
 
-stop (Events)
-		when (is_atom (Events) orelse is_pid (Events)) ->
-	gen_event:stop (Events).
-
+broadcasted (Message) ->
+	gen_event:notify (mosaic_discovery_events, Message).
 
 broadcasted (Events, Message)
-		when (is_atom (Events) orelse is_pid (Events)) ->
+		when (is_pid (Events) orelse is_atom (Events)) ->
 	gen_event:notify (Events, {broadcasted, Message}).
 
 

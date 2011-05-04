@@ -47,13 +47,11 @@
 
 -export ([
 		process_controller__start_stop/1,
-		process_controller__start_error/1,
 		process_controller__create/1,
 		process_controller__migrate/1]).
 
 -ifdef (process_controller__enabled).
 -test ({process_controller__start_stop, [defaults]}).
--test ({process_controller__start_error, [defaults]}).
 -test ({process_controller__create, [succeed]}).
 -test ({process_controller__create, [{fail, module}]}).
 -test ({process_controller__create, [{fail, failed}]}).
@@ -230,20 +228,16 @@ process_tester__migrate_as_target (Completion) ->
 
 
 process_controller__start_stop (defaults) ->
-	{ok, Supervisor} = mosaic_cluster_sup:start_link (mosaic_process_sup),
+	{ok, Supervisor} = mosaic_sup:start_link (mosaic_process_sup),
 	{ok, Controller} = start_link_process_controller (noname, defaults),
 	ok = stop_and_join_process_controller (Controller),
 	true = erlang:exit (Supervisor, normal),
 	ok = mosaic_tests:join (Supervisor),
 	ok.
 
-process_controller__start_error (defaults) ->
-	{error, process_supervisor_does_not_exist} = mosaic_process_controller:start_link (noname, defaults),
-	ok.
-
 process_controller__create (Outcome) ->
 	Key = erlang:make_ref (),
-	{ok, Supervisor} = mosaic_cluster_sup:start_link (mosaic_process_sup),
+	{ok, Supervisor} = mosaic_sup:start_link (mosaic_process_sup),
 	{ok, Controller} = mosaic_process_controller:start_link (noname, defaults),
 	ok = case Outcome of
 		succeed ->
@@ -265,7 +259,7 @@ process_controller__create (Outcome) ->
 
 process_controller__migrate (once) ->
 	Key = erlang:make_ref (),
-	{ok, Supervisor} = mosaic_cluster_sup:start_link (mosaic_process_sup),
+	{ok, Supervisor} = mosaic_sup:start_link (mosaic_process_sup),
 	{ok, SourceController} = start_link_process_controller (noname, defaults),
 	{ok, TargetController} = start_link_process_controller (noname, defaults),
 	{ok, Source} = mosaic_process_controller:create (SourceController, Key, mosaic_process_tester, defaults),
@@ -282,7 +276,7 @@ process_controller__migrate (once) ->
 	
 process_controller__migrate (twice) ->
 	Key = erlang:make_ref (),
-	{ok, Supervisor} = mosaic_cluster_sup:start_link (mosaic_process_sup),
+	{ok, Supervisor} = mosaic_sup:start_link (mosaic_process_sup),
 	{ok, SourceController} = start_link_process_controller (noname, defaults),
 	{ok, TargetController} = start_link_process_controller (noname, defaults),
 	{ok, Source1} = mosaic_process_controller:create (SourceController, Key, mosaic_process_tester, defaults),

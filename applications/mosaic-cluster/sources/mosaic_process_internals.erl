@@ -10,7 +10,7 @@
 -record (migration_state, {role, status, token, migrator}).
 
 
-init ({QualifiedName, CallbackModule, Disposition})
+init ({QualifiedName, {CallbackModule, Disposition}})
 		when is_atom (CallbackModule) ->
 	false = erlang:process_flag (trap_exit, true),
 	case mosaic_tools:ensure_registered (QualifiedName) of

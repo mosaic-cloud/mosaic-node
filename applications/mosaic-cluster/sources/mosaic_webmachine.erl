@@ -1,7 +1,8 @@
 
 -module (mosaic_webmachine).
 
--export ([start_link/0, start_link/1, start_link/2, enforce_started/0]).
+-export ([start/0, start/1, start/2, start_link/0, start_link/1, start_link/2]).
+-export ([start_supervised/0, start_supervised/1]).
 -export ([return_with_outcome/3, respond_with_outcome/3]).
 -export ([return_with_content/5, respond_with_content/4]).
 -export ([enforce_request/3]).
@@ -9,45 +10,51 @@
 -export ([format_atom/1, format_numeric_key/1, format_binary_key/1, format_term/1]).
 
 
-start_link () ->
-	case options () of
+start () ->
+	start (defaults).
+
+start (Configuration) ->
+	start ({local, mosaic_webmachine}, Configuration).
+
+start (QualifiedName = {local, LocalName}, Configuration)
+		when is_atom (LocalName) ->
+	case options (Configuration) of
 		{ok, Options} ->
-			start_link (Options);
-		Error = {error, _Reason} ->
-			Error
-	end.
-
-start_link (Options) ->
-	start_link ({local, mosaic_webmachine}, Options).
-
-start_link (QualifiedName = {local, LocalName}, Options)
-		when is_atom (LocalName), is_list (Options) ->
-	case webmachine_mochiweb:start ([{name, QualifiedName} | Options]) of
-		Outcome = {ok, Server} when is_pid (Server) ->
-			true = erlang:link (Server),
-			Outcome;
-		Error = {error, _Reason} ->
-			Error
-	end.
-
-enforce_started () ->
-	Outcome = case options () of
-		{ok, Options} ->
-			QualifiedName = {local, mosaic_webmachine},
-			case mosaic_cluster_sup:start_child_daemon (QualifiedName, mosaic_webmachine, [Options], permanent) of
-				{ok, Server} when is_pid (Server) ->
-					true = erlang:unlink (Server),
-					ok;
+			case webmachine_mochiweb:start ([{name, QualifiedName} | Options]) of
+				Outcome = {ok, _Webmachine} ->
+					Outcome;
 				Error = {error, _Reason} ->
 					Error
 			end;
 		Error = {error, _Reason} ->
 			Error
-	end,
-	ok = Outcome,
-	ok.
+	end.
 
-options () ->
+
+start_link () ->
+	start_link (defaults).
+
+start_link (Configuration) ->
+	start_link ({local, mosaic_webmachine}, Configuration).
+
+start_link (QualifiedName, Configuration) ->
+	case start (QualifiedName, Configuration) of
+		Outcome = {ok, Webmachine} ->
+			true = erlang:link (Webmachine),
+			Outcome;
+		Error = {error, _Reason} ->
+			Error
+	end.
+
+
+start_supervised () ->
+	start_supervised (defaults).
+
+start_supervised (Configuration) ->
+	mosaic_sup:start_child_daemon (mosaic_webmachine, {local, mosaic_webmachine}, [Configuration], permanent).
+
+
+options (defaults) ->
 	case application:get_env (mosaic_cluster, webmachine_listen) of
 		{ok, {Address, Port}} when is_list (Address), is_number (Port), (Port >= 0), (Port < 65536) ->
 			case dispatches ([mosaic_console_wm, mosaic_cluster_wm, mosaic_executor_wm]) of
@@ -65,7 +72,10 @@ options () ->
 			end;
 		undefined ->
 			{error, unconfigured}
-	end.
+	end;
+	
+options (Configuration) ->
+	{error, {invalid_configuration, Configuration}}.
 
 
 dispatches (Modules)
