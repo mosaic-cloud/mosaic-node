@@ -87,24 +87,6 @@ init ({QualifiedName, defaults}) ->
 	ok = mosaic_tools:ensure_registered (QualifiedName),
 	Delegates = orddict:new (),
 	State = #state{qualified_name = QualifiedName, delegates = Delegates},
-	Self = erlang:self (),
-	_ = spawn (
-			fun () ->
-				true = erlang:link (Self),
-				Function = fun
-					(dummy, Identifier, term, defaults) ->
-						{ok, mosaic_dummy_process, {identifier, Identifier}};
-					(dummy, _Identifier, term, ArgumentsContent) ->
-						{error, {invalid_arguments, ArgumentsContent}};
-					(dummy, Identifier, json, null) ->
-						{ok, mosaic_dummy_process, {identifier, Identifier}};
-					(dummy, _Identifier, json, ArgumentsContent) ->
-						{error, {invalid_arguments, ArgumentsContent}}
-				end,
-				ok = gen_server:call (Self, {register, dummy, term, Function}),
-				ok = gen_server:call (Self, {register, dummy, json, Function}),
-				ok
-			end),
 	{ok, State}.
 
 
@@ -130,11 +112,11 @@ handle_call ({configure, Type, Identifier, ArgumentsEncoding, ArgumentsContent},
 					{reply, {error, {function_failed, {invalid_outcome, Outcome}}}, State}
 			catch
 				throw : CatchedTerm ->
-					{reply, {error, {function_failed, CatchedTerm}}, State};
+					{reply, {error, {function_failed, {throw, CatchedTerm, erlang:get_stacktrace ()}}}, State};
 				error : CatchedTerm ->
-					{reply, {error, {function_failed, CatchedTerm}}, State};
+					{reply, {error, {function_failed, {error, CatchedTerm, erlang:get_stacktrace ()}}}, State};
 				exit : CatchedTerm ->
-					{reply, {error, {function_failed, CatchedTerm}}, State}
+					{reply, {error, {function_failed, {exit, CatchedTerm, erlang:get_stacktrace ()}}}, State}
 			end;
 		error ->
 			{reply, {error, unregistered_function}, State}
@@ -142,16 +124,20 @@ handle_call ({configure, Type, Identifier, ArgumentsEncoding, ArgumentsContent},
 	
 handle_call ({register, Type, ArgumentsEncoding, Module, Function, FunctionExtraArguments}, Sender, State)
 		when is_atom (Type), is_atom (ArgumentsEncoding), is_atom (Module), is_atom (Function) ->
+	_ = code:ensure_loaded (Module),
+	ModuleLoaded = erlang:module_loaded (Module),
 	FunctionExported = erlang:function_exported (Module, Function, 5),
 	if
-		FunctionExported ->
+		ModuleLoaded, FunctionExported ->
 			Function_ = fun (Type1, Identifier1, ArgumentsEncoding1, ArgumentsContent1)
 					when (Type1 =:= Type), (ArgumentsEncoding1 =:= ArgumentsEncoding) ->
 				erlang:apply (Module, Function, [Type1, Identifier1, ArgumentsEncoding1, ArgumentsContent1, FunctionExtraArguments])
 			end,
 			handle_call ({register, Type, ArgumentsEncoding, Function_}, Sender, State);
-		true ->
-			{reply, {error, invalid_function}, State}
+		not ModuleLoaded ->
+			{reply, {error, {invalid_module, Module}}, State};
+		not FunctionExported ->
+			{reply, {error, {invalid_function, Module, Function}}, State}
 	end;
 	
 handle_call ({register, Type, ArgumentsEncoding, Function}, _Sender, OldState = #state{delegates = OldDelegates})

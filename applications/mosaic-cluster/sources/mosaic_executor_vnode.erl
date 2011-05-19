@@ -175,16 +175,25 @@ handle_handoff_command (_Request, _Sender, State) ->
 
 handle_handoff_data (DataBinary, State = #state{object_store = ObjectStore, process_controller = ProcessController}) ->
 	DataTerm = erlang:binary_to_term (DataBinary),
-	%ok = mosaic_tools:report_info (mosaic_executor_vnode, handle_handoff_data, data_term, DataTerm),
-	ok = case DataTerm of
+	Outcome = case DataTerm of
 		{Key, {object, _PeerObjectStore, Object}} ->
-			ok = mosaic_object_store:include (ObjectStore, Key, none, Object),
-			ok;
+			case mosaic_object_store:include (ObjectStore, Key, none, Object) of
+				ok ->
+					ok;
+				_Error = {error, Reason} ->
+					ok = mosaic_tools:trace_error ("failed handling handoff object; ignoring!", [{key, Key}, {object, Object}, {reason, Reason}]),
+					ok
+			end;
 		{Key, {process, PeerProcessController, _PeerProcess}} ->
-			{ok, _Target} = mosaic_process_controller:migrate (PeerProcessController, ProcessController, Key),
-			ok
+			case mosaic_process_controller:migrate (PeerProcessController, ProcessController, Key) of
+				{ok, _Target} ->
+					ok;
+				_Error = {error, Reason} ->
+					ok = mosaic_tools:trace_error ("failed handling handoff process; ignoring!", [{key, Key}, {reason, Reason}]),
+					ok
+			end
 	end,
-	{reply, ok, State}.
+	{reply, Outcome, State}.
 
 encode_handoff_item (Key, Object) ->
 	erlang:term_to_binary ({Key, Object}).

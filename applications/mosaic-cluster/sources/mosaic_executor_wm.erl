@@ -10,6 +10,8 @@
 -dispatch ({["executor", "processes"], {processes}}).
 -dispatch ({["executor", "processes", "create"], {processes, create}}).
 -dispatch ({["executor", "processes", "stop"], {processes, stop}}).
+-dispatch ({["executor", "processes", "call"], {processes, call}}).
+-dispatch ({["executor", "processes", "cast"], {processes, cast}}).
 -dispatch ({["executor", "ping"], {ping}}).
 
 
@@ -55,9 +57,20 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 					Error
 			end;
 		{processes, stop} ->
-			case mosaic_webmachine:enforce_request ('GET', [{"key", fun mosaic_webmachine:parse_hex_binary_key/1}], Request) of
+			case mosaic_webmachine:enforce_request ('GET', [{"key", fun mosaic_webmachine:parse_string_identifier/1}], Request) of
 				{ok, false, [Key]} ->
 					{ok, false, State#state{arguments = dict:from_list ([{key, Key}])}};
+				Error = {error, _Reason} ->
+					Error
+			end;
+		{processes, Action} when ((Action =:= call) orelse (Action =:= cast)) ->
+			case mosaic_webmachine:enforce_request ('GET',
+					[
+						{"key", fun mosaic_webmachine:parse_string_identifier/1},
+						{"arguments", fun mosaic_webmachine:parse_json/1}],
+					Request) of
+				{ok, false, [Key, Arguments]} ->
+					{ok, false, State#state{arguments = dict:from_list ([{key, Key}, {arguments, Arguments}])}};
 				Error = {error, _Reason} ->
 					Error
 			end;
@@ -105,10 +118,10 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			case mosaic_executor:select_processes () of
 				{ok, Keys, []} ->
 					{ok, json_struct, [
-							{keys, lists:map (fun mosaic_webmachine:format_binary_key/1, Keys)}]};
+							{keys, lists:map (fun mosaic_webmachine:format_string_identifier/1, Keys)}]};
 				{ok, Keys, Reasons} ->
 					{ok, json_struct, [
-							{keys, lists:map (fun mosaic_webmachine:format_binary_key/1, Keys)},
+							{keys, lists:map (fun mosaic_webmachine:format_string_identifier/1, Keys)},
 							{error, lists:map (fun mosaic_webmachine:format_term/1, Reasons)}]};
 				Error = {error, _Reason} ->
 					Error
@@ -120,10 +133,10 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			case mosaic_executor:define_and_create_processes (ProcessType, json, ProcessArgumentsContent, Count) of
 				{ok, Keys, _Processes, []} ->
 					{ok, json_struct, [
-							{keys, lists:map (fun mosaic_webmachine:format_binary_key/1, Keys)}]};
+							{keys, lists:map (fun mosaic_webmachine:format_string_identifier/1, Keys)}]};
 				{ok, Keys, _Processes, Reasons} ->
 					{ok, json_struct, [
-							{keys, lists:map (fun mosaic_webmachine:format_binary_key/1, Keys)},
+							{keys, lists:map (fun mosaic_webmachine:format_string_identifier/1, Keys)},
 							{errors, lists:map (fun mosaic_webmachine:format_term/1, Reasons)}]};
 				Error = {error, _Reason} ->
 					Error
@@ -136,6 +149,32 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 				Error = {error, _Reason} ->
 					Error
 			end;
+		{processes, Action} when ((Action =:= call) orelse (Action =:= cast)) ->
+			Key = dict:fetch (key, Arguments),
+			CallArguments = dict:fetch (arguments, Arguments),
+			case mosaic_executor:resolve_process (Key) of
+				{ok, Process} ->
+					case Action of
+						call ->
+							case mosaic_process:call (Process, CallArguments, <<>>) of
+								{ok, {struct, ReplyAttributes}, _ReplyData} ->
+									{ok, json_struct, ReplyAttributes};
+								{ok, Reply, _ReplyData} ->
+									{error, {invalid_reply, Reply}};
+								Error = {error, _Reason} ->
+									Error
+							end;
+						cast ->
+							case mosaic_process:call (Process, CallArguments, <<>>) of
+								ok ->
+									ok;
+								Error = {error, _Reason} ->
+									Error
+							end
+					end;
+				Error = {error, _Reason} ->
+					Error
+			end;
 		{ping} ->
 			Count = dict:fetch (count, Arguments),
 			case mosaic_executor:ping (Count) of
@@ -144,15 +183,15 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 							{pongs, lists:map (
 									fun ({pong, Key, {Partition, Node}}) ->
 										{struct, [
-												{key, mosaic_webmachine:format_binary_key (Key)},
-												{partition, mosaic_webmachine:format_numeric_key (Partition)},
+												{key, mosaic_webmachine:format_string_identifier (Key)},
+												{partition, mosaic_webmachine:format_integer_identifier (Partition)},
 												{node, mosaic_webmachine:format_atom (Node)}]}
 									end, Pongs)},
 							{pangs, lists:map (
 									fun ({pang, Key, {Partition, Node}, Reason}) ->
 										{struct, [
-												{key, mosaic_webmachine:format_binary_key (Key)},
-												{partition, mosaic_webmachine:format_numeric_key (Partition)},
+												{key, mosaic_webmachine:format_string_identifier (Key)},
+												{partition, mosaic_webmachine:format_integer_identifier (Partition)},
 												{node, mosaic_webmachine:format_atom (Node)},
 												{reason, mosaic_webmachine:format_term (Reason)}]}
 									end, Pangs)}]};

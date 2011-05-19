@@ -4,97 +4,117 @@
 -behaviour (mosaic_process).
 
 -export ([
-		init/1, terminate/2, handle_stop/2,
-		handle_call/3, handle_cast/2, handle_info/2,
-		begin_migration/2, commit_migration/1, rollback_migration/1]).
+		init/3, terminate/2, handle_stop/2,
+		handle_call/4, handle_cast/3, handle_info/2,
+		begin_migration/4, commit_migration/1, rollback_migration/1]).
 
--record (state, {status, arguments, port_name, port_settings, port}).
 
-init ({create, Arguments}) ->
-	case initialize (Arguments, #state{status = created}) of
-		{ok, State1} ->
+-record (state, {status, configuration, port}).
+
+
+init (create, _Identifier, Configuration) ->
+	case validate_configuration (create, Configuration) of
+		ok ->
+			State1 = #state{status = created, configuration = Configuration},
 			case create_port (State1) of
 				{ok, State2} ->
 					{ok, State2};
 				{error, Reason, _State2} ->
 					{stop, Reason}
 			end;
-		{error, Reason, _State1} ->
+		{error, Reason} ->
 			{stop, Reason}
 	end;
 	
-init (migrate) ->
-	{ok, #state{status = pre_migrating_as_target}};
-	
-init (_Disposition) ->
-	{stop, invalid_disposition}.
+init (migrate, _Identifier, Configuration) ->
+	case validate_configuration (migrate, Configuration) of
+		ok ->
+			defaults = Configuration,
+			State = #state{status = pre_migrating_as_target},
+			{ok, State};
+		{error, Reason} ->
+			{stop, Reason}
+	end.
 
-terminate (_Reason, OldState = #state{status = running}) ->
+
+terminate (Reason, OldState = #state{port = Port})
+		when (Port =/= undefined) ->
 	case destroy_port (OldState) of
-		{ok, _NewState} ->
-			ok;
-		{error, _Reason, _NewState} ->
-			ok
+		{ok, NewState} ->
+			terminate (Reason, NewState);
+		{error, _Reason, NewState} ->
+			terminate (Reason, NewState)
 	end;
 	
-terminate (_Reason, _State = #state{status = Status, port = undefined})
-		when (Status =:= closed) or (Status =:= failed)
-			or (Status =:= pre_migrating_as_target) or (Status =:= migration_succeeded) or (Status =:= migration_failed) ->
+terminate (_Reason, _State = #state{status = Status})
+		when ((Status =:= closed) orelse (Status =:= pre_migrating_as_target) orelse (Status =:= migration_succeeded) orelse (Status =:= migration_failed)) ->
 	ok.
 
+
+handle_stop (normal, State = #state{status = running}) ->
+	{stop, normal, ok, State};
+	
 handle_stop (Signal, State = #state{status = running}) ->
-	case Signal of
-		normal ->
-			{stop, normal, ok, State};
-		_ ->
-			{reply, {error, invalid_signal}, State}
-	end;
+	ok = mosaic_tools:trace_error ("received invalid stop request; ignoring!", [{signal, Signal}]),
+	{reply, {error, {invalid_signal, Signal}}, State};
 	
-handle_stop (_Signal, State = #state{status = Status})
-		when (Status =:= pre_migrating_as_target) or (Status =:= migrating_as_source) or (Status =:= migrating_as_target) ->
-	{reply, {error, invalid_state}, State}.
+handle_stop (Signal, State = #state{status = Status})
+		when ((Status =:= pre_migrating_as_target) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
+	ok = mosaic_tools:trace_error ("received unexpected stop request; ignoring!", [{signal, Signal}, {status, Status}]),
+	{reply, {error, {invalid_status, Status}}, State}.
 
-handle_call (_Request, _Sender, State = #state{status = running}) ->
-	{reply, {error, invalid_request}, State};
+
+handle_call (Request, _RequestData, Sender, State = #state{status = running}) ->
+	ok = mosaic_tools:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
+	{reply, {error, {invalid_request, Request}}, State};
 	
-handle_call (_Request, _Sender, State = #state{status = Status})
-		when (Status =:= pre_migrating_as_target) or (Status =:= migrating_as_source) or (Status =:= migrating_as_target) ->
-	{reply, {error, invalid_state}, State}.
+handle_call (Request, _RequestData, Sender, State = #state{status = Status})
+		when ((Status =:= pre_migrating_as_target) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
+	ok = mosaic_tools:trace_error ("received unexpected call request; ignoring!", [{request, Request}, {sender, Sender}, {status, Status}]),
+	{reply, {error, {invalid_status, Status}}, State}.
 
-handle_cast (Request, State = #state{status = running}) ->
-	ok = error_logger:error_report (mosaic_error, [{mosaic_port_process, handle_cast, erlang:self ()}, {invalid_request, Request}]),
+
+handle_cast (Request, _RequestData, State = #state{status = running}) ->
+	ok = mosaic_tools:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
 	{noreply, State};
 	
-handle_cast (_Request, State = #state{status = Status})
-		when (Status =:= pre_migrating_as_target) or (Status =:= migrating_as_source) or (Status =:= migrating_as_target) ->
-	ok = error_logger:error_report (mosaic_error, [{mosaic_port_process, handle_cast, erlang:self ()}, invalid_status]),
+handle_cast (Request, _RequestData, State = #state{status = Status})
+		when ((Status =:= pre_migrating_as_target) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
+	ok = mosaic_tools:trace_error ("received unexpected cast request; ignoring!", [{request, Request}, {status, Status}]),
 	{noreply, State}.
+
 
 handle_info (Message, State = #state{status = running}) ->
-	ok = error_logger:error_report (mosaic_error, [{mosaic_port_process, handle_info, erlang:self ()}, {invalid_info_message, Message}]),
+	ok = mosaic_tools:trace_error ("received invalid message; ignoring!", [{message, Message}]),
 	{noreply, State};
 	
-handle_info (_Message, State = #state{status = Status})
-		when (Status =:= pre_migrating_as_target) or (Status =:= migrating_as_source) or (Status =:= migrating_as_target) ->
-	ok = error_logger:error_report (mosaic_error, [{mosaic_port_process, handle_cast, erlang:self ()}, invalid_status]),
+handle_info (Message, State = #state{status = Status})
+		when ((Status =:= pre_migrating_as_target) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
+	ok = mosaic_tools:trace_error ("received unexpected message; ignoring!", [{message, Message}, {status, Status}]),
 	{noreply, State}.
 
-begin_migration ({source, defaults, CompletionFun}, OldState = #state{status = running, arguments = CreationArguments}) ->
-	ok = CompletionFun ({prepared, CreationArguments}),
-	ok = CompletionFun (completed),
-	{continue, OldState#state{status = migrating_as_source}};
+
+begin_migration (source, MigrateConfiguration, CompletionFunction, OldState = #state{status = running, configuration = CreateConfiguration}) ->
+	case validate_configuration (migrate, MigrateConfiguration) of
+		ok ->
+			defaults = MigrateConfiguration,
+			ok = CompletionFunction ({prepared, CreateConfiguration}),
+			ok = CompletionFunction (completed),
+			{continue, OldState#state{status = migrating_as_source}};
+		{error, Reason} ->
+			{reject, Reason, OldState}
+	end;
 	
-begin_migration ({source, _MigrationArguments, _CompletionFun}, State = #state{status = running}) ->
-	{reject, invalid_arguments, State};
-	
-begin_migration ({target, Arguments, CompletionFun}, OldState = #state{status = pre_migrating_as_target}) ->
-	case initialize (Arguments, OldState) of
-		{ok, NewState} ->
-			ok = CompletionFun (completed),
-			{continue, NewState#state{status = migrating_as_target}};
-		{error, Reason, NewState} ->
-			{terminate, Reason, NewState#state{status = migration_failed}}
+begin_migration (target, CreateConfiguration, CompletionFunction, OldState = #state{status = pre_migrating_as_target}) ->
+	case validate_configuration (create, CreateConfiguration) of
+		ok ->
+			NewState = #state{status = migrating_as_target, configuration = CreateConfiguration},
+			ok = CompletionFunction (completed),
+			{continue, NewState};
+		{error, Reason} ->
+			{reject, Reason, OldState}
 	end.
+
 
 commit_migration (OldState = #state{status = migrating_as_source}) ->
 	case destroy_port (OldState) of
@@ -112,31 +132,59 @@ commit_migration (OldState = #state{status = migrating_as_target}) ->
 			{terminate, Reason, NewState#state{status = migration_failed}}
 	end.
 
+
 rollback_migration (OldState = #state{status = migrating_as_source}) ->
 	{continue, OldState#state{status = running}};
 	
-rollback_migration (OldState = #state{status = Status}) when (Status =:= pre_migrating_as_target) or (Status =:= migrating_as_target) ->
+rollback_migration (OldState = #state{status = Status})
+		when ((Status =:= pre_migrating_as_target) orelse (Status =:= migrating_as_target)) ->
 	{continue, OldState#state{status = migration_failed}}.
 
-initialize (
-		Arguments,
-		OldState = #state{status = Status, arguments = undefined, port_name = undefined, port_settings = undefined, port = undefined})
-		when (Status =:= created) or (Status =:= pre_migrating_as_target) ->
-	case Arguments of
-		{PortName = {spawn_executable, PortExecutable}, PortSettings} when is_list (PortExecutable), is_list (PortSettings) ->
-			{ok, OldState#state{arguments = Arguments, port_name = PortName, port_settings = PortSettings}};
-		_ ->
-			{error, invalid_arguments, OldState}
-	end.
 
-create_port (OldState = #state{status = Status, port = undefined, port_name = PortName, port_settings = PortSettings})
-		when (Status =:= created) or (Status =:= migrating_as_target) ->
+create_port (OldState = #state{status = Status, configuration = Configuration})
+		when ((Status =:= created) orelse (Status =:= migrating_as_target)) ->
+	{{spawn_executable, Executable}, [{arg0, Arg0}]} = Configuration,
+	PortName = {spawn_executable, erlang:binary_to_list (Executable)},
+	PortSettings = [{arg0, erlang:binary_to_list (Arg0)}],
 	Port = erlang:open_port (PortName, PortSettings),
 	true = erlang:port_connect (Port, erlang:self ()),
 	{ok, OldState#state{status = running, port = Port}}.
 
+
 destroy_port (OldState = #state{status = Status, port = Port})
-		when (Status =:= running) or (Status =:= migrating_as_source) ->
+		when ((Status =:= running) orelse (Status =:= migrating_as_source)) ->
 	true = erlang:port_close (Port),
 	true = erlang:unlink (Port),
 	{ok, OldState#state{status = closed, port = undefined}}.
+
+
+validate_configuration (create, {PortName, PortSettings}) ->
+	try
+		ok = case PortName of
+			{spawn_executable, Executable} when is_binary (Executable) ->
+				ok;
+			{spawn_executable, Executable} ->
+				throw ({error, {invalid_executable, Executable}});
+			_ ->
+				throw ({error, {invalid_port_name, PortName}})
+		end,
+		ok = case PortSettings of
+			[{arg0, Arg0}] when is_binary (Arg0) ->
+				ok;
+			[{arg0, Arg0}] ->
+				throw ({error, {invalid_arg0, Arg0}});
+			_ ->
+				throw ({error, {invalid_port_settings, PortSettings}})
+		end,
+		ok
+	catch
+		throw : Error = {error, _Reason} ->
+			Error
+	end;
+	
+validate_configuration (migrate, defaults) ->
+	ok;
+	
+validate_configuration (Disposition, Configuration)
+		when ((Disposition =:= create) orelse (Disposition =:= migrate)) ->
+	{error, {invalid_configuration, Configuration}}.

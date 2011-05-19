@@ -4,31 +4,50 @@
 -behaviour (mosaic_process).
 
 -export ([
-		init/1, terminate/2,
-		handle_stop/2, handle_call/3, handle_cast/2, handle_info/2,
-		begin_migration/2, commit_migration/1, rollback_migration/1]).
+		init/3, terminate/2, handle_stop/2, handle_call/4, handle_cast/3, handle_info/2,
+		begin_migration/4, commit_migration/1, rollback_migration/1]).
 
 
--record (state, {status, migration_outcome, terminate_delegate, begin_migration_delegate, commit_migration_delegate, rollback_migration_delegate}).
+-record (state, {
+			identifier, status,
+			terminate_delegate, handle_stop_delegate, handle_call_delegate, handle_cast_delegate, handle_info_delegate,
+			begin_migration_delegate, commit_migration_delegate, rollback_migration_delegate,
+			migration_outcome}).
 
 
-init ({create, defaults}) ->
-	init ({create, ok});
+init (create, Identifier, defaults)
+		when is_binary (Identifier), (bit_size (Identifier) =:= 160) ->
+	init (create, Identifier, ok);
 	
-init ({create, ok}) ->
+init (create, Identifier, ok)
+		when is_binary (Identifier), (bit_size (Identifier) =:= 160) ->
 	{ok, #state{
-			status = active, migration_outcome = undefined,
+			identifier = Identifier, status = active,
 			terminate_delegate = none,
-			begin_migration_delegate = none, commit_migration_delegate = none, rollback_migration_delegate = none}};
+			handle_stop_delegate = none, handle_call_delegate = none, handle_cast_delegate = none, handle_info_delegate = none,
+			begin_migration_delegate = none, commit_migration_delegate = none, rollback_migration_delegate = none,
+			migration_outcome = none}};
 	
-init ({create, {stop, Reason}}) ->
+init (create, Identifier, {stop, Reason})
+		when is_binary (Identifier), (bit_size (Identifier) =:= 160) ->
 	{stop, Reason};
 	
-init (migrate) ->
+init (migrate, Identifier, defaults)
+		when is_binary (Identifier), (bit_size (Identifier) =:= 160) ->
+	init (migrate, Identifier, ok);
+	
+init (migrate, Identifier, ok)
+		when is_binary (Identifier), (bit_size (Identifier) =:= 160) ->
 	{ok, #state{
 			status = migrating_as_target_waiting_begin,
 			terminate_delegate = none,
-			begin_migration_delegate = none, commit_migration_delegate = none, rollback_migration_delegate = none}}.
+			handle_stop_delegate = none, handle_call_delegate = none, handle_cast_delegate = none, handle_info_delegate = none,
+			begin_migration_delegate = none, commit_migration_delegate = none, rollback_migration_delegate = none,
+			migration_outcome = none}};
+	
+init (migrate, Identifier, {stop, Reason})
+		when is_binary (Identifier), (bit_size (Identifier) =:= 160) ->
+	{stop, Reason}.
 
 
 terminate (Reason, State = #state{terminate_delegate = Delegate})
@@ -36,12 +55,16 @@ terminate (Reason, State = #state{terminate_delegate = Delegate})
 	Delegate (Reason, State);
 	
 terminate (_Reason, #state{status = Status})
-		when (Status =:= active) or (Status =:= stopped)
-				or (Status =:= migrating_as_source_succeeded) or (Status =:= migrating_as_source_failed)
-				or (Status =:= migrating_as_target_waiting_begin) or (Status =:= migrating_as_target_failed) ->
+		when (Status =:= active) orelse (Status =:= stopped)
+				orelse (Status =:= migrating_as_source_succeeded) orelse (Status =:= migrating_as_source_failed)
+				orelse (Status =:= migrating_as_target_waiting_begin) orelse (Status =:= migrating_as_target_failed) ->
 	ok.
 
 
+handle_stop (Signal, State = #state{handle_stop_delegate = Delegate})
+		when (Delegate =/= none) ->
+	Delegate (Signal, State);
+	
 handle_stop (normal, State = #state{status = active}) ->
 	{stop, normal, ok, State#state{status = stopped}};
 	
@@ -62,70 +85,99 @@ handle_stop (_Signal, State = #state{status = Status}) ->
 	{reply, {error, {invalid_status, Status}}, State}.
 
 
-handle_call (status, _Sender, State = #state{status = Status}) ->
-	{reply, {ok, Status}, State};
+handle_call (Request, RequestData, Sender, State = #state{handle_call_delegate = Delegate})
+		when is_binary (RequestData), (Delegate =/= none) ->
+	Delegate (Request, RequestData, Sender, State);
 	
-handle_call ({terminate_delegate, Delegate}, _Sender, State)
-		when (Delegate =:= none) or is_function (Delegate, 2) ->
-	{reply, ok, State#state{terminate_delegate = Delegate}};
+handle_call (status, <<>>, _Sender, State = #state{status = Status}) ->
+	{reply, {ok, Status, <<>>}, State};
 	
-handle_call ({begin_migration_delegate, Delegate}, _Sender, State)
-		when (Delegate =:= none) or is_function (Delegate, 2) ->
-	{reply, ok, State#state{begin_migration_delegate = Delegate}};
+handle_call ({terminate_delegate, Delegate}, <<>>, _Sender, State)
+		when (Delegate =:= none) orelse is_function (Delegate, 2) ->
+	{reply, {ok, none, <<>>}, State#state{terminate_delegate = Delegate}};
 	
-handle_call ({commit_migration_delegate, Delegate}, _Sender, State)
-		when (Delegate =:= none) or is_function (Delegate, 1) ->
-	{reply, ok, State#state{commit_migration_delegate = Delegate}};
+handle_call ({handle_stop_delegate, Delegate}, <<>>, _Sender, State)
+		when ((Delegate =:= none) orelse is_function (Delegate, 2)) ->
+	{reply, {ok, none, <<>>}, State#state{handle_stop_delegate = Delegate}};
 	
-handle_call ({rollback_migration_delegate, Delegate}, _Sender, State)
-		when (Delegate =:= none) or is_function (Delegate, 1) ->
-	{reply, ok, State#state{rollback_migration_delegate = Delegate}};
+handle_call ({handle_call_delegate, Delegate}, <<>>, _Sender, State)
+		when ((Delegate =:= none) orelse is_function (Delegate, 4)) ->
+	{reply, {ok, none, <<>>}, State#state{handle_call_delegate = Delegate}};
 	
-handle_call ({ping, Target, Token1, Return}, Sender, State)
-		when is_pid (Target), (Return =:= reply) or (Return =:= noreply) ->
+handle_call ({handle_cast_delegate, Delegate}, <<>>, _Sender, State)
+		when ((Delegate =:= none) orelse is_function (Delegate, 3)) ->
+	{reply, {ok, none, <<>>}, State#state{handle_cast_delegate = Delegate}};
+	
+handle_call ({handle_info_delegate, Delegate}, <<>>, _Sender, State)
+		when ((Delegate =:= none) orelse is_function (Delegate, 2)) ->
+	{reply, {ok, none, <<>>}, State#state{handle_info_delegate = Delegate}};
+	
+handle_call ({begin_migration_delegate, Delegate}, <<>>, _Sender, State)
+		when (Delegate =:= none) orelse is_function (Delegate, 3) ->
+	{reply, {ok, none, <<>>}, State#state{begin_migration_delegate = Delegate}};
+	
+handle_call ({commit_migration_delegate, Delegate}, <<>>, _Sender, State)
+		when (Delegate =:= none) orelse is_function (Delegate, 1) ->
+	{reply, {ok, none, <<>>}, State#state{commit_migration_delegate = Delegate}};
+	
+handle_call ({rollback_migration_delegate, Delegate}, <<>>, _Sender, State)
+		when (Delegate =:= none) orelse is_function (Delegate, 1) ->
+	{reply, {ok, none, <<>>}, State#state{rollback_migration_delegate = Delegate}};
+	
+handle_call ({ping, Target, Token1, Return}, <<>>, Sender, State)
+		when is_pid (Target), ((Return =:= reply) orelse (Return =:= noreply)) ->
 	Token2 = erlang:make_ref (),
-	Target ! {pong, Token1, Token2},
+	Target ! {pong, call, Token1, Token2},
 	case Return of
 		reply ->
-			{reply, {pong, Token1, Token2}, State};
+			{reply, {ok, {pong, Token1, Token2}, <<>>}, State};
 		noreply ->
-			_ = gen_server:reply (Sender, {pong, Token1, Token2}),
+			_ = gen_server:reply (Sender, {ok, {pong, Token1, Token2}, <<>>}),
 			{noreply, State}
 	end;
 	
-handle_call ({reply, Reply}, _Sender, State) ->
+handle_call ({reply, Reply}, <<>>, _Sender, State) ->
 	{reply, Reply, State};
 	
-handle_call ({stop, Reason, Reply}, _Sender, State) ->
+handle_call ({stop, Reason, Reply}, <<>>, _Sender, State) ->
 	{stop, Reason, Reply, State};
 	
-handle_call ({delegate, Delegate}, _Sender, State)
+handle_call ({delegate, Delegate}, <<>>, _Sender, State)
 		when is_function (Delegate, 1) ->
 	Delegate (State);
 	
-handle_call (Request, _Sender, State) ->
-	{reply, {error, {invalid_request, Request}}, State}.
+handle_call (Request, RequestData, _Sender, State)
+		when is_binary (RequestData) ->
+	{reply, {error, {invalid_request, Request, RequestData}}, State}.
 
 
-handle_cast ({ping, Target, Token}, State)
+handle_cast (Request, RequestData, State = #state{handle_cast_delegate = Delegate})
+		when is_binary (RequestData), (Delegate =/= none) ->
+	Delegate (Request, RequestData, State);
+	
+handle_cast ({ping, Target, Token}, <<>>, State)
 		when is_pid (Target) ->
-	Target ! {pong, Token, Token},
+	Target ! {pong, cast, Token, Token},
 	{noreply, State};
 	
-handle_cast ({stop, Reason}, State) ->
+handle_cast ({stop, Reason}, <<>>, State) ->
 	{stop, Reason, State};
 	
-handle_cast ({delegate, Delegate}, State)
+handle_cast ({delegate, Delegate}, <<>>, State)
 		when is_function (Delegate, 1) ->
 	Delegate (State);
 	
-handle_cast (_Request, State) ->
+handle_cast (_Request, _RequestData, State) ->
 	{noreply, State}.
 
 
+handle_info (Message, State = #state{handle_info_delegate = Delegate})
+		when (Delegate =/= none) ->
+	Delegate (Message, State);
+	
 handle_info ({ping, Target, Token}, State)
 		when is_pid (Target) ->
-	Target ! {pong, Token, Token},
+	Target ! {pong, info, Token, Token},
 	{noreply, State};
 	
 handle_info ({stop, Reason}, State) ->
@@ -139,44 +191,48 @@ handle_info (_Message, State) ->
 	{noreply, State}.
 
 
-begin_migration (Disposition, State = #state{begin_migration_delegate = Delegate})
+begin_migration (Disposition, Configuration, CompletionFunction, State = #state{begin_migration_delegate = Delegate})
 		when (Delegate =/= none) ->
-	Delegate (Disposition, State);
+	Delegate (Disposition, Configuration, CompletionFunction, State);
 	
-begin_migration ({source, defaults, CompletionFun}, State) ->
-	begin_migration ({source, {continue, {continue, succeed}, succeed}, CompletionFun}, State);
+begin_migration (source, defaults, CompletionFunction, State) ->
+	begin_migration (source, {continue, {continue, succeed}, succeed}, CompletionFunction, State);
 	
-begin_migration ({source, {continue, Arguments, Outcome}, CompletionFun}, State = #state{status = active})
-		when is_function (CompletionFun, 1), (Outcome =:= succeed) or (Outcome =:= fail) ->
-	ok = CompletionFun ({prepared, Arguments}),
-	ok = CompletionFun (completed),
+begin_migration (source, {continue, Configuration, Outcome}, CompletionFunction, State = #state{status = active})
+		when is_function (CompletionFunction, 1), ((Outcome =:= succeed) orelse (Outcome =:= fail)) ->
+	ok = CompletionFunction ({prepared, Configuration}),
+	ok = CompletionFunction (completed),
 	{continue, State#state{status = migrating_as_source_waiting_commit, migration_outcome = Outcome}};
 	
-begin_migration ({target, {continue, Outcome}, CompletionFun}, State = #state{status = migrating_as_target_waiting_begin})
-		when is_function (CompletionFun, 1), (Outcome =:= succeed) or (Outcome =:= fail) ->
-	ok = CompletionFun (completed),
+begin_migration (target, {continue, Outcome}, CompletionFunction, State = #state{status = migrating_as_target_waiting_begin})
+		when is_function (CompletionFunction, 1), ((Outcome =:= succeed) orelse (Outcome =:= fail)) ->
+	ok = CompletionFunction (completed),
 	{continue, State#state{status = migrating_as_target_waiting_commit, migration_outcome = Outcome}};
 	
-begin_migration ({Role, Continuation, CompletionFun}, State = #state{status = Status})
-		when ((Role =:= source) and (Status =:= active))
-					or ((Role =:= target) and (Status =:= migrating_as_target_waiting_begin)),
-				(Continuation =:= reject) or (Continuation =:= terminate),
-				is_function (CompletionFun, 1) ->
+begin_migration (Role, Continuation, CompletionFunction, State = #state{status = Status})
+		when (((Role =:= source) andalso (Status =:= active))
+					orelse ((Role =:= target) andalso (Status =:= migrating_as_target_waiting_begin))),
+				((Continuation =:= reject) orelse (Continuation =:= terminate)),
+				is_function (CompletionFunction, 1) ->
 	case Continuation of
 		reject ->
 			{reject, rejected, State};
 		terminate ->
 			{terminate, terminated,
-					State#state{status = case Role of source -> migrating_as_source_failed; target -> migrating_as_target_failed end}}
+					State#state{
+							status = if
+								(Role =:= source) -> migrating_as_source_failed;
+								(Role =:= target) -> migrating_as_target_failed
+							end}}
 	end;
 	
-begin_migration ({Role, Arguments, CompletionFun}, State = #state{status = Status})
-		when (Role =:= source) or (Role =:= target), (Status =:= active) or (Status =:= migrating_as_target_waiting_begin),
-				is_function (CompletionFun, 1) ->
-	{reject, {invalid_arguments, Arguments}, State};
+begin_migration (Role, Configuration, CompletionFunction, State = #state{status = Status})
+		when ((Role =:= source) orelse (Role =:= target)), ((Status =:= active) orelse (Status =:= migrating_as_target_waiting_begin)),
+				is_function (CompletionFunction, 1) ->
+	{reject, {invalid_configuration, Configuration}, State};
 	
-begin_migration ({Role, _Arguments, CompletionFun}, State = #state{status = Status})
-		when (Role =:= source) or (Role =:= target), is_function (CompletionFun, 1) ->
+begin_migration (Role, _Configuration, CompletionFunction, State = #state{status = Status})
+		when ((Role =:= source) orelse (Role =:= target)), is_function (CompletionFunction, 1) ->
 	{reject, {invalid_status, Status}, State}.
 
 
@@ -185,7 +241,7 @@ commit_migration (State = #state{commit_migration_delegate = Delegate})
 	Delegate (State);
 	
 commit_migration (State = #state{status = migrating_as_source_waiting_commit, migration_outcome = Outcome})
-		when (Outcome =:= succeed) or (Outcome =:= fail) ->
+		when ((Outcome =:= succeed) orelse (Outcome =:= fail)) ->
 	case Outcome of
 		succeed ->
 			{continue, State#state{status = migrating_as_source_succeeded}};
@@ -194,7 +250,7 @@ commit_migration (State = #state{status = migrating_as_source_waiting_commit, mi
 	end;
 	
 commit_migration (State = #state{status = migrating_as_target_waiting_commit, migration_outcome = Outcome})
-		when (Outcome =:= succeed) or (Outcome =:= fail) ->
+		when ((Outcome =:= succeed) orelse (Outcome =:= fail)) ->
 	case Outcome of
 		succeed ->
 			{continue, State#state{status = active}};
@@ -208,7 +264,7 @@ rollback_migration (State = #state{rollback_migration_delegate = Delegate})
 	Delegate (State);
 	
 rollback_migration (State = #state{status = migrating_as_source_waiting_commit, migration_outcome = Outcome})
-		when (Outcome =:= succeed) or (Outcome =:= fail) ->
+		when ((Outcome =:= succeed) orelse (Outcome =:= fail)) ->
 	case Outcome of
 		succeed ->
 			{continue, State#state{status = active}};
@@ -217,7 +273,7 @@ rollback_migration (State = #state{status = migrating_as_source_waiting_commit, 
 	end;
 	
 rollback_migration (State = #state{status = migrating_as_target_waiting_commit, migration_outcome = Outcome})
-		when (Outcome =:= succeed) or (Outcome =:= fail) ->
+		when ((Outcome =:= succeed) orelse (Outcome =:= fail)) ->
 	case Outcome of
 		succeed ->
 			{continue, State#state{status = migrating_as_target_failed}};

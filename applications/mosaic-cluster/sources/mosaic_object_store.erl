@@ -132,13 +132,13 @@ handle_call ({count}, _Sender, State = #state{table = Table}) ->
 	{reply, {ok, Count}, State};
 	
 handle_call (Request, Sender, State) ->
-	ok = error_logger:error_report (mosaic_error, [{mosaic_object_store, handle_call, erlang:self ()}, {invalid_call, Request, Sender}]),
-	{reply, {error, {invalid_call, Request}}, State}.
+	ok = mosaic_tools:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
+	{reply, {error, {invalid_request, Request}}, State}.
 
 handle_cast (Request, State) ->
-	ok = error_logger:error_report (mosaic_error, [{mosaic_object_store, handle_cast, erlang:self ()}, {invalid_cast, Request}]),
+	ok = mosaic_tools:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
 	{noreply, State}.
 
-handle_info (Request, State) ->
-	ok = error_logger:error_report (mosaic_error, [{mosaic_object_store, handle_info, erlang:self ()}, {invalid_info, Request}]),
+handle_info (Message, State) ->
+	ok = mosaic_tools:trace_error ("received invalid message; ignoring!", [{message, Message}]),
 	{noreply, State}.

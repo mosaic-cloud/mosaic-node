@@ -83,7 +83,7 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 					{partitions, lists:map (
 							fun ({Key, Node}) ->
 								{struct, [
-										{key, mosaic_webmachine:format_numeric_key (Key)},
+										{key, mosaic_webmachine:format_integer_identifier (Key)},
 										{node, mosaic_webmachine:format_atom (Node)}]}
 							end, Partitions)}]};
 		{ring, include} ->

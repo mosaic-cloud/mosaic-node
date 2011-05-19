@@ -7,14 +7,14 @@
 
 
 start (normal, defaults) ->
-	try begin
+	try
 		{ok, Supervisor} = start_supervisor (),
 		ok = start_discovery_events (),
 		ok = start_discovery_agent (),
 		ok = start_webmachine (),
 		ok = start_services (),
 		{ok, Supervisor, void}
-	end catch
+	catch
 		throw : Error = {error, _Reason} ->
 			Error
 	end;
@@ -53,7 +53,6 @@ start_discovery_agent () ->
 	JoinFunction = fun (Message, void) ->
 			case Message of
 				{broadcasted, {mosaic_cluster, {join, Node}}} when is_atom (Node) ->
-					% ok = mosaic_tools:report_info (mosaic_cluster_tests, test, join, {Node}),
 					ok = mosaic_cluster:ring_include (Node),
 					{ok, void};
 				_ ->
@@ -73,10 +72,10 @@ start_discovery_agent () ->
 			throw (Error2)
 	end,
 	ok = case mosaic_discovery_agent:broadcast ({mosaic_cluster, {join, erlang:node ()}}) of
-		ok ->
+		{ok, _Reference} ->
 			ok;
-		Error4 = {error, _Reason4} ->
-			throw (Error4)
+		Error3 = {error, _Reason3} ->
+			throw (Error3)
 	end,
 	ok.
 

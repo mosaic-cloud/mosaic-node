@@ -65,7 +65,7 @@ broadcast (Agent, Message, Count, Delay)
 
 -record (state, {qualified_name, configuration, socket, socket_ip, socket_port, broadcasts}).
 -record (configuration, {identity, shared_secret, socket_ip, socket_port, events}).
--record (broadcast, {key, message, count, delay, timer}).
+-record (broadcast, {reference, message, count, delay, timer}).
 
 
 init ({QualifiedName, OriginalConfiguration}) ->
@@ -114,35 +114,35 @@ handle_call ({stop, Signal}, _Sender, State) ->
 	
 handle_call ({broadcast, Message, Count, Delay}, _Sender, OldState = #state{broadcasts = OldBroadcasts})
 		when ((Count =:= infinity) orelse (is_integer (Count) andalso (Count > 0))), is_integer (Delay), (Delay > 0) ->
-	Key = erlang:make_ref (),
-	case timer:send_interval (Delay, {broadcast, Key}) of
+	Reference = erlang:make_ref (),
+	case timer:send_interval (Delay, {broadcast, Reference}) of
 		{ok, Timer} ->
-			NewBroadcast = #broadcast{key = Key, message = Message, count = Count, delay = Delay, timer = Timer},
-			NewBroadcasts = orddict:store (Key, NewBroadcast, OldBroadcasts),
-			{reply, ok, OldState#state{broadcasts = NewBroadcasts}};
+			NewBroadcast = #broadcast{reference = Reference, message = Message, count = Count, delay = Delay, timer = Timer},
+			NewBroadcasts = orddict:store (Reference, NewBroadcast, OldBroadcasts),
+			{reply, {ok, Reference}, OldState#state{broadcasts = NewBroadcasts}};
 		Error = {error, _Reason} ->
 			Error
 	end;
 	
-handle_call (Request, _Sender, State) ->
-	ok = mosaic_tools:report_error (mosaic_discovery_agent, handle_call, invalid_request, {Request}),
+handle_call (Request, Sender, State) ->
+	ok = mosaic_tools:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
 	{reply, {error, {invalid_request, Request}}, State}.
 
 
 handle_cast (Request, State) ->
-	ok = mosaic_tools:report_error (mosaic_discovery_agent, handle_cast, invalid_request, {Request}),
+	ok = mosaic_tools:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
 	{noreply, State}.
 
 
 handle_info (
-			{broadcast, Key},
+			{broadcast, Reference},
 			OldState = #state{
 					configuration = #configuration{identity = Identity, shared_secret = SharedSecret},
 					socket = Socket, socket_ip = SocketIp, socket_port = SocketPort,
 					broadcasts = OldBroadcasts})
-		when is_reference (Key) ->
-	case orddict:find (Key, OldBroadcasts) of
-		{ok, OldBroadcast = #broadcast{key = Key, message = Message, count = OldCount, timer = Timer}} ->
+		when is_reference (Reference) ->
+	case orddict:find (Reference, OldBroadcasts) of
+		{ok, OldBroadcast = #broadcast{reference = Reference, message = Message, count = OldCount, timer = Timer}} ->
 			{ok, Payload} = encode_payload (Identity, SharedSecret, Message),
 			ok = gen_udp:send (Socket, SocketIp, SocketPort, Payload),
 			case OldCount of
@@ -150,19 +150,19 @@ handle_info (
 					{noreply, OldState};
 				1 ->
 					{ok, cancel} = timer:cancel (Timer),
-					NewBroadcasts = orddict:erase (Key, OldBroadcasts),
+					NewBroadcasts = orddict:erase (Reference, OldBroadcasts),
 					{noreply, OldState#state{broadcasts = NewBroadcasts}};
 				_ ->
-					NewBroadcasts = orddict:store (Key, OldBroadcast#broadcast{count = OldCount - 1}, OldBroadcasts),
+					NewBroadcasts = orddict:store (Reference, OldBroadcast#broadcast{count = OldCount - 1}, OldBroadcasts),
 					{noreply, OldState#state{broadcasts = NewBroadcasts}}
 			end;
 		error ->
-			ok = mosaic_tools:report_error (mosaic_discovery_agent, handle_info, invalid_broadcast, {Key}),
+			ok = mosaic_tools:trace_error ("received invalid broadcast request: invalid reference; ignoring!", [{reference, Reference}]),
 			{noreply, OldState}
 	end;
 	
 handle_info (
-			{udp, Socket, _SourceIp, _SourcePort, Payload},
+			{udp, Socket, SourceIp, SourcePort, Payload},
 			State = #state{
 					configuration = #configuration{identity = Identity, shared_secret = SharedSecret, events = Events},
 					socket = Socket}) ->
@@ -173,12 +173,12 @@ handle_info (
 			ok = mosaic_discovery_events:broadcasted (Events, Message),
 			{noreply, State};
 		{error, Reason} ->
-			ok = mosaic_tools:report_error (mosaic_discovery_agent, handle_info, error, {Reason}),
+			ok = mosaic_tools:trace_error ("received invalid broadcast packet: invalid payload; ignoring!", [{source, {SourceIp, SourcePort}}, {payload, Payload}, {reason, Reason}]),
 			{noreply, State}
 	end;
 	
 handle_info (Message, State) ->
-	ok = mosaic_tools:report_error (mosaic_discovery_agent, handle_info, invalid_message, {Message}),
+	ok = mosaic_tools:trace_error ("received invalid message; ignoring!", [{message, Message}]),
 	{noreply, State}.
 
 

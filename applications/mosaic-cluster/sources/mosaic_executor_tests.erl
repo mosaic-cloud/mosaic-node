@@ -2,15 +2,14 @@
 -module (mosaic_executor_tests).
 
 -export ([test/0]).
+-export ([
+		test_ping/1,
+		test_define_process/1,
+		test_create_stop_process/1]).
 
--export ([ping/1]).
--test ({ping, [16]}).
-
--export ([define_process/2]).
--test ({define_process, [mosaic_process_tester, ok]}).
-
--export ([create_process/2]).
--test ({create_process, [mosaic_process_tester, ok]}).
+-test ({test_ping, [{defaults}]}).
+-test ({test_define_process, [{defaults}]}).
+-test ({test_create_stop_process, [{defaults}]}).
 
 
 test () ->
@@ -21,29 +20,27 @@ test () ->
 	ok.
 
 
-ping (Count)
-		when is_integer (Count), (Count > 0) ->
-	case mosaic_executor:ping (Count) of
-		{ok, Count, []} ->
+test_ping ({defaults}) ->
+	ok = case mosaic_executor:ping () of
+		{ok, _Pongs, _Pangs = []} ->
 			ok;
-		{ok, 0, Outcomes} ->
-			ok = error_logger:error_report ("Ping failed completely!", [Outcomes]),
+		{ok, Pongs = [], Pangs} ->
+			ok = mosaic_tools:trace_warning ("Ping failed completely!", [{pongs, Pongs}, {pangs, Pangs}]),
 			ok;
-		{ok, PingCount, Outcomes} when (PingCount =< Count) ->
-			ok = error_logger:warning_report ("Ping failed partially!", [Outcomes]),
+		{ok, Pongs, Pangs} ->
+			ok = mosaic_tools:trace_warning ("Ping failed partially!", [{pongs, Pongs}, {pangs, Pangs}]),
 			ok
-	end.
-
-
-define_process (Module, Arguments)
-		when is_atom (Module) ->
-	{ok, _Key} = mosaic_executor:define_process (Module, Arguments),
+	end,
 	ok.
 
 
-create_process (Module, Arguments)
-		when is_atom (Module) ->
-	{ok, Key} = mosaic_executor:define_process (Module, Arguments),
+test_define_process ({defaults}) ->
+	{ok, _Key} = mosaic_executor:define_process (dummy, term, defaults),
+	ok.
+
+
+test_create_stop_process ({defaults}) ->
+	{ok, Key} = mosaic_executor:define_process (dummy, term, defaults),
 	{ok, _Process} = mosaic_executor:create_process (Key),
 	ok = mosaic_executor:stop_process (Key),
 	ok.

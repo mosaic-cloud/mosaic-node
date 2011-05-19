@@ -92,7 +92,7 @@ enum _cleanup_action {
 };
 
 unsigned int const _timeout_slice = 100;
-unsigned int const _timeout_waitpid = 6 * 1000;
+unsigned int const _timeout_waitpid = 2 * 100;
 
 // ----------------------------------------
 
@@ -384,6 +384,8 @@ static void _cleanup_execute (void);
 
 static void _cleanup_cancel (void);
 
+static unsigned int _pid;
+
 // ----------------------------------------
 
 unsigned int main (
@@ -393,6 +395,8 @@ unsigned int main (
 	struct _cleanup * _input_cleanup;
 	struct _cleanup * _output_cleanup;
 	struct _context * _context;
+	
+	_pid = getpid ();
 	
 	_input_cleanup = 0;
 	_cleanup_register_close (&_input_cleanup, 0);
@@ -414,7 +418,7 @@ unsigned int main (
 	_cleanup_execute ();
 	
 	if (TRACE_LEVEL <= _trace_event_debugging)
-		__trace (_trace_event_debugging, "exiting...", __func__, __LINE__);
+		__trace (_trace_event_information, "exited!", __func__, __LINE__);
 	
 	exit (0);
 }
@@ -446,13 +450,13 @@ extern unsigned char const * const * const environ;
 		__assert ((_condition), #_condition, __func__, __LINE__)
 
 #define ___s(_value) \
-		do { fprintf (stderr, "[##] `%s` := \"%s\" @@ `%s`/%d\n", #_value, (_value), __func__, __LINE__); fflush (stderr); } while (0);
+		do { fprintf (stderr, "[%5u][##] `%s` := \"%s\" @@ `%s`/%d\n", _pid, #_value, (_value), __func__, __LINE__); fflush (stderr); } while (0);
 #define ___p(_value) \
-		do { fprintf (stderr, "[##] `%s` := %p @@ `%s`/%d\n", #_value, (_value), __func__, __LINE__); fflush (stderr); } while (0);
+		do { fprintf (stderr, "[%5u][##] `%s` := %p @@ `%s`/%d\n", _pid, #_value, (_value), __func__, __LINE__); fflush (stderr); } while (0);
 #define ___ui(_value) \
-		do { fprintf (stderr, "[##] `%s` := %u @@ `%s`/%d\n", #_value, (_value), __func__, __LINE__); fflush (stderr); } while (0);
+		do { fprintf (stderr, "[%5u][##] `%s` := %u @@ `%s`/%d\n", _pid, #_value, (_value), __func__, __LINE__); fflush (stderr); } while (0);
 #define ___ \
-		do { fprintf (stderr, "[##] @@ `%s`/%d\n", __func__, __LINE__); fflush (stderr); } while (0);
+		do { fprintf (stderr, "[%5u][##] @@ `%s`/%d\n", _pid, __func__, __LINE__); fflush (stderr); } while (0);
 
 #define _trace_debugging(_message) \
 		do { if (TRACE_LEVEL <= _trace_event_debugging) __trace (_trace_event_debugging, _message, __func__, __LINE__); } while (0)
@@ -527,6 +531,38 @@ static void _context_check (
 	switch (_context->state) {
 		case _context_state_active :
 		case _context_state_flushing :
+			if ((_context->controller_output_stream != 0)
+					&& (_context->controller_output_stream->state != _packet_stream_state_outputing)) {
+				_trace_information ("closing controller output stream...");
+				_packet_stream_destroy (&_context->controller_output_stream);
+			}
+			if ((_context->controller_input_stream != 0)
+					&& (_context->controller_input_stream->state != _packet_stream_state_inputing)
+					&& (_context->controller_input_stream->pending == 0)
+					&& (_context->controller_input_stream->queue_head == 0)) {
+				_trace_information ("closing controller input stream...");
+				_packet_stream_destroy (&_context->controller_input_stream);
+			}
+			if ((_context->process != 0) && (_context->process->output_stream != 0)
+					&& (_context->process->output_stream->state != _packet_stream_state_outputing)) {
+				_trace_information ("closing process input stream...");
+				_packet_stream_destroy (&_context->process->output_stream);
+			}
+			if ((_context->process != 0) && (_context->process->input_stream != 0)
+					&& (_context->process->input_stream->state != _packet_stream_state_inputing)
+					&& (_context->process->input_stream->pending == 0)
+					&& (_context->process->input_stream->queue_head == 0)) {
+				_trace_information ("closing process output stream...");
+				_packet_stream_destroy (&_context->process->input_stream);
+			}
+			if ((_context->process != 0)
+					&& ((_context->controller_input_stream == 0) || (_context->state == _context_state_flushing))
+					&& (_context->process->output_stream != 0)
+					&& (_context->process->output_stream->pending == 0)
+					&& (_context->process->output_stream->queue_head == 0)) {
+				_trace_information ("closing process input stream...");
+				_packet_stream_destroy (&_context->process->output_stream);
+			}
 			if ((_context->process != 0) && (_context->process->state == _process_state_running)) {
 				_process_poll (_context->process);
 				if (_context->process->state == _process_state_exited) {
@@ -546,45 +582,30 @@ static void _context_check (
 						_packet_allocate (&_packet, _packet_payload_size);
 						*((unsigned int *) _packet->buffer->data) = htonl (_packet_payload_size);
 						memcpy (_packet->buffer->data + 4, _packet_payload, _packet_payload_size - 1);
-						_packet->buffer->data[4 + _packet_payload_size] = '\0';
+						_packet->buffer->data[4 + _packet_payload_size - 1] = '\0';
 						free (_packet_payload);
 						_packet->size = _packet_payload_size;
 						_packet->state = _packet_state_output_ready;
 						_packet_stream_enqueue (_context->controller_output_stream, &_packet);
 					}
+					_process_destroy (&_context->process);
 				}
 			}
 			break;
 	}
 	switch (_context->state) {
 		case _context_state_active :
-			if (
-					((_context->controller_input_stream != 0)
-						&& (_context->controller_input_stream->state != _packet_stream_state_inputing))
-					|| ((_context->process != 0) && (_context->process->input_stream != 0)
-						&& (_context->process->input_stream->state != _packet_stream_state_inputing))
-					|| ((_context->process != 0) && (_context->process->state != _process_state_running)))
+			if (_context->controller_input_stream == 0)
 				_context->state = _context_state_flushing;
 			break;
 		case _context_state_flushing :
 			if (
-					(((_context->controller_input_stream == 0)
-						|| ((_context->controller_input_stream->state != _packet_stream_state_inputing)
-							&& (_context->controller_input_stream->pending == 0)
+					((_context->controller_input_stream == 0)
+						|| ((_context->controller_input_stream->pending == 0)
 							&& (_context->controller_input_stream->queue_head == 0)))
 					&& ((_context->controller_output_stream == 0)
-						|| (_context->controller_output_stream->state != _packet_stream_state_outputing)
 						|| ((_context->controller_output_stream->pending == 0)
 							&& (_context->controller_output_stream->queue_head == 0))))
-				|| (((_context->process == 0) || (_context->process->input_stream == 0)
-						|| ((_context->process->input_stream->state != _packet_stream_state_inputing)
-							&& (_context->process->input_stream->pending == 0)
-							&& (_context->process->input_stream->queue_head == 0)))
-					&& ((_context->process == 0) || (_context->process->output_stream == 0)
-						|| (_context->process->output_stream->state != _packet_stream_state_outputing)
-						|| ((_context->process->output_stream->pending == 0)
-							&& (_context->process->output_stream->queue_head == 0)))
-					&& ((_context->process == 0) || (_context->process->state != _process_state_running))))
 				_context->state = _context_state_flushed;
 			break;
 		case _context_state_flushed :
@@ -862,10 +883,9 @@ static void _context_poll_packets (
 	
 	_pollable_streams_count = 0;
 	if (_controller_input_stream != 0) {
+		_controller_input_stream->poll_waiting = POLLHUP | POLLERR;
 		if ((_controller_input_stream->pending != 0) || (_controller_input_stream->queue_head == 0))
-			_controller_input_stream->poll_waiting = POLLIN;
-		else
-			_controller_input_stream->poll_waiting = 0;
+			_controller_input_stream->poll_waiting |= POLLIN;
 		_controller_input_stream->poll_pending = 0;
 		if (_controller_input_stream->poll_waiting != 0) {
 			_pollable_streams[_pollable_streams_count] = _controller_input_stream;
@@ -873,10 +893,9 @@ static void _context_poll_packets (
 		}
 	}
 	if (_controller_output_stream != 0) {
+		_controller_output_stream->poll_waiting = POLLHUP | POLLERR;
 		if ((_controller_output_stream->pending != 0) || (_controller_output_stream->queue_head != 0))
-			_controller_output_stream->poll_waiting = POLLOUT;
-		else
-			_controller_output_stream->poll_waiting = 0;
+			_controller_output_stream->poll_waiting |= POLLOUT;
 		_controller_output_stream->poll_pending = 0;
 		if (_controller_output_stream->poll_waiting != 0) {
 			_pollable_streams[_pollable_streams_count] = _controller_output_stream;
@@ -884,10 +903,9 @@ static void _context_poll_packets (
 		}
 	}
 	if (_component_input_stream != 0) {
+		_component_input_stream->poll_waiting = POLLHUP | POLLERR;
 		if ((_component_input_stream->pending != 0) || (_component_input_stream->queue_head == 0))
-			_component_input_stream->poll_waiting = POLLIN;
-		else
-			_component_input_stream->poll_waiting = 0;
+			_component_input_stream->poll_waiting |= POLLIN;
 		_component_input_stream->poll_pending = 0;
 		if (_component_input_stream->poll_waiting != 0) {
 			_pollable_streams[_pollable_streams_count] = _component_input_stream;
@@ -895,10 +913,9 @@ static void _context_poll_packets (
 		}
 	}
 	if (_component_output_stream != 0) {
+		_component_output_stream->poll_waiting = POLLHUP | POLLERR;
 		if ((_component_output_stream->pending != 0) || (_component_output_stream->queue_head != 0))
-			_component_output_stream->poll_waiting = POLLOUT;
-		else
-			_component_output_stream->poll_waiting = 0;
+			_component_output_stream->poll_waiting |= POLLOUT;
 		_component_output_stream->poll_pending = 0;
 		if (_component_output_stream->poll_waiting != 0) {
 			_pollable_streams[_pollable_streams_count] = _component_output_stream;
@@ -1141,7 +1158,22 @@ static void _process_destroy (
 	if (_process->state == _process_state_running) {
 		_assert (_process->descriptor > 0);
 		_assert (_process->cleanup != 0);
-		_outcome = waitpid (_process->descriptor, &_status, WNOHANG);
+		_trace_information ("closing process...");
+		if (_process->input_stream != 0)
+			_packet_stream_destroy (&_process->input_stream);
+		if (_process->output_stream != 0)
+			_packet_stream_destroy (&_process->output_stream);
+		_trace_information ("waiting process...");
+		for (_timeout = 0; _timeout < 6000; _timeout += _timeout_slice) {
+			_outcome = waitpid (_process->descriptor, &_status, WNOHANG);
+			if (_outcome == _process->descriptor)
+				break;
+			else if (_outcome == 0)
+				;
+			else
+				_enforce (0);
+			usleep (_timeout_slice);
+		}
 		if (_outcome == _process->descriptor) {
 			_trace_information ("process exited...");
 			_process->exit_status = _status;
@@ -1164,7 +1196,7 @@ static void _process_destroy (
 				waitpid (_process->descriptor, 0, WNOHANG);
 				_process->exit_status = ~0;
 			}
-			_trace_warning ("process killed...");
+			_trace_information ("process killed...");
 		} else
 			_enforce (0);
 		_process->state = _process_state_exited;
@@ -1174,10 +1206,6 @@ static void _process_destroy (
 		_assert (_process->cleanup == 0);
 	} else
 		_enforce (0);
-	if (_process->input_stream != 0)
-		_packet_stream_destroy (&_process->input_stream);
-	if (_process->output_stream != 0)
-		_packet_stream_destroy (&_process->output_stream);
 	_process_configuration_destroy (&_process->configuration);
 	memset (_process, 0xee, sizeof (struct _process));
 	free (_process);
@@ -1193,6 +1221,7 @@ static void _process_configuration_create (
 	struct _buffer * _malloc;
 	json_error_t _json_error;
 	json_t * _executable_json;
+	json_t * _argument0_json;
 	json_t * _arguments_json;
 	json_t * _environment_json;
 	json_t * _working_directory_json;
@@ -1213,9 +1242,9 @@ static void _process_configuration_create (
 	_buffer_malloc_block ((void **) &_configuration, sizeof (struct _process_configuration), _malloc);
 	_configuration->malloc = _malloc;
 	
-	_json_outcome = json_unpack_ex (_json, &_json_error, JSON_STRICT, "{s:o,s:o,s:o,s:o}",
-			"executable", &_executable_json, "arguments", &_arguments_json, "environment", &_environment_json,
-			"working-directory", &_working_directory_json);
+	_json_outcome = json_unpack_ex (_json, &_json_error, JSON_STRICT, "{s:o,s:o,s:o,s:o,s:o}",
+			"executable", &_executable_json, "argument0", &_argument0_json, "arguments", &_arguments_json,
+			"environment", &_environment_json, "working-directory", &_working_directory_json);
 	if (_json_outcome != 0)
 		_terminate_with_reason_1 (_exit_status_invalid_packet_json, _json_error.text);
 	
@@ -1224,24 +1253,32 @@ static void _process_configuration_create (
 	else
 		_terminate (_exit_status_invalid_packet_json);
 	
-	if (json_is_array (_arguments_json) && (json_array_size (_arguments_json) != 0)) {
+	if (json_is_array (_arguments_json)) {
 		_count = json_array_size (_arguments_json);
-		_buffer_malloc_block ((void **) &_configuration->argument_values, sizeof (unsigned char *) * (_count + 1), _malloc);
+		_buffer_malloc_block ((void **) &_configuration->argument_values, sizeof (unsigned char *) * (_count + 1 + 1), _malloc);
+		_configuration->argument_values[0] = 0;
 		for (_index = 0; _index < _count; _index++) {
 			_temporary_json = json_array_get (_arguments_json, _index);
 			if (json_is_string (_temporary_json))
-				_buffer_malloc_strdup (&_configuration->argument_values[_index], json_string_value (_temporary_json), _malloc);
+				_buffer_malloc_strdup (&_configuration->argument_values[1 + _index], json_string_value (_temporary_json), _malloc);
 			else
 				_terminate (_exit_status_invalid_packet_json);
 		}
-		_configuration->argument_values[_count] = 0;
-		_configuration->argument_count = _count;
+		_configuration->argument_values[1 + _count] = 0;
+		_configuration->argument_count = 1 + _count;
 	} else if (json_is_null (_arguments_json)) {
-		_buffer_malloc_block ((void **) &_configuration->argument_values, sizeof (unsigned char *) * (1 + 1), _malloc);
-		_configuration->argument_values[0] = _configuration->executable;
+		_buffer_malloc_block ((void **) &_configuration->argument_values, sizeof (unsigned char *) * (0 + 1 + 1), _malloc);
+		_configuration->argument_values[0] = 0;
 		_configuration->argument_values[1] = 0;
 		_configuration->argument_count = 1;
 	} else
+		_terminate (_exit_status_invalid_packet_json);
+	
+	if (json_is_string (_argument0_json))
+		_buffer_malloc_strdup (&_configuration->argument_values[0], json_string_value (_argument0_json), _malloc);
+	else if (json_is_null (_argument0_json))
+		_configuration->argument_values[0] = _configuration->executable;
+	else
 		_terminate (_exit_status_invalid_packet_json);
 	
 	if (json_is_object (_environment_json)) {
@@ -1399,7 +1436,7 @@ static void _packet_streams_poll (
 		_pollfd = &_pollfds[_index];
 		_assert (_stream != 0);
 		_assert ((_stream->state == _packet_stream_state_inputing) || (_stream->state == _packet_stream_state_outputing));
-		_assert ((_stream->poll_waiting == POLLIN) || (_stream->poll_waiting == POLLOUT));
+		_assert ((_stream->poll_waiting & ~(POLLIN | POLLOUT | POLLHUP | POLLERR)) == 0);
 		_assert (_stream->poll_pending == 0);
 		_pollfd->fd = _stream->descriptor;
 		_pollfd->events = _stream->poll_waiting;
@@ -1410,8 +1447,17 @@ static void _packet_streams_poll (
 	for (_index = 0; _index < _pollable_count; _index++) {
 		_stream = _streams[_index];
 		_pollfd = &_pollfds[_index];
-		_assert ((_pollfd->revents & !(POLLIN | POLLOUT | POLLERR | POLLHUP)) == 0);
-		_stream->poll_pending = _pollfd->revents;
+		_assert ((_pollfd->revents & ~(POLLIN | POLLOUT | POLLERR | POLLHUP)) == 0);
+		if (_pollfd->revents & (POLLIN | POLLOUT))
+			_stream->poll_pending = 1;
+		else if (_pollfd->revents & POLLERR)
+			_stream->state = _packet_stream_state_failed;
+		else if (_pollfd->revents & POLLHUP)
+			_stream->state = _packet_stream_state_closed;
+		else if (_pollfd->revents == 0)
+			_stream->poll_pending = 0;
+		else
+			_enforce (0);
 	}
 	*_polled_count = _poll_outcome;
 }
@@ -1831,9 +1877,9 @@ static void __terminate (
 		unsigned int const _source_line)
 {
 	if (TRACE_SOURCE)
-		fprintf (stderr, "[!!] terminated with %d @@ `%s`/%d\n", _exit_status, _source_file, _source_line);
+		fprintf (stderr, "[%5u][!!] terminated with %d @@ `%s`/%d\n", _pid, _exit_status, _source_file, _source_line);
 	else
-		fprintf (stderr, "[!!] terminated with %d\n", _exit_status);
+		fprintf (stderr, "[%5u][!!] terminated with %d\n", _pid, _exit_status);
 	fflush (stderr);
 	_cleanup_execute ();
 	exit (_exit_status);
@@ -1846,9 +1892,9 @@ static void __terminate_with_reason_1 (
 		unsigned char const * const _reason)
 {
 	if (TRACE_SOURCE)
-		fprintf (stderr, "[!!] terminated with %d: %s @@ `%s`/%d\n", _exit_status, _reason, _source_file, _source_line);
+		fprintf (stderr, "[%5u][!!] terminated with %d: %s @@ `%s`/%d\n", _pid, _exit_status, _reason, _source_file, _source_line);
 	else
-		fprintf (stderr, "[!!] terminated with %d: %s\n", _exit_status, _reason);
+		fprintf (stderr, "[%5u][!!] terminated with %d: %s\n", _pid, _exit_status, _reason);
 	fflush (stderr);
 	_cleanup_execute ();
 	exit (_exit_status);
@@ -1862,9 +1908,9 @@ static void __terminate_with_reason_2 (
 		unsigned char const * const _reason_2)
 {
 	if (TRACE_SOURCE)
-		fprintf (stderr, "[!!] terminated with %d: %s / %s @@ `%s`/%d\n", _exit_status, _reason_1, _reason_2, _source_file, _source_line);
+		fprintf (stderr, "[%5u][!!] terminated with %d: %s / %s @@ `%s`/%d\n", _pid, _exit_status, _reason_1, _reason_2, _source_file, _source_line);
 	else
-		fprintf (stderr, "[!!] terminated with %d: %s / %s\n", _exit_status, _reason_1, _reason_2);
+		fprintf (stderr, "[%5u][!!] terminated with %d: %s / %s\n", _pid, _exit_status, _reason_1, _reason_2);
 	fflush (stderr);
 	_cleanup_execute ();
 	exit (_exit_status);
@@ -1877,7 +1923,7 @@ static void __enforce (
 		unsigned int const _source_line)
 {
 	if (!_condition_value) {
-		fprintf (stderr, "[!!] enforcement failed for `%s` @@ `%s`/%d\n", _condition_expression, _source_file, _source_line);
+		fprintf (stderr, "[%5u][!!] enforcement failed for `%s` @@ `%s`/%d\n", _pid, _condition_expression, _source_file, _source_line);
 		fflush (stderr);
 		_cleanup_execute ();
 		exit (_exit_status_failed_assertion);
@@ -1891,7 +1937,7 @@ static void __assert (
 		unsigned int const _source_line)
 {
 	if (!_condition_value) {
-		fprintf (stderr, "[!!] assertion failed for `%s` @@ `%s`/%d\n", _condition_expression, _source_file, _source_line);
+		fprintf (stderr, "[%5u][!!] assertion failed for `%s` @@ `%s`/%d\n", _pid, _condition_expression, _source_file, _source_line);
 		fflush (stderr);
 		_cleanup_execute ();
 		exit (_exit_status_failed_assertion);
@@ -1907,34 +1953,34 @@ static void __trace (
 	switch (_event) {
 		case _trace_event_debugging :
 			if (TRACE_SOURCE)
-				fprintf (stderr, "[  ] %s @@ `%s`/%d\n", _message, _source_file, _source_line);
+				fprintf (stderr, "[%5u][  ] %s @@ `%s`/%d\n", _pid, _message, _source_file, _source_line);
 			else
-				fprintf (stderr, "[  ] %s\n", _message);
+				fprintf (stderr, "[%5u][  ] %s\n", _pid, _message);
 			fflush (stderr);
 			break;
 		case _trace_event_information :
 			if (TRACE_SOURCE)
-				fprintf (stderr, "[ii] %s @@ `%s`/%d\n", _message, _source_file, _source_line);
+				fprintf (stderr, "[%5u][ii] %s @@ `%s`/%d\n", _pid, _message, _source_file, _source_line);
 			else
-				fprintf (stderr, "[ii] %s\n", _message);
+				fprintf (stderr, "[%5u][ii] %s\n", _pid, _message);
 			fflush (stderr);
 			break;
 		case _trace_event_warning :
 			if (TRACE_SOURCE)
-				fprintf (stderr, "[ww] %s @@ `%s`/%d\n", _message, _source_file, _source_line);
+				fprintf (stderr, "[%5u][ww] %s @@ `%s`/%d\n", _pid, _message, _source_file, _source_line);
 			else
-				fprintf (stderr, "[ww] %s\n", _message);
+				fprintf (stderr, "[%5u][ww] %s\n", _pid, _message);
 			fflush (stderr);
 			break;
 		case _trace_event_error :
 			if (TRACE_SOURCE)
-				fprintf (stderr, "[ee] %s @@ `%s`/%d\n", _message, _source_file, _source_line);
+				fprintf (stderr, "[%5u][ee] %s @@ `%s`/%d\n", _pid, _message, _source_file, _source_line);
 			else
-				fprintf (stderr, "[ee] %s\n", _message);
+				fprintf (stderr, "[%5u][ee] %s\n", _pid, _message);
 			fflush (stderr);
 			break;
 		default :
-			fprintf (stderr, "[??] %s @@ `%s`/%d\n", _message, _source_file, _source_line);
+			fprintf (stderr, "[%5u][??] %s @@ `%s`/%d\n", _pid, _message, _source_file, _source_line);
 			fflush (stderr);
 			break;
 	}
@@ -1991,16 +2037,16 @@ static void _cleanup_execute (void)
 			case _cleanup_action_canceled :
 				break;
 			case _cleanup_action_close :
-				fprintf (stderr, "[!!] executing cleanup action `close` for %d...\n", _cleanup->arguments.close.descriptor);
+				fprintf (stderr, "[%5u][!!] executing cleanup action `close` for %d...\n", _pid, _cleanup->arguments.close.descriptor);
 				fflush (stderr);
 				_outcome = close (_cleanup->arguments.close.descriptor);
 				if (_outcome != 0) {
-					fprintf (stderr, "[!!]  -> `close` failed with %d: %s...\n", errno, strerror (errno));
+					fprintf (stderr, "[%5u][!!]  -> `close` failed with %d: %s...\n", _pid, errno, strerror (errno));
 					fflush (stderr);
 				}
 				break;
 			case _cleanup_action_kill :
-				fprintf (stderr, "[!!] executing cleanup action `kill` for %d...\n", _cleanup->arguments.kill.descriptor);
+				fprintf (stderr, "[%5u][!!] executing cleanup action `kill` for %d...\n", _pid, _cleanup->arguments.kill.descriptor);
 				fflush (stderr);
 				_outcome = waitpid (_cleanup->arguments.kill.descriptor, 0, WNOHANG);
 				if (_outcome == _cleanup->arguments.kill.descriptor)
@@ -2008,7 +2054,7 @@ static void _cleanup_execute (void)
 				else if (_outcome == 0) {
 					_outcome = kill (_cleanup->arguments.kill.descriptor, SIGTERM);
 					if (_outcome != 0) {
-						fprintf (stderr, "[!!]  -> `kill (SIGTERM)` failed with %d: %s...\n", errno, strerror (errno));
+						fprintf (stderr, "[%5u][!!]  -> `kill (SIGTERM)` failed with %d: %s...\n", _pid, errno, strerror (errno));
 						fflush (stderr);
 					}
 					for (_timeout = 0; _timeout <= _timeout_waitpid; _timeout += _timeout_slice) {
@@ -2018,7 +2064,7 @@ static void _cleanup_execute (void)
 						else if (_outcome == 0)
 							;
 						else {
-							fprintf (stderr, "[!!]  -> `wait` failed with %d: %s...\n", errno, strerror (errno));
+							fprintf (stderr, "[%5u][!!]  -> `wait` failed with %d: %s...\n", _pid, errno, strerror (errno));
 							fflush (stderr);
 							break;
 						}
@@ -2027,18 +2073,18 @@ static void _cleanup_execute (void)
 					if (_outcome != _cleanup->arguments.kill.descriptor) {
 						_outcome = kill (_cleanup->arguments.kill.descriptor, SIGKILL);
 						if (_outcome != 0) {
-							fprintf (stderr, "[!!]  -> `kill (SIGKILL)` failed with %d: %s...\n", errno, strerror (errno));
+							fprintf (stderr, "[%5u][!!]  -> `kill (SIGKILL)` failed with %d: %s...\n", _pid, errno, strerror (errno));
 							fflush (stderr);
 						}
 						waitpid (_cleanup->arguments.kill.descriptor, 0, WNOHANG);
 					}
 				} else {
-					fprintf (stderr, "[!!]  -> `wait` failed with %d: %s...\n", errno, strerror (errno));
+					fprintf (stderr, "[%5u][!!]  -> `wait` failed with %d: %s...\n", _pid, errno, strerror (errno));
 					fflush (stderr);
 				}
 				break;
 			default :
-				fprintf (stderr, "[!!] invalid cleanup action %d...\n", _cleanup->action);
+				fprintf (stderr, "[%5u][!!] invalid cleanup action %d...\n", _pid, _cleanup->action);
 				fflush (stderr);
 				break;
 		}

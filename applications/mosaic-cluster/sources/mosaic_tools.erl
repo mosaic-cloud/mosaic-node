@@ -5,7 +5,9 @@
 -export ([ensure_registered/1, ensure_registered/2]).
 -export ([enforce_registered/1, enforce_registered/2]).
 -export ([start/4, start_link/4]).
--export ([report_error/4, report_info/4]).
+-export ([wait/1, wait/2]).
+-export ([trace_error/1, trace_error/2, trace_warning/1, trace_warning/2, trace_information/1, trace_information/2]).
+-export ([trace_debugging/1, trace_debugging/2]).
 
 
 start (Type, Module, QualifiedName, Configuration)
@@ -60,6 +62,44 @@ start_link (Type, Module, QualifiedName, Configuration)
 	end.
 
 
+wait (Process) ->
+	wait (Process, infinity).
+
+wait (Process, Timeout)
+		when (is_pid (Process) orelse is_port (Process) orelse is_atom (Process)),
+				((Timeout =:= infinity) orelse (is_integer (Timeout) andalso (Timeout >= 0))) ->
+	try
+		Monitor = erlang:monitor (process, Process),
+		ok = receive
+			{'DOWN', Monitor, process, Process, noproc} ->
+				throw (receive {'EXIT', Process, Reason1_} -> {ok, Reason1_} after 0 -> {error, noproc} end);
+			{'DOWN', Monitor, process, Process, noconnection} ->
+				throw (receive {'EXIT', Process, Reason1_} -> {ok, Reason1_} after 0 -> {error, noproc} end);
+			{_, Monitor, _, _, _} ->
+				throw ({error, unexpected_error})
+		after 0 ->
+			ok
+		end,
+		{ok, Reason} = receive
+			{'DOWN', Monitor, process, Process, Reason2_} ->
+				ok = receive {'EXIT', Process, Reason2_} -> ok after 0 -> ok end,
+				{ok, Reason2_};
+			{_, Monitor, _, _, _} ->
+				throw ({error, unexpected_error})
+		after Timeout ->
+			true = erlang:demonitor (Monitor),
+			ok = receive {_, Monitor, _, _, _} -> ok after 0 -> ok end,
+			throw ({error, timeout})
+		end,
+		{ok, Reason}
+	catch
+		throw : Outcome = {ok, _Reason} ->
+			Outcome;
+		throw : Error = {error, _Reason} ->
+			Error
+	end.
+
+
 resolve_registered (QualifiedName = {local, LocalName})
 		when is_atom (LocalName) ->
 	case erlang:whereis (LocalName) of
@@ -109,10 +149,57 @@ enforce_registered (noname, Process)
 	ok.
 
 
-report_info (Module, Function, InfoType, InfoDetails) ->
-	ok = error_logger:info_report ([{source, Module, Function, erlang:self ()}, {info, InfoType, InfoDetails}]),
-	ok.
+trace_debugging (Message) ->
+	trace_debugging (Message, []).
 
-report_error (Module, Function, ErrorType, ErrorDetails) ->
-	ok = error_logger:error_report ([{source, Module, Function, erlang:self ()}, {error, ErrorType, ErrorDetails}]),
+trace_debugging (Message, Report) ->
+	trace (debugging, Message, Report).
+
+trace_information (Message) ->
+	trace_information (Message, []).
+
+trace_information (Message, Report) ->
+	trace (information, Message, Report).
+
+trace_warning (Message) ->
+	trace_warning (Message, []).
+
+trace_warning (Message, Report) ->
+	trace (warning, Message, Report).
+
+trace_error (Message) ->
+	trace_error (Message, []).
+
+trace_error (Message, Report) ->
+	trace (error, Message, Report).
+
+
+trace (Level, MessageSpecification, Report)
+		when is_tuple (MessageSpecification), (tuple_size (MessageSpecification) > 0), is_list (element (1, MessageSpecification)) ->
+	[MessageFormat | MessageArguments] = erlang:tuple_to_list (MessageSpecification),
+	Message = lists:flatten (io_lib:format (MessageFormat, MessageArguments)),
+	trace (Level, Message, Report);
+	
+trace (Level, Message, Report)
+		when is_list (Message), is_list (Report) ->
+	Self = erlang:self (),
+	{ok, [_ | StackTrace]} = try throw (stacktrace) catch throw : stacktrace -> {ok, erlang:get_stacktrace ()} end,
+	trace (Level, Self, StackTrace, Message, Report).
+
+
+trace (Level, Process, [LastStackTrace | _], Message, Report) ->
+	ok = case Level of
+		debugging ->
+			ok = error_logger:info_report ([Message, {source, Process, LastStackTrace, Level} | Report]),
+			ok;
+		information ->
+			ok = error_logger:info_report ([Message, {source, Process, LastStackTrace, Level} | Report]),
+			ok;
+		warning ->
+			ok = error_logger:warning_report ([Message, {source, Process, LastStackTrace, Level} | Report]),
+			ok;
+		error ->
+			ok = error_logger:error_report ([Message, {source, Process, LastStackTrace, Level} | Report]),
+			ok
+	end,
 	ok.

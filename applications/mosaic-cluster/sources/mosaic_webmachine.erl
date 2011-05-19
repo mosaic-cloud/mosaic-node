@@ -6,8 +6,16 @@
 -export ([return_with_outcome/3, respond_with_outcome/3]).
 -export ([return_with_content/5, respond_with_content/4]).
 -export ([enforce_request/3]).
--export ([parse_existing_atom/1, parse_integer/1, parse_float/1, parse_hex_binary_key/1, parse_json/1]).
--export ([format_atom/1, format_numeric_key/1, format_binary_key/1, format_term/1]).
+-export ([
+		parse_existing_atom/1, parse_integer/1, parse_float/1,
+		parse_hex_string/1,
+		parse_integer_identifier/1, parse_string_identifier/1,
+		parse_json/1]).
+-export ([
+		format_atom/1, format_integer/1, format_float/1, format_term/1,
+		format_hex_string/1,
+		format_integer_identifier/1, format_string_identifier/1,
+		format_json/1]).
 
 
 start () ->
@@ -225,6 +233,10 @@ parse_arguments ([{Name, Parser} | Arguments], Request, Names, Values)
 	end.
 
 
+parse_existing_atom (Binary)
+		when is_binary (Binary) ->
+	parse_existing_atom (erlang:binary_to_list (Binary));
+	
 parse_existing_atom (String)
 		when is_list (String) ->
 	try
@@ -234,6 +246,10 @@ parse_existing_atom (String)
 			{error, {inexistent_atom, String}}
 	end.
 
+parse_integer (Binary)
+		when is_binary (Binary) ->
+	parse_integer (erlang:binary_to_list (Binary));
+	
 parse_integer (String)
 		when is_list (String) ->
 	try
@@ -243,6 +259,10 @@ parse_integer (String)
 			{error, {invalid_integer, String}}
 	end.
 
+parse_float (Binary)
+		when is_binary (Binary) ->
+	parse_float (erlang:binary_to_list (Binary));
+	
 parse_float (String)
 		when is_list (String) ->
 	try
@@ -252,25 +272,74 @@ parse_float (String)
 			{error, {invalid_float, String}}
 	end.
 
-parse_hex_binary_key (String)
+parse_hex_string (Binary)
+		when is_binary (Binary) ->
+	parse_hex_string (erlang:binary_to_list (Binary));
+	
+parse_hex_string (String)
 		when is_list (String) ->
 	try
-		Integer = erlang:list_to_integer (String, 16),
-		Binary = binary:encode_unsigned (Integer),
-		BinarySize = erlang:bit_size (Binary),
-		if
-			BinarySize =:= 160 ->
-				{ok, Binary};
-			BinarySize < 160 ->
-				{ok, <<0 : (erlang:max (160 - BinarySize)), Binary / binary>>};
+		StringLength = erlang:length (String),
+		ok = if
+			((StringLength rem 2) =:= 0) ->
+				ok;
 			true ->
-				{error, {invalid_key_size, BinarySize}}
+				throw ({error, {invalid_length, StringLength}})
+		end,
+		FinalBinarySize = (StringLength div 2),
+		Integer = erlang:list_to_integer (String, 16),
+		IntegerBinary = binary:encode_unsigned (Integer),
+		IntegerBinarySize = erlang:byte_size (IntegerBinary),
+		if
+			(FinalBinarySize =:= IntegerBinarySize) ->
+				{ok, IntegerBinary};
+			(FinalBinarySize > IntegerBinarySize) ->
+				{ok, <<0 : ((FinalBinarySize - IntegerBinarySize) * 8), IntegerBinary / binary>>};
+			true ->
+				throw ({error, {invalid_length, StringLength}})
 		end
 	catch
-		error : _ ->
-			{error, {invalid_key, String}}
+		throw : Error = {error, _Reason} ->
+			Error;
+		error : Reason ->
+			{error, Reason}
 	end.
 
+parse_string_identifier (Binary)
+		when is_binary (Binary) ->
+	parse_string_identifier (erlang:binary_to_list (Binary));
+	
+parse_string_identifier (String)
+		when is_list (String) ->
+	case parse_hex_string (String) of
+		Outcome = {ok, Identifier} ->
+			if
+				(erlang:bit_size (Identifier) =:= 160) ->
+					Outcome;
+				true ->
+					{error, {invalid_length, erlang:length (String)}}
+			end;
+		Error = {error, _Reason} ->
+			Error
+	end.
+
+parse_integer_identifier (Binary)
+		when is_binary (Binary) ->
+	parse_integer_identifier (erlang:binary_to_list (Binary));
+	
+parse_integer_identifier (String)
+		when is_list (String) ->
+	case parse_string_identifier (String) of
+		{ok, <<Identifier : 160>>} ->
+			{ok, Identifier};
+		Error = {error, _Reason} ->
+			Error
+	end.
+
+parse_json (Binary)
+		when is_binary (Binary) ->
+	parse_json (erlang:binary_to_list (Binary));
+	
 parse_json (String)
 		when is_list (String) ->
 	try
@@ -283,50 +352,70 @@ parse_json (String)
 
 format_atom (Atom)
 		when is_atom (Atom) ->
-	erlang:iolist_to_binary (erlang:atom_to_list (Atom)).
+	erlang:list_to_binary (erlang:atom_to_list (Atom)).
 
-format_numeric_key (Key)
-		when is_integer (Key), (Key >= 0), (Key < 1461501637330902918203684832716283019655932542976) ->
-	KeyHex = string:to_lower (erlang:integer_to_list (Key, 16)),
-	KeyHexPadded = lists:duplicate (40 - erlang:length (KeyHex), $0) ++ KeyHex,
-	erlang:list_to_binary (KeyHexPadded).
+format_integer (Integer)
+		when is_integer (Integer) ->
+	erlang:list_to_binary (erlang:integer_to_list (Integer)).
 
-format_binary_key (Key)
-		when is_binary (Key), (bit_size (Key) =:= 160) ->
-	erlang:iolist_to_binary (lists:flatten ([io_lib:format ("~2.16.0b", [Byte]) || Byte <- erlang:binary_to_list (Key)])).
+format_float (Float)
+		when is_float (Float) ->
+	erlang:list_to_binary (erlang:float_to_list (Float)).
+
+format_hex_string (Binary)
+		when is_binary (Binary) ->
+	format_hex_string (erlang:binary_to_list (Binary));
+	
+format_hex_string (String)
+		when is_list (String) ->
+	erlang:iolist_to_binary (lists:flatten ([io_lib:format ("~2.16.0b", [Byte]) || Byte <- String])).
+
+format_string_identifier (Identifier)
+		when is_binary (Identifier), (bit_size (Identifier) =:= 160) ->
+	format_hex_string (Identifier).
+
+format_integer_identifier (Identifier)
+		when is_integer (Identifier), (Identifier >= 0), (Identifier < 1461501637330902918203684832716283019655932542976) ->
+	format_string_identifier (<<Identifier : 160>>).
 
 format_json (Json) ->
 	mochijson2:encode (Json).
 
 format_term (Term) ->
-	erlang:iolist_to_binary (format_term_ (Term)).
+	erlang:iolist_to_binary (format_term_1 (Term)).
 
-format_term_ (Atom)
+format_term_1 (Atom)
 		when is_atom (Atom) ->
 	[$', erlang:atom_to_list (Atom), $'];
 	
-format_term_ (Integer)
+format_term_1 (Integer)
 		when is_integer (Integer) ->
 	erlang:integer_to_list (Integer);
 	
-format_term_ (Float)
+format_term_1 (Float)
 		when is_float (Float) ->
 	erlang:float_to_list (Float);
 	
-format_term_ (List)
+format_term_1 (List)
 		when is_list (List) ->
 	Ascii = lists:all (fun (Byte) when is_integer (Byte), (Byte >= 32), (Byte =< 127) -> true; (_) -> false end, List),
 	if
 		Ascii ->
 			[$", io_lib:format ("~s", [List]), $"];
 		true ->
-			[$[, string:join ([format_term_ (Element) || Element <- List], ", "), $]]
+			[$[, string:join ([format_term_1 (Element) || Element <- List], ", "), $]]
 	end;
 	
-format_term_ (Tuple)
+format_term_1 (Tuple)
 		when is_tuple (Tuple) ->
-	[${, string:join ([format_term_ (Element) || Element <- erlang:tuple_to_list (Tuple)], ", "), $}];
+	[${, string:join ([format_term_1 (Element) || Element <- erlang:tuple_to_list (Tuple)], ", "), $}];
 	
-format_term_ (Binary)
+format_term_1 (<<>>) ->
+	"<<>>";
+	
+format_term_1 (Binary)
 		when is_binary (Binary) ->
-	["<<16#", [io_lib:format ("~2.16.0b", [Byte]) || Byte <- binary:bin_to_list (Binary)], ":", erlang:integer_to_list (erlang:bit_size (Binary)), ">>"].
+	["<<16#", [io_lib:format ("~2.16.0b", [Byte]) || Byte <- binary:bin_to_list (Binary)], ":", erlang:integer_to_list (erlang:bit_size (Binary)), ">>"];
+	
+format_term_1 (Object) ->
+	["binary_to_term(", format_term_1 (erlang:term_to_binary (Object)), ")"].

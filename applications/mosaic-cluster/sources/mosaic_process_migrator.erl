@@ -69,13 +69,13 @@ code_change (_OldVsn, StateName, StateData, _Arguments) ->
 	{ok, StateName, StateData}.
 
 
-handle_sync_event (Event, _Sender, StateName, StateData) ->
-	ok = mosaic_tools:report_error (mosaic_process_migrator, handle_sync_event, invalid_event, {Event}),
+handle_sync_event (Event, Sender, StateName, StateData) ->
+	ok = mosaic_tools:trace_error ("received invalid event; ignoring!", [{event, Event}, {sender, Sender}]),
 	{reply, {error, invalid_event}, StateName, StateData}.
 
 
 handle_event (Event, StateName, StateData) ->
-	ok = mosaic_tools:report_error (mosaic_process_migrator, handle_event, invalid_event, {Event}),
+	ok = mosaic_tools:trace_error ("received invalid event; ignoring!", [{event, Event}]),
 	{next_state, StateName, StateData}.
 
 

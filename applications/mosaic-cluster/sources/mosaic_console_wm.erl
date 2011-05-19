@@ -150,6 +150,18 @@
 			_mosaic.executor.processes.stop = _wrapped (function (_key) {
 				return (_get (\"/executor/processes/stop\", {key : _key}) .ok);
 			});
+			_mosaic.executor.processes.call = _wrapped (function (_key, _arguments) {
+				if (_arguments == undefined)
+					_arguments = null;
+				_arguments = JSON.stringify (_arguments);
+				return (_get (\"/executor/processes/call\", {key : _key, arguments : _arguments}));
+			});
+			_mosaic.executor.processes.cast = _wrapped (function (_key, _arguments) {
+				if (_arguments == undefined)
+					_arguments = null;
+				_arguments = JSON.stringify (_arguments);
+				return (_get (\"/executor/processes/cast\", {key : _key, arguments : _arguments}));
+			});
 			
 			$(\"#sandbox\")[0].contentWindow.mosaic = _mosaic;
 			

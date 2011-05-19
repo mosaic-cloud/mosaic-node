@@ -10,7 +10,7 @@
 
 
 key () ->
-	key (erlang:make_ref ()).
+	key (crypto:rand_bytes (160 div 8)).
 
 key (Token) ->
 	Key = chash:key_of (term_to_binary (Token)),
@@ -22,7 +22,7 @@ key (Token, Index)
 
 keys (Count)
 		when is_integer (Count), (Count > 0) ->
-	keys (erlang:make_ref (), Count).
+	keys (crypto:rand_bytes (160 div 8), Count).
 
 keys (Token, Count)
 		when is_integer (Count), (Count > 0) ->

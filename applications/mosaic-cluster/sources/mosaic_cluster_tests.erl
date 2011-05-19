@@ -1,87 +1,81 @@
 
 -module (mosaic_cluster_tests).
 
--export ([test/0]).
+-export ([test/0, execute/1]).
 
 
 test () ->
-	ok = try begin
+	ok = try
 		ok = case application:load (mosaic_cluster) of
 			ok ->
 				ok;
-			Error = {error, _Reason} ->
-				throw (Error)
+			Error1 = {error, _Reason1} ->
+				throw (Error1)
 		end,
-		{ok, Actions} = case application:get_env (mosaic_cluster, tests_scenario) of
-			{ok, normal} ->
-				{ok, [
+		{ok, Scenario, Actions} = case application:get_env (mosaic_cluster, tests_scenario) of
+			{ok, boot} ->
+				{ok, defaults, [
+						{boot}, {ping, 4}]};
+			{ok, create_dummy_1} ->
+				{ok, defaults, [
 						{boot}, {ping, 4},
-						{define_and_create_processes, dummy, term, defaults, 2}]};
+						{define_and_create_processes, dummy, term, defaults, 1}]};
+			{ok, create_dummy_16} ->
+				{ok, defaults, [
+						{boot}, {ping, 4},
+						{define_and_create_processes, dummy, term, defaults, 16}]};
+			{ok, create_abacus_1} ->
+				{ok, defaults, [
+						{boot}, {ping, 4},
+						{define_and_create_processes, abacus, term, defaults, 1}]};
 			{ok, ring_join_leave} ->
 				Self = erlang:node (),
 				case application:get_env (mosaic_cluster, tests_nodes) of
 					{ok, [Self | _Peers]} ->
-						{ok, [
+						{ok, ring_join_leave_master, [
 								{boot}, {ping, 4}]};
 					{ok, Nodes} ->
 						Peers = lists:delete (Self, Nodes),
-						{ok, [
+						{ok, ring_join_leave_slaves, [
 								{boot}, {ping, 4},
 								{sleep, 2 * 1000}, {ring, include, Peers},
 								{sleep, 2 * 10}, {ping, 4},
 								{sleep, 2 * 1000}, {ring, exclude, Self},
 								{sleep, 2 * 10}, {ping, 4},
-								{sleep, 2 * 1000}]};
+								{sleep, 2 * 1000},
+								{exit}]};
 					undefined ->
 						throw ({error, undefined_nodes})
 				end;
-			{ok, Scenario} ->
-				throw ({error, {invalid_scenario, Scenario}});
+			{ok, Scenario_} ->
+				throw ({error, {invalid_scenario, Scenario_}});
 			undefined ->
 				throw ({error, undefined_scenario})
 		end,
-		ok = test (Actions),
+		Tests = lists:map (fun (Action) -> {mosaic_cluster_tests, execute, [Action], infinity} end, Actions),
+		case mosaic_tests:test_scenario (Scenario, Tests) of
+			ok ->
+				ok;
+			Error2 = {error, _Reason2} ->
+				throw (Error2)
+		end,
 		ok
-	end catch
-		throw : {error, Reason} ->
-			ok = mosaic_tools:report_error (mosaic_cluster, test, error, Reason),
+	catch
+		throw : _Error3 = {error, Reason3} ->
+			ok = mosaic_tools:trace_error ("failed executing scenario; stopping!", [{reason, Reason3}]),
+			ok = timer:sleep (100),
+			ok = init:halt (),
 			ok
 	end,
 	ok.
 
 
-test (Actions)
-		when is_list (Actions) ->
-	OldTrapExit = erlang:process_flag (trap_exit, true),
-	Slave = erlang:spawn_link (
-			fun () ->
-				ok = lists:foreach (
-						fun (Action) ->
-							ok = mosaic_tools:report_info (mosaic_cluster, test, action, Action),
-							ok = execute (Action),
-							ok
-						end,
-						lists:flatten (Actions))
-			end),
-	Outcome = receive
-		{'EXIT', Slave, normal} ->
-			ok;
-		{'EXIT', Slave, Error1 = {error, _Reason1}} ->
-			Error1;
-		{'EXIT', Slave, Reason1} ->
-			{error, Reason1}
-	end,
-	true = erlang:process_flag (trap_exit, OldTrapExit),
-	case Outcome of
-		ok ->
-			ok;
-		Error2 = {error, _Reason2} ->
-			throw (Error2)
-	end.
-
-
 execute ({boot}) ->
 	ok = mosaic_cluster:boot (),
+	ok = mosaic_process_configurator:register (dummy, term, mosaic_process_tests, configure, void),
+	ok = mosaic_process_configurator:register (dummy, json, mosaic_process_tests, configure, void),
+	ok = mosaic_process_configurator:register (abacus, term, mosaic_component_process_tests, configure, [{router, mosaic_process_router}]),
+	ok = mosaic_process_configurator:register (abacus, json, mosaic_component_process_tests, configure, [{router, mosaic_process_router}]),
 	ok;
 	
 execute ({activate}) ->
@@ -143,7 +137,7 @@ execute ({define_and_create_processes, Type, ArgumentsEncoding, ArgumentsContent
 	ok;
 	
 execute ({sleep, Timeout}) ->
-	ok = timer:sleep (Timeout),
+	ok = mosaic_tests:sleep (Timeout),
 	ok;
 	
 execute ({exit}) ->
