@@ -7,9 +7,9 @@ cd -- "$( dirname -- "$( readlink -e -- "${0}" )" )"
 
 set -x
 
-rm -Rf ./generated
-mkdir ./generated
+rm -Rf ./.generated
+mkdir ./.generated
 
-cp -T ./repositories/mochiweb/src/mochiweb.app.src ./generated/mochiweb.app
+cp -T ./repositories/mochiweb/src/mochiweb.app.src ./.generated/mochiweb.app
 
 exit 0

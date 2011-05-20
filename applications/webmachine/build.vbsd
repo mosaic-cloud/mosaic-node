@@ -5,4 +5,4 @@
 	dependencies: 'mochiweb
 	erl: "\\./repositories/webmachine/src/.*\\.erl"
 	hrl: "\\./repositories/webmachine/(include|src)/.*\\.hrl"
-	additional-ebin: "\\./generated/webmachine\\.app")
+	additional-ebin: "\\./\\.generated/webmachine\\.app")

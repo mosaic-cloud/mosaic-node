@@ -1,13 +1,6 @@
 
-/.git
-/.hg
-
-/.outputs
-/.tools
-
-generated
-
+.*
 *#
 *~
-*.beam
-*.elf
+
+!.gitignore

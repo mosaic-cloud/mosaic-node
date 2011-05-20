@@ -5,4 +5,4 @@
 	dependencies: '(webmachine mochiweb)
 	erl: "\\./repositories/riak-core/src/.*\\.erl"
 	hrl: "\\./repositories/riak-core/include/.*\\.hrl"
-	additional-ebin: "\\./generated/riak_core\\.app")
+	additional-ebin: "\\./\\.generated/riak_core\\.app")

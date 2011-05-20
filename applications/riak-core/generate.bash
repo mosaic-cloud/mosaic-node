@@ -7,9 +7,9 @@ cd -- "$( dirname -- "$( readlink -e -- "${0}" )" )"
 
 set -x
 
-rm -Rf ./generated
-mkdir ./generated
+rm -Rf ./.generated
+mkdir ./.generated
 
-cp -T ./repositories/riak-core/ebin/riak_core.app ./generated/riak_core.app
+cp -T ./repositories/riak-core/ebin/riak_core.app ./.generated/riak_core.app
 
 exit 0
