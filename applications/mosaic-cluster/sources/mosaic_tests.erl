@@ -12,7 +12,7 @@
 test_module (Module)
 		when is_atom (Module) ->
 	try
-		DefaultTimeout = 1000,
+		DefaultTimeout = 10000,
 		ok = mosaic_tools:trace_debugging ({"testing module `~w`...", Module}),
 		ModuleLoaded = erlang:module_loaded (Module),
 		ok = if

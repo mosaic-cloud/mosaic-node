@@ -165,7 +165,7 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 									Error
 							end;
 						cast ->
-							case mosaic_process:call (Process, CallArguments, <<>>) of
+							case mosaic_process:cast (Process, CallArguments, <<>>) of
 								ok ->
 									ok;
 								Error = {error, _Reason} ->

@@ -6,7 +6,7 @@ if __name__ != "__main__" :
 
 ## ----------------------------------------
 
-_trace_level = 2 # 0 -> trace; 1 -> debugging; 2 -> information; 3 -> warning; 4 -> error
+_trace_level = 2 # 1 -> debugging; 2 -> information; 3 -> warning; 4 -> error
 
 ## ----------------------------------------
 
@@ -71,7 +71,7 @@ _simple_backend_scenarios = {
 
 ## ----------------------------------------
 
-def _simple_frontend_test_parrot () :
+def _simple_frontend_test_python_parrot () :
 	_output (({
 			"__type__" : "execute",
 			"executable" : sys.executable,
@@ -84,7 +84,8 @@ def _simple_frontend_test_parrot () :
 		_output_message = {
 				"__type__" : "exchange",
 				"action" : "call",
-				"request" : i,
+				"correlation" : str (i),
+				"meta-data" : i,
 		}
 		_output_payload = ""
 		_output_packet = (_output_message, _output_payload)
@@ -94,6 +95,73 @@ def _simple_frontend_test_parrot () :
 			raise Exception ()
 		_input_message, _input_payload = _input_packet
 		if _input_message["__type__"] != "exchange" :
+			raise Exception ()
+		if _input_message["action"] != "return" :
+			raise Exception ()
+		if _input_message["correlation"] != str (i) :
+			raise Exception ()
+		if _input_message["meta-data"] != i :
+			raise Exception ()
+	_output_close ()
+	_input_packet = _input ()
+	if _input_packet is None :
+		raise Exception ()
+	_input_message, _input_payload = _input_packet
+	if _input_message["__type__"] != "exit" :
+		raise Exception ()
+	_input_close ()
+
+def _simple_frontend_test_python_abacus () :
+	_output (({
+			"__type__" : "execute",
+			"executable" : sys.executable,
+			"argument0" : None,
+			"arguments" : [sys.argv[0], "simple-backend", "abacus", "identifier"],
+			"environment" : None,
+			"working-directory" : None,
+	}, ""))
+	__simple_frontend_test_abacus ()
+
+def _simple_frontend_test_java_abacus () :
+	_output (({
+			"__type__" : "execute",
+			"executable" : "/usr/bin/java",
+			"argument0" : None,
+			"arguments" : [
+				"-jar",
+				"../mosaic-java-components/components-container/target/components-container-0.2-SNAPSHOT-jar-with-dependencies.jar",
+				"eu.mosaic_cloud.components.examples.abacus.AbacusComponentCallbacks",
+				"file:../mosaic-java-components/components-examples/target/components-examples-0.2-SNAPSHOT.jar"],
+			"environment" : None,
+			"working-directory" : None,
+	}, ""))
+	__simple_frontend_test_abacus ()
+
+def __simple_frontend_test_abacus () :
+	for i in xrange (0, 10) :
+		_output_message = {
+				"__type__" : "exchange",
+				"action" : "call",
+				"correlation" : str (i),
+				"meta-data" : {
+					"operator" : "+",
+					"operands" : [i * 2, i * 3],
+				},
+		}
+		_output_payload = ""
+		_output_packet = (_output_message, _output_payload)
+		_output (_output_packet)
+		_input_packet = _input ()
+		if _input_packet is None :
+			raise Exception ()
+		_input_message, _input_payload = _input_packet
+		if _input_message["__type__"] != "exchange" :
+			raise Exception ()
+		if _input_message["action"] != "return" :
+			raise Exception ()
+		if _input_message["correlation"] != str (i) :
+			raise Exception ()
+		if _input_message["meta-data"]["outcome"] != i * 5 :
 			raise Exception ()
 	_output_close ()
 	_input_packet = _input ()
@@ -177,7 +245,9 @@ _simple_frontend_scenarios = {
 		"execute-1" : _simple_frontend_test_execute_1,
 		"execute-2" : _simple_frontend_test_execute_2,
 		"exchange" : _simple_frontend_test_exchange,
-		"parrot" : _simple_frontend_test_parrot,
+		"python-parrot" : _simple_frontend_test_python_parrot,
+		"python-abacus" : _simple_frontend_test_python_abacus,
+		"java-abacus" : _simple_frontend_test_java_abacus,
 		"nodejs" : _simple_frontend_test_nodejs,
 }
 
@@ -196,7 +266,7 @@ def _simple_backend (_scenario, _identifier) :
 	
 	_scenario (_identifier)
 
-def _simple_frontend (_harness, _scenario) :
+def _simple_frontend (_scenario) :
 	
 	global _input_stream
 	global _output_stream
@@ -208,11 +278,11 @@ def _simple_frontend (_harness, _scenario) :
 	if True :
 		_process = subprocess.Popen (
 				["[mosaic_component_harness]"],
-				executable = _harness,
+				executable = "./.outputs/gcc/applications-elf/mosaic_component_harness.elf",
 				stdin = subprocess.PIPE, stdout = subprocess.PIPE)
 	else :
 		_process = subprocess.Popen (
-				["[mosaic_component_harness_strace]", "-e", "trace=file,desc,process", "--", _harness],
+				["[mosaic_component_harness_strace]", "-e", "trace=file,desc,process", "--", "./.outputs/gcc/applications-elf/mosaic_component_harness.elf"],
 				executable = "/usr/bin/strace",
 				stdin = subprocess.PIPE, stdout = subprocess.PIPE)
 	
@@ -300,11 +370,10 @@ def _main () :
 		_identifier = sys.argv[3]
 		_behaviour = lambda : _simple_backend (_scenario, _identifier)
 	elif _behaviour == "simple-frontend" :
-		if len (sys.argv) != 4 :
+		if len (sys.argv) != 3 :
 			raise Exception ()
-		_harness = sys.argv[2]
-		_scenario = sys.argv[3]
-		_behaviour = lambda : _simple_frontend (_harness, _scenario)
+		_scenario = sys.argv[2]
+		_behaviour = lambda : _simple_frontend (_scenario)
 	else :
 		raise Exception ()
 	

@@ -74,8 +74,10 @@ execute ({boot}) ->
 	ok = mosaic_cluster:boot (),
 	ok = mosaic_process_configurator:register (dummy, term, mosaic_process_tests, configure, void),
 	ok = mosaic_process_configurator:register (dummy, json, mosaic_process_tests, configure, void),
-	ok = mosaic_process_configurator:register (abacus, term, mosaic_component_process_tests, configure, [{router, mosaic_process_router}]),
-	ok = mosaic_process_configurator:register (abacus, json, mosaic_component_process_tests, configure, [{router, mosaic_process_router}]),
+	ok = mosaic_process_configurator:register (python_abacus, term, mosaic_component_process_tests, configure, [{router, mosaic_process_router}]),
+	ok = mosaic_process_configurator:register (python_abacus, json, mosaic_component_process_tests, configure, [{router, mosaic_process_router}]),
+	ok = mosaic_process_configurator:register (java_abacus, term, mosaic_component_process_tests, configure, [{router, mosaic_process_router}]),
+	ok = mosaic_process_configurator:register (java_abacus, json, mosaic_component_process_tests, configure, [{router, mosaic_process_router}]),
 	ok;
 	
 execute ({activate}) ->
