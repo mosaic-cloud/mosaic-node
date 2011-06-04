@@ -3,6 +3,7 @@
 
 -behaviour (mosaic_process).
 
+
 -export ([validate_configuration/2, parse_configuration/3]).
 -export ([
 		init/3, terminate/2, handle_stop/2,
@@ -85,15 +86,15 @@ handle_stop (Signal, State) ->
 
 
 handle_call (Request, RequestData, Sender, State) ->
-	handle_info ({inbound_call, Request, RequestData, Sender}, State).
+	handle_info ({mosaic_component_process_internals, inbound_call, Request, RequestData, Sender}, State).
 
 
 handle_cast (Request, RequestData, State) ->
-	handle_info ({inbound_cast, Request, RequestData}, State).
+	handle_info ({mosaic_component_process_internals, inbound_cast, Request, RequestData}, State).
 
 
 handle_info (
-			{exchange, HarnessToken, {MetaData, Data}},
+			{mosaic_component_harness, exchange, HarnessToken, {MetaData, Data}},
 			State = #state{status = Status, harness_token = HarnessToken})
 		when is_list (MetaData), is_binary (Data),
 				((Status =:= executing) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
@@ -102,7 +103,7 @@ handle_info (
 				when is_binary (Correlation_) ->
 			case mosaic_webmachine:parse_string_identifier (Correlation_) of
 				{ok, Correlation} ->
-					handle_info ({inbound_return, Correlation, {ok, Reply, Data}}, State);
+					handle_info ({mosaic_component_process_internals, inbound_return, Correlation, {ok, Reply, Data}}, State);
 				{error, Reason} ->
 					ok = mosaic_tools:trace_error ("received invalid inbound call return: invalid correlation identifier; ignoring!", [{correlation, Correlation_}, {reason, Reason}]),
 					{noreply, State}
@@ -113,7 +114,7 @@ handle_info (
 				{ok, Component} ->
 					case mosaic_webmachine:parse_string_identifier (Correlation_) of
 						{ok, Correlation} ->
-							handle_info ({outbound_call, Component, Correlation, Request, Data}, State);
+							handle_info ({mosaic_component_process_internals, outbound_call, Component, Correlation, Request, Data}, State);
 						{error, Reason} ->
 							ok = mosaic_tools:trace_error ("received invalid outbound call request: invalid correlation identifier; ignoring!", [{correlation, Correlation_}, {reason, Reason}]),
 							{noreply, State}
@@ -126,7 +127,7 @@ handle_info (
 				when is_binary (Component_) ->
 			case mosaic_webmachine:parse_string_identifier (Component_) of
 				{ok, Component} ->
-					handle_info ({outbound_cast, Component, Request, Data}, State);
+					handle_info ({mosaic_component_process_internals, outbound_cast, Component, Request, Data}, State);
 				{error, Reason} ->
 					ok = mosaic_tools:trace_error ("received invalid outbound cast request: invalid component identifier; ignoring!", [{component, Component_}, {reason, Reason}]),
 					{noreply, State}
@@ -141,11 +142,11 @@ handle_info ({Reference, Outcome}, State)
 	handle_info ({outbound_return, Reference, Outcome}, State);
 	
 handle_info (
-			{inbound_call, Request, RequestData, Sender},
+			{mosaic_component_process_internals, inbound_call, Request, RequestData, Sender},
 			OldState = #state{status = Status, harness = Harness, inbound_pending_calls = OldPendingCalls})
 		when is_binary (RequestData),
 				((Status =:= executing) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
-	{ok, Correlation} = mosaic_cluster:key (),
+	{ok, Correlation} = mosaic_cluster_tools:key (),
 	MetaData = [{<<"action">>, <<"call">>}, {<<"correlation">>, mosaic_webmachine:format_string_identifier (Correlation)}, {<<"meta-data">>, Request}],
 	PendingCall = #inbound_pending_call{correlation = Correlation, sender = Sender},
 	NewPendingCalls = orddict:store (Correlation, PendingCall, OldPendingCalls),
@@ -154,11 +155,11 @@ handle_info (
 		ok ->
 			{noreply, NewState};
 		Error = {error, _Reason} ->
-			handle_info ({inbound_return, Correlation, Error}, NewState)
+			handle_info ({mosaic_component_process_internals, inbound_return, Correlation, Error}, NewState)
 	end;
 	
 handle_info (
-			{inbound_call, Request, RequestData, Sender},
+			{mosaic_component_process_internals, inbound_call, Request, RequestData, Sender},
 			State = #state{status = Status})
 		when is_binary (RequestData) ->
 	ok = mosaic_tools:trace_error ("received unexpected inbound call; ignoring!", [{request, Request}, {request_data, RequestData}, {sender, Sender}]),
@@ -166,7 +167,7 @@ handle_info (
 	{noreply, State};
 	
 handle_info (
-			{inbound_return, Correlation, Outcome},
+			{mosaic_component_process_internals, inbound_return, Correlation, Outcome},
 			OldState = #state{status = Status, inbound_pending_calls = OldPendingCalls})
 		when is_binary (Correlation), (bit_size (Correlation) =:= 160),
 				((Status =:= executing) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
@@ -192,14 +193,14 @@ handle_info (
 	end;
 	
 handle_info (
-			{inbound_return, Correlation, _Outcome},
+			{mosaic_component_process_internals, inbound_return, Correlation, _Outcome},
 			State = #state{status = _Status})
 		when is_binary (Correlation), (bit_size (Correlation) =:= 160) ->
 	% !!!!
 	{noreply, State};
 	
 handle_info (
-			{outbound_call, Component, Correlation, Request, RequestData},
+			{mosaic_component_process_internals, outbound_call, Component, Correlation, Request, RequestData},
 			OldState = #state{status = Status, router = Router, outbound_pending_calls = OldPendingCalls})
 		when is_binary (Component), (bit_size (Component) =:= 160), is_binary (Correlation), (bit_size (Correlation) =:= 160), is_binary (RequestData),
 				((Status =:= executing) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
@@ -212,18 +213,18 @@ handle_info (
 		ok ->
 			{noreply, NewState};
 		Error = {error, _Reason} ->
-			handle_info ({outbound_return, Reference, Error}, NewState)
+			handle_info ({mosaic_component_process_internals, outbound_return, Reference, Error}, NewState)
 	end;
 	
 handle_info (
-			{outbound_call, Component, Correlation, _Request, RequestData},
+			{mosaic_component_process_internals, outbound_call, Component, Correlation, _Request, RequestData},
 			State = #state{status = _Status})
 		when is_binary (Component), (bit_size (Component) =:= 160), is_binary (Correlation), (bit_size (Correlation) =:= 160), is_binary (RequestData) ->
 	% !!!!
 	{noreply, State};
 	
 handle_info (
-			{outbound_return, Reference, Outcome},
+			{mosaic_component_process_internals, outbound_return, Reference, Outcome},
 			OldState = #state{status = Status, harness = Harness, outbound_pending_calls = OldPendingCalls})
 		when is_reference (Reference),
 				((Status =:= executing) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
@@ -255,14 +256,14 @@ handle_info (
 	end;
 	
 handle_info (
-			{outbound_return, Reference, _Outcome},
+			{mosaic_component_process_internals, outbound_return, Reference, _Outcome},
 			State = #state{status = _Status})
 		when is_reference (Reference) ->
 	% !!!!
 	{noreply, State};
 	
 handle_info (
-			{inbound_cast, Request, RequestData},
+			{mosaic_component_process_internals, inbound_cast, Request, RequestData},
 			State = #state{status = Status, harness = Harness})
 		when is_binary (RequestData),
 				((Status =:= executing) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
@@ -276,14 +277,14 @@ handle_info (
 	end;
 	
 handle_info (
-			{inbound_cast, _Request, RequestData},
+			{mosaic_component_process_internals, inbound_cast, _Request, RequestData},
 			State = #state{status = _Status})
 		when is_binary (RequestData) ->
 	% !!!!
 	{noreply, State};
 	
 handle_info (
-			{outbound_cast, Component, Request, RequestData},
+			{mosaic_component_process_internals, outbound_cast, Component, Request, RequestData},
 			State = #state{status = Status, router = Router})
 		when is_binary (Component), (bit_size (Component) =:= 160), is_binary (RequestData),
 				((Status =:= executing) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
@@ -296,7 +297,7 @@ handle_info (
 	end;
 	
 handle_info (
-			{outbound_cast, Component, Request, RequestData},
+			{mosaic_component_process_internals, outbound_cast, Component, Request, RequestData},
 			State = #state{status = Status})
 		when is_binary (Component), (bit_size (Component) =:= 160), is_binary (RequestData) ->
 	ok = mosaic_tools:trace_error ("received unexpected outbound cast request; ignoring!", [{component, Component}, {request, Request}, {request_data, RequestData}, {status, Status}]),

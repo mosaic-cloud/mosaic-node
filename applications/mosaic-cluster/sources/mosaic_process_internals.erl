@@ -3,6 +3,7 @@
 
 -behaviour (gen_server).
 
+
 -export ([init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2, handle_info/2]).
 
 
@@ -66,11 +67,11 @@ terminate (
 	end.
 
 
-code_change (_OldVsn, State, _Data) ->
+code_change (_OldVsn, State, _Argument) ->
 	{ok, State}.
 
 
-handle_call ({stop, Signal}, _Sender, OldState = #state{callback_module = CallbackModule, callback_state = OldCallbackState}) ->
+handle_call ({mosaic_process, stop, Signal}, _Sender, OldState = #state{callback_module = CallbackModule, callback_state = OldCallbackState}) ->
 	case erlang:apply (CallbackModule, handle_stop, [Signal, OldCallbackState]) of
 		{reply, Outcome = ok, NewCallbackState} ->
 			{reply, Outcome, OldState#state{callback_state = NewCallbackState}};
@@ -86,7 +87,7 @@ handle_call ({stop, Signal}, _Sender, OldState = #state{callback_module = Callba
 			{stop, Reason, Error, OldState#state{callback_state = NewCallbackState}}
 	end;
 	
-handle_call ({call, Request, RequestData}, Sender, OldState = #state{callback_module = CallbackModule, callback_state = OldCallbackState})
+handle_call ({mosaic_process, call, Request, RequestData}, Sender, OldState = #state{callback_module = CallbackModule, callback_state = OldCallbackState})
 		when is_binary (RequestData) ->
 	case erlang:apply (CallbackModule, handle_call, [Request, RequestData, Sender, OldCallbackState]) of
 		{reply, Outcome = {ok, _Reply, ReplyData}, NewCallbackState} when is_binary (ReplyData) ->
@@ -101,7 +102,7 @@ handle_call ({call, Request, RequestData}, Sender, OldState = #state{callback_mo
 			{stop, Reason, Error, OldState#state{callback_state = NewCallbackState}}
 	end;
 	
-handle_call ({begin_migration, Token, Arguments, Migrator}, _Sender, OldState)
+handle_call ({mosaic_process, begin_migration, Token, Arguments, Migrator}, _Sender, OldState)
 		when is_pid (Migrator) ->
 	case handle_begin_migration (Token, Arguments, Migrator, OldState) of
 		{continue, Outcome = ok, NewState} ->
@@ -114,7 +115,7 @@ handle_call ({begin_migration, Token, Arguments, Migrator}, _Sender, OldState)
 			{stop, Reason, Error, NewState}
 	end;
 	
-handle_call ({commit_migration, Token}, _Sender, OldState) ->
+handle_call ({mosaic_process, commit_migration, Token}, _Sender, OldState) ->
 	case handle_commit_migration (Token, OldState) of
 		{continue, Outcome = ok, NewState} ->
 			{reply, Outcome, NewState};
@@ -126,7 +127,7 @@ handle_call ({commit_migration, Token}, _Sender, OldState) ->
 			{stop, Reason, Error, NewState}
 	end;
 	
-handle_call ({rollback_migration, Token}, _Sender, OldState) ->
+handle_call ({mosaic_process, rollback_migration, Token}, _Sender, OldState) ->
 	case handle_rollback_migration (Token, OldState) of
 		{continue, Outcome = ok, NewState} ->
 			{reply, Outcome, NewState};
@@ -143,7 +144,7 @@ handle_call (Request, Sender, State) ->
 	{reply, {error, {invalid_request, Request}}, State}.
 
 
-handle_cast ({cast, Request, RequestData}, OldState = #state{callback_module = CallbackModule, callback_state = OldCallbackState})
+handle_cast ({mosaic_process, cast, Request, RequestData}, OldState = #state{callback_module = CallbackModule, callback_state = OldCallbackState})
 		when is_binary (RequestData) ->
 	case erlang:apply (CallbackModule, handle_cast, [Request, RequestData, OldCallbackState]) of
 		{noreply, NewCallbackState} ->
@@ -157,7 +158,7 @@ handle_cast (Request, State) ->
 	{noreply, State}.
 
 
-handle_info ({continue_migration, Token, Completion}, State) ->
+handle_info ({mosaic_process_internals, continue_migration, Token, Completion}, State) ->
 	case handle_continue_migration (Token, Completion, State) of
 		{continue, undefined, NewState} ->
 			{noreply, NewState};
@@ -188,17 +189,17 @@ handle_begin_migration (
 							role = Role, status = waiting_begin, token = Token, migrator = none}})
 		when (Role =:= source) or (Role =:= target) ->
 	Self = erlang:self (),
-	CompletionFunction = fun (Completion) -> Self ! {continue_migration, Token, Completion}, ok end,
+	CompletionFunction = fun (Completion) -> Self ! {mosaic_process_internals, continue_migration, Token, Completion}, ok end,
 	case erlang:apply (CallbackModule, begin_migration, [Role, Arguments, CompletionFunction, OldCallbackState]) of
 		{continue, NewCallbackState} ->
-			Migrator ! {begin_migration, Token, succeeded},
+			Migrator ! {mosaic_process_migrator, 'begin', Token, succeeded},
 			NewMigrationStatus = case Role of source -> waiting_prepared; target -> waiting_completed end,
 			NewState = OldState#state{
 					callback_state = NewCallbackState,
 					migration_state = OldMigrationState#migration_state{status = NewMigrationStatus, migrator = Migrator}},
 			{continue, ok, NewState};
 		{reject, Reason, NewCallbackState} ->
-			Migrator ! {begin_migration, Token, failed, Reason},
+			Migrator ! {mosaic_process_migrator, 'begin', Token, failed, Reason},
 			case Role of
 				source ->
 					NewState = OldState#state{status = active, callback_state = NewCallbackState, migration_state = none},
@@ -231,12 +232,12 @@ handle_begin_migration (_Token, _Arguments, _Migrator, State) ->
 
 
 handle_continue_migration (
-			Token, {prepared, Arguments},
+			Token, {prepared, Data},
 			OldState = #state{
 					status = migrating,
 					migration_state = OldMigrationState = #migration_state{
 							role = source, status = waiting_prepared, token = Token, migrator = Migrator}}) ->
-	Migrator ! {continue_migration, Token, prepared, Arguments},
+	Migrator ! {mosaic_process_migrator, continue, Token, {prepared, Data}},
 	{continue, undefined, OldState#state{migration_state = OldMigrationState#migration_state{status = waiting_completed}}};
 	
 handle_continue_migration (
@@ -246,7 +247,7 @@ handle_continue_migration (
 					migration_state = OldMigrationState = #migration_state{
 							role = Role, status = waiting_completed, token = Token, migrator = Migrator}})
 		when (Role =:= source) or (Role =:= target) ->
-	Migrator ! {continue_migration, Token, completed},
+	Migrator ! {mosaic_process_migrator, continue, Token, completed},
 	{continue, undefined, OldState#state{migration_state = OldMigrationState#migration_state{status = waiting_commit}}};
 	
 handle_continue_migration (
@@ -276,7 +277,7 @@ handle_commit_migration (
 		when (Role =:= source) or (Role =:= target) ->
 	case erlang:apply (CallbackModule, commit_migration, [OldCallbackState]) of
 		{continue, NewCallbackState} ->
-			Migrator ! {commit_migration, Token, succeeded},
+			Migrator ! {mosaic_process_migrator, commit, Token, succeeded},
 			case Role of
 				source ->
 					NewState = OldState#state{status = migration_succeeded, callback_state = NewCallbackState, migration_state = none},
@@ -286,7 +287,7 @@ handle_commit_migration (
 					{continue, ok, NewState}
 			end;
 		{terminate, Reason, NewCallbackState} ->
-			Migrator ! {commit_migration, Token, failed, Reason},
+			Migrator ! {mosaic_process_migrator, commit, Token, failed, Reason},
 			NewState = OldState#state{status = migration_failed, callback_state = NewCallbackState, migration_state = none},
 			{terminate, {migration_failed, Reason}, {error, Reason}, NewState}
 	end;
@@ -312,7 +313,7 @@ handle_rollback_migration (
 		when (Role =:= source) or (Role =:= target) ->
 	case erlang:apply (CallbackModule, rollback_migration, [OldCallbackState]) of
 		{continue, NewCallbackState} ->
-			Migrator ! {rollback_migration, Token, succeeded},
+			Migrator ! {mosaic_process_migrator, rollback, Token, succeeded},
 			case Role of
 				source ->
 					NewState = OldState#state{status = active, callback_state = NewCallbackState, migration_state = none},
@@ -322,7 +323,7 @@ handle_rollback_migration (
 					{terminate, normal, ok, NewState}
 			end;
 		{terminate, Reason, NewCallbackState} ->
-			Migrator ! {rollback_migration, Token, failed, Reason},
+			Migrator ! {mosaic_process_migrator, rollback, Token, failed, Reason},
 			NewState = OldState#state{status = migration_failed, callback_state = NewCallbackState, migration_state = none},
 			{terminate, {migration_failed, Reason}, {error, Reason}, NewState}
 	end;

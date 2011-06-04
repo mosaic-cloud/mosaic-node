@@ -107,7 +107,7 @@ test_ping ([{ping_method, PingMethod}]) ->
 
 
 test_migrate_as_source (Completion) ->
-	MigrateArguments = erlang:make_ref (),
+	MigrateConfiguration = erlang:make_ref (),
 	Self = erlang:self (),
 	SourceToken = erlang:make_ref (),
 	{ok, Source} = start_link_process (mosaic_process_tester, create),
@@ -121,29 +121,29 @@ test_migrate_as_source (Completion) ->
 			ok = wait_process (Source, [{migration_failed, terminated}]),
 			ok;
 		{_, CompletionOutcome} ->
-			ok = mosaic_process:begin_migration (Source, SourceToken, {continue, MigrateArguments, CompletionOutcome}, Self),
-			ok = receive {begin_migration, SourceToken, succeeded} -> ok end,
-			ok = receive {continue_migration, SourceToken, prepared, MigrateArguments} -> ok end,
-			ok = receive {continue_migration, SourceToken, completed} -> ok end,
+			ok = mosaic_process:begin_migration (Source, SourceToken, {continue, MigrateConfiguration, CompletionOutcome}, Self),
+			ok = receive {mosaic_process_migrator, 'begin', SourceToken, succeeded} -> ok end,
+			ok = receive {mosaic_process_migrator, continue, SourceToken, {prepared, MigrateConfiguration}} -> ok end,
+			ok = receive {mosaic_process_migrator, continue, SourceToken, completed} -> ok end,
 			case Completion of
 				{commit, succeed} ->
 					ok = mosaic_process:commit_migration (Source, SourceToken),
-					ok = receive {commit_migration, SourceToken, succeeded} -> ok end,
+					ok = receive {mosaic_process_migrator, commit, SourceToken, succeeded} -> ok end,
 					ok = wait_process (Source),
 					ok;
 				{commit, fail} ->
 					{error, failed} = mosaic_process:commit_migration (Source, SourceToken),
-					ok = receive {commit_migration, SourceToken, failed, failed} -> ok end,
+					ok = receive {mosaic_process_migrator, commit, SourceToken, failed, failed} -> ok end,
 					ok = wait_process (Source, [{migration_failed, failed}]),
 					ok;
 				{rollback, succeed} ->
 					ok = mosaic_process:rollback_migration (Source, SourceToken),
-					ok = receive {rollback_migration, SourceToken, succeeded} -> ok end,
+					ok = receive {mosaic_process_migrator, rollback, SourceToken, succeeded} -> ok end,
 					ok = stop_and_wait_process (Source),
 					ok;
 				{rollback, fail} ->
 					{error, failed} = mosaic_process:rollback_migration (Source, SourceToken),
-					ok = receive {rollback_migration, SourceToken, failed, failed} -> ok end,
+					ok = receive {mosaic_process_migrator, rollback, SourceToken, failed, failed} -> ok end,
 					ok = wait_process (Source, [{migration_failed, failed}]),
 					ok
 			end
@@ -166,27 +166,27 @@ test_migrate_as_target (Completion) ->
 			ok;
 		{_, CompletionOutcome} ->
 			ok = mosaic_process:begin_migration (Target, TargetToken, {continue, CompletionOutcome}, Self),
-			ok = receive {begin_migration, TargetToken, succeeded} -> ok end,
-			ok = receive {continue_migration, TargetToken, completed} -> ok end,
+			ok = receive {mosaic_process_migrator, 'begin', TargetToken, succeeded} -> ok end,
+			ok = receive {mosaic_process_migrator, continue, TargetToken, completed} -> ok end,
 			ok = case Completion of
 				{commit, succeed} ->
 					ok = mosaic_process:commit_migration (Target, TargetToken),
-					ok = receive {commit_migration, TargetToken, succeeded} -> ok end,
+					ok = receive {mosaic_process_migrator, commit, TargetToken, succeeded} -> ok end,
 					ok = stop_and_wait_process (Target),
 					ok;
 				{commit, fail} ->
 					{error, failed} = mosaic_process:commit_migration (Target, TargetToken),
-					ok = receive {commit_migration, TargetToken, failed, failed} -> ok end,
+					ok = receive {mosaic_process_migrator, commit, TargetToken, failed, failed} -> ok end,
 					ok = wait_process (Target, [{migration_failed, failed}]),
 					ok;
 				{rollback, succeed} ->
 					ok = mosaic_process:rollback_migration (Target, TargetToken),
-					ok = receive {rollback_migration, TargetToken, succeeded} -> ok end,
+					ok = receive {mosaic_process_migrator, rollback, TargetToken, succeeded} -> ok end,
 					ok = wait_process (Target),
 					ok;
 				{rollback, fail} ->
 					{error, failed} = mosaic_process:rollback_migration (Target, TargetToken),
-					ok = receive {rollback_migration, TargetToken, failed, failed} -> ok end,
+					ok = receive {mosaic_process_migrator, rollback, TargetToken, failed, failed} -> ok end,
 					ok = wait_process (Target, [{migration_failed, failed}]),
 					ok
 			end

@@ -3,6 +3,7 @@
 
 -behaviour (gen_fsm).
 
+
 -export ([start/1, start/2, start_link/1, start_link/2]).
 -export ([stop/1, stop/2]).
 -export ([execute/2, signal/2, exchange/2]).
@@ -34,22 +35,22 @@ stop (Harness) ->
 
 stop (Harness, Signal)
 		when (is_pid (Harness) orelse is_atom (Harness)) ->
-	gen_fsm:sync_send_event (Harness, {stop, Signal}).
+	gen_fsm:sync_send_event (Harness, {mosaic_component_harness, stop, Signal}).
 
 
 execute (Harness, Specification)
 		when (is_pid (Harness) orelse is_atom (Harness)) ->
-	gen_fsm:sync_send_event (Harness, {execute, Specification}).
+	gen_fsm:sync_send_event (Harness, {mosaic_component_harness, execute, Specification}).
 
 
 signal (Harness, Specification)
 		when (is_pid (Harness) orelse is_atom (Harness)) ->
-	gen_fsm:sync_send_event (Harness, {signal, Specification}).
+	gen_fsm:sync_send_event (Harness, {mosaic_component_harness, signal, Specification}).
 
 
 exchange (Harness, Specification)
 		when (is_pid (Harness) orelse is_atom (Harness)) ->
-	gen_fsm:sync_send_event (Harness, {exchange, Specification}).
+	gen_fsm:sync_send_event (Harness, {mosaic_component_harness, exchange, Specification}).
 
 
 -record (state, {qualified_name, controller, controller_token, port, port_exit_status}).
@@ -103,11 +104,11 @@ terminate (_Reason, _StateName, _StateData = #state{port = Port, port_exit_statu
 	ok.
 
 
-code_change (_OldVsn, StateName, StateData, _Data) ->
+code_change (_OldVsn, StateName, StateData, _Arguments) ->
 	{ok, StateName, StateData}.
 
 
-waiting_execute ({execute, OriginalSpecification}, _Sender, State = #state{port = Port, port_exit_status = none})
+waiting_execute ({mosaic_component_harness, execute, OriginalSpecification}, _Sender, State = #state{port = Port, port_exit_status = none})
 		when is_port (Port) ->
 	case parse_execute_specification (OriginalSpecification) of
 		{ok, Specification} ->
@@ -134,7 +135,7 @@ waiting_execute (Request, OldStateData) ->
 	end.
 
 
-executing ({signal, OriginalSpecification}, _Sender, State = #state{port = Port, port_exit_status = none})
+executing ({mosaic_component_harness, signal, OriginalSpecification}, _Sender, State = #state{port = Port, port_exit_status = none})
 		when is_port (Port) ->
 	case parse_signal_specification (OriginalSpecification) of
 		{ok, Specification} ->
@@ -148,7 +149,7 @@ executing ({signal, OriginalSpecification}, _Sender, State = #state{port = Port,
 			{stop, Reason, Error, State}
 	end;
 	
-executing ({exchange, OriginalSpecification}, _Sender, State = #state{port = Port, port_exit_status = none})
+executing ({mosaic_component_harness, exchange, OriginalSpecification}, _Sender, State = #state{port = Port, port_exit_status = none})
 		when is_port (Port) ->
 	case parse_exchange_specification (OriginalSpecification) of
 		{ok, Specification} ->
@@ -163,17 +164,17 @@ executing ({exchange, OriginalSpecification}, _Sender, State = #state{port = Por
 	end;
 	
 executing (
-			{internal, port_packet, PacketPayload}, _Sender,
+			{mosaic_component_harness_internals, port_packet, PacketPayload}, _Sender,
 			OldState = #state{controller = Controller, controller_token = ControllerToken, port = Port, port_exit_status = none})
 		when is_binary (PacketPayload), is_port (Port), is_pid (Controller), is_reference (ControllerToken) ->
 	case decode_packet (PacketPayload) of
 		{ok, json, {PacketMetaData, PacketData}} ->
 			case lists:sort (PacketMetaData) of
 				[{<<"__type__">>, <<"exchange">>} | OtherMetaData] ->
-					Controller ! {exchange, ControllerToken, {OtherMetaData, PacketData}},
+					Controller ! {mosaic_component_harness, exchange, ControllerToken, {OtherMetaData, PacketData}},
 					{reply, ok, executing, OldState};
 				[{<<"__type__">>, <<"exit">>}, {<<"exit-status">>, ExitStatus}] when PacketData =:= <<"">> ->
-					Controller ! {exit, ControllerToken, ExitStatus},
+					Controller ! {mosaic_component_harness, exit, ControllerToken, ExitStatus},
 					{reply, ok, waiting_execute, OldState};
 				_ ->
 					Reason = {invalid_packet, {PacketMetaData, PacketData}},
@@ -195,7 +196,9 @@ executing (Request, OldStateData) ->
 	end.
 
 
-handle_sync_event ({stop, Signal}, _Sender, OldStateName, OldStateData = #state{port = Port, port_exit_status = OldPortExitStatus}) ->
+handle_sync_event (
+			{mosaic_component_harness, stop, Signal}, _Sender,
+			OldStateName, OldStateData = #state{port = Port, port_exit_status = OldPortExitStatus}) ->
 	case Signal of
 		normal ->
 			if
@@ -217,7 +220,7 @@ handle_sync_event ({stop, Signal}, _Sender, OldStateName, OldStateData = #state{
 	end;
 	
 handle_sync_event (
-			{internal, port_exit_status, PortExitStatus}, _Sender,
+			{mosaic_component_harness_internals, port_exit_status, PortExitStatus}, _Sender,
 			OldStateName, OldStateData = #state{port = Port, port_exit_status = none})
 		when is_integer (PortExitStatus), (PortExitStatus >= 0), is_port (Port) ->
 	NewStateData = OldStateData#state{port_exit_status = PortExitStatus},
@@ -250,16 +253,16 @@ handle_info ({PeerPort, Callback}, StateName, StateData = #state{port = Port})
 		when is_port (PeerPort), is_port (Port), (PeerPort =:= Port) ->
 	case Callback of
 		{data, PacketPayload} when is_binary (PacketPayload) ->
-			erlang:apply (mosaic_component_harness, StateName, [{internal, port_packet, PacketPayload}, StateData]);
+			erlang:apply (mosaic_component_harness, StateName, [{mosaic_component_harness_internals, port_packet, PacketPayload}, StateData]);
 		{exit_status, ExitStatus} when is_integer (ExitStatus), (ExitStatus >= 0) ->
-			erlang:apply (mosaic_component_harness, StateName, [{internal, port_exit_status, ExitStatus}, StateData]);
+			erlang:apply (mosaic_component_harness, StateName, [{mosaic_component_harness_internals, port_exit_status, ExitStatus}, StateData]);
 		_ ->
 			{stop, {invalid_callback, Callback}, StateData}
 	end;
 	
 handle_info ({'EXIT', PeerPort, ExitReason}, StateName, StateData = #state{port = Port})
 		when is_port (PeerPort), is_port (Port), (PeerPort =:= Port) ->
-	erlang:apply (mosaic_component_harness, StateName, [{internal, port_exit_reason, ExitReason}, StateData]);
+	erlang:apply (mosaic_component_harness, StateName, [{mosaic_component_harness_internals, port_exit_reason, ExitReason}, StateData]);
 	
 handle_info (Message, _StateName, StateData) ->
 	{stop, {invalid_message, Message}, StateData}.
@@ -677,7 +680,7 @@ parse_signal_specification (Specification) ->
 
 
 validate_exchange_specification (#exchange_specification{meta_data = MetaData, data = Data}) ->
-	case parse_json ({struct, MetaData}) of
+	case mosaic_webmachine:coerce_json ({struct, MetaData}) of
 		{ok, {struct, MetaData}} ->
 			if
 				is_binary (Data) ->
@@ -695,7 +698,7 @@ validate_exchange_specification (Specification) ->
 
 parse_exchange_specification ({OriginalMetaData, OriginalData})
 		when is_list (OriginalMetaData), is_binary (OriginalData) ->
-	case parse_json ({struct, OriginalMetaData}) of
+	case mosaic_webmachine:coerce_json ({struct, OriginalMetaData}) of
 		{ok, {struct, MetaData}} ->
 			Specification = #exchange_specification{meta_data = MetaData, data = OriginalData},
 			{ok, Specification};
@@ -753,77 +756,3 @@ decode_packet (PacketPayload)
 		_ ->
 			{error, invalid_packet_framing}
 	end.
-
-
-parse_json (Integer)
-		when is_integer (Integer) ->
-	{ok, Integer};
-	
-parse_json (Float)
-		when is_float (Float) ->
-	{ok, Float};
-	
-parse_json (Binary)
-		when is_binary (Binary) ->
-	{ok, Binary};
-	
-parse_json (Atom)
-		when is_atom (Atom) ->
-	{ok, erlang:atom_to_binary (Atom, utf8)};
-	
-parse_json (OriginalList)
-		when is_list (OriginalList) ->
-	try
-		List = lists:map (
-				fun (OriginalElement) ->
-					case parse_json (OriginalElement) of
-						{ok, Element} ->
-							Element;
-						Error = {error, _Reason} ->
-							throw (Error)
-					end
-				end,
-				OriginalList),
-		{ok, List}
-	catch
-		throw : Error = {error, _Reason} ->
-			Error;
-		error : _ ->
-			{error, {invalid_list, OriginalList}}
-	end;
-	
-parse_json ({struct, OriginalAttributes})
-		when is_list (OriginalAttributes) ->
-	try
-		Attributes = lists:map (
-				fun
-					({OriginalName, OriginalValue}) ->
-						{ok, Name} = if
-							is_integer (OriginalName); is_float (OriginalName); is_binary (OriginalName) ->
-								{ok, OriginalName};
-							is_atom (OriginalName) ->
-								{ok, erlang:atom_to_binary (OriginalName, utf8)};
-							true ->
-								throw ({error, {invalid_attribute_name, OriginalName}})
-						end,
-						{ok, Value} = case parse_json (OriginalValue) of
-							Outcome = {ok, _Value} ->
-								Outcome;
-							Error = {error, _Reason} ->
-								throw (Error)
-						end,
-						{Name, Value};
-					(OriginalAttribute) ->
-						throw ({error, {invalid_attribute, OriginalAttribute}})
-				end,
-				OriginalAttributes),
-		{ok, {struct, Attributes}}
-	catch
-		throw : Error = {error, _Reason} ->
-			Error;
-		error : _ ->
-			{error, {invalid_attributes, OriginalAttributes}}
-	end;
-	
-parse_json (Value) ->
-	{error, {invalid_value, Value}}.

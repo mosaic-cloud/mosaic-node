@@ -1,6 +1,7 @@
 
 -module (mosaic_process).
 
+
 -export ([behaviour_info/1]).
 -export ([start/4, start/5, start_link/4, start_link/5]).
 -export ([start_supervised/5]).
@@ -45,20 +46,20 @@ stop (Process) ->
 
 stop (Process, Signal)
 		when (is_pid (Process) orelse is_atom (Process)) ->
-	gen_server:call (Process, {stop, Signal}).
+	gen_server:call (Process, {mosaic_process, stop, Signal}).
 
 
 call (Process, Request) ->
 	call (Process, Request, <<>>).
 
 call (Process, Request, RequestData) ->
-	call (Process, Request, RequestData, 5000).
+	call (Process, Request, RequestData, default).
 
 call (Process, Request, RequestData, Timeout)
 		when (is_pid (Process) orelse is_atom (Process)), is_binary (RequestData),
-			((Timeout =:= infinity) orelse (is_number (Timeout) andalso (Timeout > 0))) ->
+			((Timeout =:= default) orelse (Timeout =:= infinity) orelse (is_number (Timeout) andalso (Timeout > 0))) ->
 	try
-		case gen_server:call (Process, {call, Request, RequestData}, Timeout) of
+		case gen_server:call (Process, {mosaic_process, call, Request, RequestData}, case Timeout of default -> 5000; _ -> Timeout end) of
 			Outcome = {ok, _Reply, ReplyData} when is_binary (ReplyData) ->
 				Outcome;
 			Error = {error, _Reason} ->
@@ -82,7 +83,7 @@ cast (Process, Request) ->
 cast (Process, Request, RequestData)
 		when (is_pid (Process) orelse is_atom (Process)), is_binary (RequestData) ->
 	try
-		ok = gen_server:cast (Process, {cast, Request, RequestData})
+		ok = gen_server:cast (Process, {mosaic_process, cast, Request, RequestData})
 	catch
 		throw : Reason ->
 			{error, Reason};
@@ -96,7 +97,7 @@ cast (Process, Request, RequestData)
 begin_migration (Process, Token, Arguments, Monitor)
 		when is_pid (Process), is_pid (Monitor) ->
 	try
-		case gen_server:call (Process, {begin_migration, Token, Arguments, Monitor}, infinity) of
+		case gen_server:call (Process, {mosaic_process, begin_migration, Token, Arguments, Monitor}, infinity) of
 			Outcome = ok ->
 				Outcome;
 			Error = {error, _Reason} ->
@@ -117,7 +118,7 @@ begin_migration (Process, Token, Arguments, Monitor)
 commit_migration (Process, Token)
 		when is_pid (Process) ->
 	try
-		case gen_server:call (Process, {commit_migration, Token}, infinity) of
+		case gen_server:call (Process, {mosaic_process, commit_migration, Token}, infinity) of
 			Outcome = ok ->
 				Outcome;
 			Error = {error, _Reason} ->
@@ -138,7 +139,7 @@ commit_migration (Process, Token)
 rollback_migration (Process, Token)
 		when is_pid (Process) ->
 	try
-		case gen_server:call (Process, {rollback_migration, Token}, infinity) of
+		case gen_server:call (Process, {mosaic_process, rollback_migration, Token}, infinity) of
 			Outcome = ok ->
 				Outcome;
 			Error = {error, _Reason} ->

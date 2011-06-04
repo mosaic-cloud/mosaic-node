@@ -1,6 +1,7 @@
 
 -module (mosaic_component_process_tests).
 
+
 -export ([test/0]).
 -export ([
 		test_start_stop/1,
@@ -8,6 +9,7 @@
 		test_cast/1,
 		test_abacus/1]).
 -export ([configure/5]).
+
 
 -import (mosaic_process_tests, [start_link_process/4, stop_and_wait_process/1, wait_process/1, call_process/3, cast_process/3]).
 
@@ -20,7 +22,7 @@
 
 
 test_start_stop ({defaults}) ->
-	{ok, Identifier} = mosaic_cluster:key (),
+	{ok, Identifier} = mosaic_cluster_tools:key (),
 	{ok, Configuration} = configure (python_parrot, Identifier),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
 	ok = stop_and_wait_process (Process),
@@ -28,7 +30,7 @@ test_start_stop ({defaults}) ->
 
 
 test_call ({defaults}) ->
-	{ok, Identifier} = mosaic_cluster:key (),
+	{ok, Identifier} = mosaic_cluster_tools:key (),
 	{ok, Configuration} = configure (python_parrot, Identifier),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
 	Request = {struct, [{<<"key-1">>, 1}, {<<"key-a">>, <<"a">>}]},
@@ -39,13 +41,13 @@ test_call ({defaults}) ->
 
 
 test_cast ({defaults}) ->
-	{ok, Identifier} = mosaic_cluster:key (),
+	{ok, Identifier} = mosaic_cluster_tools:key (),
 	{ok, Configuration} = configure (python_parrot, Identifier),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
 	Request = {struct, [{<<"key-1">>, 1}, {<<"key-a">>, <<"a">>}]},
 	RequestData = <<"data">>,
 	ok = cast_process (Process, Request, RequestData),
-	ok = receive {'$gen_cast', {cast, Identifier, Request, RequestData}} -> ok end,
+	ok = receive {'$gen_cast', {mosaic_process_router, cast, Identifier, Request, RequestData}} -> ok end,
 	ok = stop_and_wait_process (Process),
 	ok.
 
@@ -57,7 +59,7 @@ test_abacus ({Flavour}) ->
 		java ->
 			{ok, java_abacus}
 	end,
-	{ok, Identifier} = mosaic_cluster:key (),
+	{ok, Identifier} = mosaic_cluster_tools:key (),
 	{ok, Configuration} = configure (Type, Identifier),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
 	Request = {struct, [{<<"operator">>, <<"+">>}, {<<"operands">>, [1, 2]}]},

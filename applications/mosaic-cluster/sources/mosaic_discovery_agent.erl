@@ -3,6 +3,7 @@
 
 -behaviour (gen_server).
 
+
 -export ([start/0, start/1, start/2, start_link/0, start_link/1, start_link/2]).
 -export ([start_supervised/0, start_supervised/1]).
 -export ([stop/0, stop/1, stop/2]).
@@ -45,7 +46,7 @@ stop (Agent) ->
 
 stop (Agent, Signal)
 		when (is_atom (Agent) orelse is_pid (Agent)) ->
-	gen_server:call (Agent, {stop, Signal}).
+	gen_server:call (Agent, {mosaic_discovery_agent, stop, Signal}).
 
 
 broadcast (Message) ->
@@ -60,7 +61,7 @@ broadcast (Agent, Message) ->
 broadcast (Agent, Message, Count, Delay)
 		when (is_atom (Agent) orelse is_pid (Agent)),
 				((Count =:= infinity) orelse (is_integer (Count) andalso (Count > 0))), is_integer (Delay), (Delay > 0) ->
-	gen_server:call (Agent, {broadcast, Message, Count, Delay}).
+	gen_server:call (Agent, {mosaic_discovery_agent, broadcast, Message, Count, Delay}).
 
 
 -record (state, {qualified_name, configuration, socket, socket_ip, socket_port, broadcasts}).
@@ -100,11 +101,11 @@ terminate (_Reason, _State = #state{socket = Socket}) ->
 	end.
 
 
-code_change (_OldVsn, State, _Data) ->
+code_change (_OldVsn, State, _Arguments) ->
 	{ok, State}.
 
 
-handle_call ({stop, Signal}, _Sender, State) ->
+handle_call ({mosaic_discovery_agent, stop, Signal}, _Sender, State) ->
 	case Signal of
 		normal ->
 			{stop, normal, ok, State};
@@ -112,10 +113,10 @@ handle_call ({stop, Signal}, _Sender, State) ->
 			{reply, {error, {invalid_signal, Signal}}, State}
 	end;
 	
-handle_call ({broadcast, Message, Count, Delay}, _Sender, OldState = #state{broadcasts = OldBroadcasts})
+handle_call ({mosaic_discovery_agent, broadcast, Message, Count, Delay}, _Sender, OldState = #state{broadcasts = OldBroadcasts})
 		when ((Count =:= infinity) orelse (is_integer (Count) andalso (Count > 0))), is_integer (Delay), (Delay > 0) ->
 	Reference = erlang:make_ref (),
-	case timer:send_interval (Delay, {broadcast, Reference}) of
+	case timer:send_interval (Delay, {mosaic_discovery_agent_internals, broadcast, Reference}) of
 		{ok, Timer} ->
 			NewBroadcast = #broadcast{reference = Reference, message = Message, count = Count, delay = Delay, timer = Timer},
 			NewBroadcasts = orddict:store (Reference, NewBroadcast, OldBroadcasts),
@@ -135,7 +136,7 @@ handle_cast (Request, State) ->
 
 
 handle_info (
-			{broadcast, Reference},
+			{mosaic_discovery_agent_internals, broadcast, Reference},
 			OldState = #state{
 					configuration = #configuration{identity = Identity, shared_secret = SharedSecret},
 					socket = Socket, socket_ip = SocketIp, socket_port = SocketPort,

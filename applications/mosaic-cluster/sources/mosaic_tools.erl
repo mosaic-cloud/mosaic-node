@@ -134,7 +134,7 @@ enforce_registered (QualifiedName) ->
 	enforce_registered (QualifiedName, erlang:self ()).
 
 enforce_registered (QualifiedName = {local, LocalName}, Process)
-		when is_atom (LocalName), (is_pid (Process) or is_port (Process)) ->
+		when is_atom (LocalName), (is_pid (Process) orelse is_port (Process)) ->
 	case erlang:whereis (LocalName) of
 		Process ->
 			ok;

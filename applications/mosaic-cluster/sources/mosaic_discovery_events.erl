@@ -3,6 +3,7 @@
 
 -behaviour (gen_event).
 
+
 -export ([start/0, start/1, start_link/0, start_link/1, start_link/2]).
 -export ([start_supervised/0]).
 -export ([stop/0, stop/1, stop/2]).
@@ -40,7 +41,7 @@ stop (Events) ->
 
 stop (Events, Signal)
 		when (is_pid (Events) orelse is_atom (Events)) ->
-	gen_event:call (Events, {stop, Signal}).
+	gen_event:call (Events, {mosaic_discrovery_events, stop, Signal}).
 
 
 register_handler (Module, Arguments) ->
@@ -63,7 +64,7 @@ broadcasted (Message) ->
 
 broadcasted (Events, Message)
 		when (is_pid (Events) orelse is_atom (Events)) ->
-	gen_event:notify (Events, {broadcasted, Message}).
+	gen_event:notify (Events, {mosaic_discovery_events, broadcasted, Message}).
 
 
 init (Closure = {Function, _State})
@@ -73,15 +74,17 @@ init (Closure = {Function, _State})
 terminate (_Arguments, _Closure) ->
 	ok.
 
-code_change (_OldVsn, Closure, _Data) ->
+code_change (_OldVsn, Closure, _Arguments) ->
 	{ok, Closure}.
 
 handle_event (Event, {Function, OldState}) ->
 	{ok, NewState} = Function (Event, OldState),
 	{ok, {Function, NewState}}.
 
-handle_call ({stop, normal}, _Closure) ->
-	{remove_handler, ok}.
+handle_call (Request, Closure) ->
+	ok = mosaic_tools:trace_error ("received invalid call request; ignoring!", [{request, Request}]),
+	{ok, {error, {invalid_request, Request}}, Closure}.
 
-handle_info ({stop, normal}, _Closure) ->
-	remove_handler.
+handle_info (Message, Closure) ->
+	ok = mosaic_tools:trace_error ("received invalid message; ignoring!", [{message, Message}]),
+	{ok, Closure}.

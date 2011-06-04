@@ -1,12 +1,14 @@
 
 -module (mosaic_process_migrator_tests).
 
+
 -export ([test/0]).
 -export ([
 		test_migrate/1]).
 -export ([
 		start_link_process_migrator/6, start_link_process_migrator/7,
 		wait_process_migrator/1]).
+
 
 -import (mosaic_process_tests, [start_link_process/2, stop_and_wait_process/1, wait_process/1]).
 
@@ -23,6 +25,7 @@ test_migrate (defaults) ->
 	{ok, Target} = start_link_process (mosaic_process_tester, {migrate, TargetToken}),
 	{ok, Migrator} = start_link_process_migrator (Source, SourceToken, Target, TargetToken, Self, SelfToken),
 	ok = mosaic_process_migrator:migrate (Migrator, defaults),
+	ok = receive {mosaic_process_migrator, migrate, SelfToken, succeeded} -> ok end,
 	ok = wait_process_migrator (Migrator),
 	ok = wait_process (Source),
 	ok = stop_and_wait_process (Target),

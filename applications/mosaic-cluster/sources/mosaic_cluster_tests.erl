@@ -1,6 +1,7 @@
 
 -module (mosaic_cluster_tests).
 
+
 -export ([test/0, execute/1]).
 
 
@@ -15,34 +16,39 @@ test () ->
 		{ok, Scenario, Actions} = case application:get_env (mosaic_cluster, tests_scenario) of
 			{ok, boot} ->
 				{ok, defaults, [
-						{boot}, {ping, 4}]};
+						{boot}, {activate}, {ping, default}, {initialize}]};
 			{ok, create_dummy_1} ->
 				{ok, defaults, [
-						{boot}, {ping, 4},
+						{boot}, {activate}, {ping, default}, {initialize},
 						{define_and_create_processes, dummy, term, defaults, 1}]};
-			{ok, create_dummy_16} ->
+			{ok, create_dummy_4} ->
 				{ok, defaults, [
-						{boot}, {ping, 4},
-						{define_and_create_processes, dummy, term, defaults, 16}]};
-			{ok, create_abacus_1} ->
+						{boot}, {activate}, {ping, default}, {initialize},
+						{define_and_create_processes, dummy, term, defaults, 4}]};
+			{ok, create_pynton_abacus_4} ->
 				{ok, defaults, [
-						{boot}, {ping, 4},
-						{define_and_create_processes, abacus, term, defaults, 1}]};
+						{boot}, {activate}, {ping, default}, {initialize},
+						{define_and_create_processes, python_abacus, term, defaults, 4}]};
+			{ok, create_java_abacus_4} ->
+				{ok, defaults, [
+						{boot}, {activate}, {ping, default}, {initialize},
+						{define_and_create_processes, java_abacus, term, defaults, 4}]};
 			{ok, ring_join_leave} ->
 				Self = erlang:node (),
 				case application:get_env (mosaic_cluster, tests_nodes) of
 					{ok, [Self | _Peers]} ->
 						{ok, ring_join_leave_master, [
-								{boot}, {ping, 4}]};
+								{boot}, {activate}, {ping, 4}, {initialize},
+								{define_and_create_processes, dummy, term, defaults, 4}]};
 					{ok, Nodes} ->
 						Peers = lists:delete (Self, Nodes),
 						{ok, ring_join_leave_slaves, [
-								{boot}, {ping, 4},
+								{boot}, {activate}, {ping, 4},
 								{sleep, 2 * 1000}, {ring, include, Peers},
 								{sleep, 2 * 10}, {ping, 4},
-								{sleep, 2 * 1000}, {ring, exclude, Self},
+								{sleep, 12 * 1000}, {ring, exclude, Self},
 								{sleep, 2 * 10}, {ping, 4},
-								{sleep, 2 * 1000},
+								{sleep, 12 * 1000},
 								{exit}]};
 					undefined ->
 						throw ({error, undefined_nodes})
@@ -71,28 +77,38 @@ test () ->
 
 
 execute ({boot}) ->
-	ok = mosaic_cluster:boot (),
-	ok = mosaic_process_configurator:register (dummy, term, mosaic_process_tests, configure, void),
-	ok = mosaic_process_configurator:register (dummy, json, mosaic_process_tests, configure, void),
-	ok = mosaic_process_configurator:register (python_abacus, term, mosaic_component_process_tests, configure, [{router, mosaic_process_router}]),
-	ok = mosaic_process_configurator:register (python_abacus, json, mosaic_component_process_tests, configure, [{router, mosaic_process_router}]),
-	ok = mosaic_process_configurator:register (java_abacus, term, mosaic_component_process_tests, configure, [{router, mosaic_process_router}]),
-	ok = mosaic_process_configurator:register (java_abacus, json, mosaic_component_process_tests, configure, [{router, mosaic_process_router}]),
+	ok = mosaic_cluster_app:boot (),
 	ok;
 	
 execute ({activate}) ->
-	ok = mosaic_executor:service_activate (),
-	ok = mosaic_cluster:node_activate (),
+	ok = mosaic_cluster_processes:service_activate (),
+	ok = mosaic_cluster_storage:service_activate (),
+	ok = mosaic_cluster_tools:node_activate (),
 	ok;
 	
 execute ({deactivate}) ->
-	ok = mosaic_executor:service_deactivate (),
-	ok = mosaic_cluster:node_deactivate (),
+	ok = mosaic_cluster_processes:service_deactivate (),
+	ok = mosaic_cluster_storage:service_deactivate (),
+	ok = mosaic_cluster_tools:node_deactivate (),
+	ok;
+	
+execute ({initialize}) ->
+	ok = mosaic_process_configurator:register (dummy, term, {mosaic_process_tests, configure, void}),
+	ok = mosaic_process_configurator:register (dummy, json, {mosaic_process_tests, configure, void}),
+	ok = mosaic_process_configurator:register (python_abacus, term, {mosaic_component_process_tests, configure, [{router, mosaic_process_router}]}),
+	ok = mosaic_process_configurator:register (python_abacus, json, {mosaic_component_process_tests, configure, [{router, mosaic_process_router}]}),
+	ok = mosaic_process_configurator:register (java_abacus, term, {mosaic_component_process_tests, configure, [{router, mosaic_process_router}]}),
+	ok = mosaic_process_configurator:register (java_abacus, json, {mosaic_component_process_tests, configure, [{router, mosaic_process_router}]}),
 	ok;
 	
 execute ({ring, include, Node})
 		when is_atom (Node) ->
-	ok = mosaic_cluster:ring_include (Node),
+	ok = case mosaic_cluster_tools:ring_include (Node) of
+		ok ->
+			ok;
+		{error, nodedown} ->
+			ok
+	end,
 	ok;
 	
 execute ({ring, include, []}) ->
@@ -105,7 +121,7 @@ execute ({ring, include, [Node | Nodes]})
 	
 execute ({ring, exclude, Node})
 		when is_atom (Node) ->
-	ok = mosaic_cluster:ring_exclude (Node),
+	ok = mosaic_cluster_tools:ring_exclude (Node),
 	ok;
 	
 execute ({ring, exclude, [Node | Nodes]})
@@ -117,23 +133,29 @@ execute ({ring, exclude, self}) ->
 	execute ({ring, exclude, erlang:node ()});
 	
 execute ({ring, reboot}) ->
-	ok = mosaic_cluster:ring_reboot (),
+	ok = mosaic_cluster_tools:ring_reboot (),
 	ok;
 	
 execute ({ping, Count}) ->
-	ok = case mosaic_executor:ping (Count) of
+	ok = case mosaic_cluster_processes:service_ping (Count) of
 		{ok, _, []} ->
 			ok;
-		{ok, _, Reasons} ->
-			erlang:exit ({error, Reasons})
+		{ok, _, Reasons1} ->
+			erlang:exit ({error, Reasons1})
+	end,
+	ok = case mosaic_cluster_storage:service_ping (Count) of
+		{ok, _, []} ->
+			ok;
+		{ok, _, Reasons2} ->
+			erlang:exit ({error, Reasons2})
 	end,
 	ok;
 	
-execute ({define_and_create_processes, Type, ArgumentsEncoding, ArgumentsContent, Count}) ->
-	ok = case mosaic_executor:define_and_create_processes (Type, ArgumentsEncoding, ArgumentsContent, Count) of
-		{ok, _, _, []} ->
+execute ({define_and_create_processes, Type, ConfigurationEncoding, ConfigurationContent, Count}) ->
+	ok = case mosaic_cluster_processes:define_and_create (Type, ConfigurationEncoding, ConfigurationContent, Count) of
+		{ok, _Processes, []} ->
 			ok;
-		{ok, _, _, Reasons} ->
+		{ok, _Processes, Reasons} ->
 			erlang:exit ({error, Reasons})
 	end,
 	ok;

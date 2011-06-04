@@ -16,6 +16,7 @@
 		format_hex_string/1,
 		format_integer_identifier/1, format_string_identifier/1,
 		format_json/1]).
+-export ([coerce_json/1]).
 
 
 start () ->
@@ -65,7 +66,7 @@ start_supervised (Configuration) ->
 options (defaults) ->
 	case application:get_env (mosaic_cluster, webmachine_listen) of
 		{ok, {Address, Port}} when is_list (Address), is_number (Port), (Port >= 0), (Port < 65536) ->
-			case dispatches ([mosaic_console_wm, mosaic_cluster_wm, mosaic_executor_wm]) of
+			case dispatches ([mosaic_cluster_wm, mosaic_cluster_processes_wm]) of
 				{ok, Dispatches} ->
 					Options = [
 							{ip, Address},
@@ -145,6 +146,8 @@ respond_with_outcome (Outcome, Request, State) ->
 	case Outcome of
 		ok ->
 			mosaic_webmachine:respond_with_content (json, {struct, [{ok, true}]}, Request, State);
+		{ok, html, HtmlBody} ->
+			mosaic_webmachine:respond_with_content (html, HtmlBody, Request, State);
 		{ok, json_struct, AttributeTerms} ->
 			mosaic_webmachine:respond_with_content (json, {struct, [{ok, true} | AttributeTerms]}, Request, State);
 		{error, Reason} ->
@@ -163,6 +166,9 @@ respond_with_content (Type, ContentTerm, Request, State) ->
 	{Content, Response, State}.
 
 
+encode_content (html, Content) ->
+	{ok, "text/html", Content};
+	
 encode_content (json, Content) ->
 	{ok, "application/json", format_json (Content)};
 	
@@ -419,3 +425,77 @@ format_term_1 (Binary)
 	
 format_term_1 (Object) ->
 	["binary_to_term(", format_term_1 (erlang:term_to_binary (Object)), ")"].
+
+
+coerce_json (Integer)
+		when is_integer (Integer) ->
+	{ok, Integer};
+	
+coerce_json (Float)
+		when is_float (Float) ->
+	{ok, Float};
+	
+coerce_json (Binary)
+		when is_binary (Binary) ->
+	{ok, Binary};
+	
+coerce_json (Atom)
+		when is_atom (Atom) ->
+	{ok, erlang:atom_to_binary (Atom, utf8)};
+	
+coerce_json (OriginalList)
+		when is_list (OriginalList) ->
+	try
+		List = lists:map (
+				fun (OriginalElement) ->
+					case coerce_json (OriginalElement) of
+						{ok, Element} ->
+							Element;
+						Error = {error, _Reason} ->
+							throw (Error)
+					end
+				end,
+				OriginalList),
+		{ok, List}
+	catch
+		throw : Error = {error, _Reason} ->
+			Error;
+		error : _ ->
+			{error, {invalid_list, OriginalList}}
+	end;
+	
+coerce_json ({struct, OriginalAttributes})
+		when is_list (OriginalAttributes) ->
+	try
+		Attributes = lists:map (
+				fun
+					({OriginalName, OriginalValue}) ->
+						{ok, Name} = if
+							is_integer (OriginalName); is_float (OriginalName); is_binary (OriginalName) ->
+								{ok, OriginalName};
+							is_atom (OriginalName) ->
+								{ok, erlang:atom_to_binary (OriginalName, utf8)};
+							true ->
+								throw ({error, {invalid_attribute_name, OriginalName}})
+						end,
+						{ok, Value} = case coerce_json (OriginalValue) of
+							Outcome = {ok, _Value} ->
+								Outcome;
+							Error = {error, _Reason} ->
+								throw (Error)
+						end,
+						{Name, Value};
+					(OriginalAttribute) ->
+						throw ({error, {invalid_attribute, OriginalAttribute}})
+				end,
+				OriginalAttributes),
+		{ok, {struct, Attributes}}
+	catch
+		throw : Error = {error, _Reason} ->
+			Error;
+		error : _ ->
+			{error, {invalid_attributes, OriginalAttributes}}
+	end;
+	
+coerce_json (Value) ->
+	{error, {invalid_value, Value}}.

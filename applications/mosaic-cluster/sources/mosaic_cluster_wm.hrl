@@ -1,14 +1,5 @@
 
--module (mosaic_console_wm).
-
--export ([init/1, allowed_methods/2, content_types_provided/2, handle_as_html/2, ping/2]).
-
-
--dispatch ({[], defaults}).
--dispatch ({["console"], defaults}).
-
-
--define (content,
+-define (console_html_body,
 <<"<!DOCTYPE html>
 <html id=\"jsconsole\">
 	<head>
@@ -113,54 +104,53 @@
 				return (_get (\"/cluster/ring/reboot\") .ok);
 			});
 			
-			_mosaic.executor = _wrapped (function () {});
-			_mosaic.executor.nodes = _wrapped (function () {
-				return (_get (\"/executor/nodes\") .nodes);
+			_mosaic.processes = _wrapped (function () {
+				return (_get (\"/processes\") .keys);
 			});
-			_mosaic.executor.nodes.self = function () {
-				return (_get (\"/cluster/nodes\") .self);
-			};
-			_mosaic.executor.nodes.self.activate = _wrapped (function () {
-				return (_get (\"/executor/nodes/self/activate\") .ok);
+			_mosaic.processes.nodes = _wrapped (function () {
+				return (_get (\"/processes/nodes\") .nodes);
 			});
-			_mosaic.executor.nodes.self.deactivate = _wrapped (function () {
-				return (_get (\"/executor/nodes/self/deactivate\") .ok);
+			_mosaic.processes.nodes.self = _wrapped (function () {
+				return (_get (\"/processes/nodes\") .self);
 			});
-			_mosaic.executor.ping = _wrapped (function (_count) {
+			_mosaic.processes.nodes.self.activate = _wrapped (function () {
+				return (_get (\"/processes/nodes/self/activate\") .ok);
+			});
+			_mosaic.processes.nodes.self.deactivate = _wrapped (function () {
+				return (_get (\"/processes/nodes/self/deactivate\") .ok);
+			});
+			_mosaic.processes.ping = _wrapped (function (_count) {
 				if (_count == undefined)
-					_count = 4;
-				var _outcome = _get (\"/executor/ping\", {count : _count});
+					_count = 0;
+				var _outcome = _get (\"/processes/ping\", {count : _count});
 				return ({pongs : _outcome.pongs, pangs : _outcome.pangs});
 			});
-			_mosaic.executor.processes = _wrapped (function () {
-				return (_get (\"/executor/processes\") .keys);
-			});
-			_mosaic.executor.processes.create = _wrapped (function (_type, _arguments, _count) {
+			_mosaic.processes.create = _wrapped (function (_type, _arguments, _count) {
 				if (_arguments == undefined)
 					_arguments = null;
 				if (_count == undefined)
 					_count = 1;
 				_arguments = JSON.stringify (_arguments);
-				var _outcome = _get (\"/executor/processes/create\", {type : _type, arguments : _arguments, count : _count});
+				var _outcome = _get (\"/processes/create\", {type : _type, arguments : _arguments, count : _count});
 				if (_count == 1)
 					return (_outcome.keys[0]);
 				else
 					return (_outcome.keys);
 			});
-			_mosaic.executor.processes.stop = _wrapped (function (_key) {
-				return (_get (\"/executor/processes/stop\", {key : _key}) .ok);
+			_mosaic.processes.stop = _wrapped (function (_key) {
+				return (_get (\"/processes/stop\", {key : _key}) .ok);
 			});
-			_mosaic.executor.processes.call = _wrapped (function (_key, _arguments) {
+			_mosaic.processes.call = _wrapped (function (_key, _arguments) {
 				if (_arguments == undefined)
 					_arguments = null;
 				_arguments = JSON.stringify (_arguments);
-				return (_get (\"/executor/processes/call\", {key : _key, arguments : _arguments}));
+				return (_get (\"/processes/call\", {key : _key, arguments : _arguments}));
 			});
-			_mosaic.executor.processes.cast = _wrapped (function (_key, _arguments) {
+			_mosaic.processes.cast = _wrapped (function (_key, _arguments) {
 				if (_arguments == undefined)
 					_arguments = null;
 				_arguments = JSON.stringify (_arguments);
-				return (_get (\"/executor/processes/cast\", {key : _key, arguments : _arguments}));
+				return (_get (\"/processes/cast\", {key : _key, arguments : _arguments}));
 			});
 			
 			$(\"#sandbox\")[0].contentWindow.mosaic = _mosaic;
@@ -168,19 +158,3 @@
 		</script>
 	</body>
 </html>">>).
-
-
-init (defaults) ->
-	{ok, void}.
-
-ping(Request, State = void) ->
-    {pong, Request, State}.
-
-allowed_methods (Request, State = void) ->
-	{['GET'], Request, State}.
-
-content_types_provided (Request, State = void) ->
-	{[{"text/html", handle_as_html}], Request, State}.
-
-handle_as_html (Request, State = void) ->
-	{?content, Request, State}.

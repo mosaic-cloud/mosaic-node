@@ -1,6 +1,7 @@
 
 -module (mosaic_process_controller_tests).
 
+
 -export ([test/0]).
 -export ([
 		test_start_stop/1,
@@ -9,6 +10,7 @@
 -export ([
 		start_link_process_controller/0, start_link_process_controller/1, start_link_process_controller/2,
 		stop_and_wait_process_controller/1, stop_and_wait_process_controller/3]).
+
 
 -import (mosaic_process_tests, [stop_and_wait_process/1, wait_process/1]).
 
@@ -60,9 +62,10 @@ test_migrate ({once}) ->
 	{ok, TargetController} = start_link_process_controller (),
 	{ok, Source} = mosaic_process_controller:create (SourceController, Identifier, mosaic_process_tester, defaults),
 	true = erlang:link (Source),
-	{ok, Target} = mosaic_process_controller:migrate (SourceController, TargetController, Identifier),
-	true = erlang:link (Target),
+	ok = mosaic_process_controller:migrate (SourceController, TargetController, Identifier),
 	ok = wait_process (Source),
+	{ok, Target} = mosaic_process_controller:resolve (TargetController, Identifier),
+	true = erlang:link (Target),
 	ok = stop_and_wait_process (Target),
 	ok = stop_and_wait_process_controller (SourceController),
 	ok = stop_and_wait_process_controller (TargetController),
@@ -77,13 +80,15 @@ test_migrate ({twice}) ->
 	{ok, TargetController} = start_link_process_controller (),
 	{ok, Source1} = mosaic_process_controller:create (SourceController, Identifier, mosaic_process_tester, defaults),
 	true = erlang:link (Source1),
-	{ok, Target1} = mosaic_process_controller:migrate (SourceController, TargetController, Identifier),
-	true = erlang:link (Target1),
+	ok = mosaic_process_controller:migrate (SourceController, TargetController, Identifier),
 	ok = wait_process (Source1),
+	{ok, Target1} = mosaic_process_controller:resolve (TargetController, Identifier),
+	true = erlang:link (Target1),
 	Source2 = Target1,
-	{ok, Target2} = mosaic_process_controller:migrate (TargetController, SourceController, Identifier),
-	true = erlang:link (Target2),
+	ok = mosaic_process_controller:migrate (TargetController, SourceController, Identifier),
 	ok = wait_process (Source2),
+	{ok, Target2} = mosaic_process_controller:resolve (SourceController, Identifier),
+	true = erlang:link (Target2),
 	ok = stop_and_wait_process (Target2),
 	ok = stop_and_wait_process_controller (SourceController),
 	ok = stop_and_wait_process_controller (TargetController),

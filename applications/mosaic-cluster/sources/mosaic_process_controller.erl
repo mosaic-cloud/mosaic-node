@@ -3,6 +3,7 @@
 
 -behaviour (gen_server).
 
+
 -export ([start/0, start/1, start/2, start_link/0, start_link/1, start_link/2]).
 -export ([start_supervised/1, start_supervised/2]).
 -export ([stop/1, stop/2]).
@@ -108,7 +109,7 @@ terminate (_Reason, _State) ->
 	ok.
 
 
-code_change (_OldVsn, State, _Data) ->
+code_change (_OldVsn, State, _Arguments) ->
 	{ok, State}.
 
 
@@ -149,32 +150,32 @@ handle_call (
 	WaiterToken = erlang:make_ref (),
 	Waiter = spawn_link (
 			fun () ->
-				{ok, Migrator, Target} = receive
-					{'begin', Migrator_, Target_, WaiterToken} ->
-						{ok, Migrator_, Target_}
+				{ok, Migrator} = receive
+					{mosaic_process_controller_internals, migrate, Migrator_, WaiterToken} ->
+						{ok, Migrator_}
 				end,
 				true = erlang:link (Migrator),
 				ok = receive
-					{terminate, WaiterToken, normal} ->
-						_ = gen_server:reply (Sender, {ok, Target}),
+					{mosaic_process_migrator, migrate, WaiterToken, succeeded} ->
+						_ = gen_server:reply (Sender, ok),
 						ok;
-					{terminate, WaiterToken, Reason} ->
+					{mosaic_process_migrator, migrate, WaiterToken, failed, Reason} ->
 						_ = gen_server:reply (Sender, {error, Reason}),
 						ok;
 					{'EXIT', Migrator, Reason} ->
-						_ = gen_server:reply (Sender, {error, Reason}),
+						_ = gen_server:reply (Sender, {error, {unexpected_error, Reason}}),
 						ok;
 					Message ->
-						_ = gen_server:reply (Sender, {error, {unexpected_message, Message}}),
+						_ = gen_server:reply (Sender, {error, {unexpected_error, {unexpected_message, Message}}}),
 						ok
 				end,
 				true = erlang:unlink (Migrator),
 				erlang:exit (normal)
 			end),
 	case handle_call ({migrate_as_target, SourceController, Identifier, Arguments, Waiter, WaiterToken}, undefined, OldState) of
-		{reply, {ok, Migrator, Target}, NewState} ->
+		{reply, {ok, Migrator, _Target}, NewState} ->
 			true = erlang:unlink (Waiter),
-			Waiter ! {'begin', Migrator, Target, WaiterToken},
+			Waiter ! {mosaic_process_controller_internals, migrate, Migrator, WaiterToken},
 			{noreply, NewState};
 		Reply = {reply, {error, _Reason}, _NewState} ->
 			true = erlang:exit (Waiter, kill),

@@ -1,18 +1,19 @@
 
--module (mosaic_executor_wm).
+-module (mosaic_cluster_processes_wm).
+
 
 -export ([init/1, allowed_methods/2, content_types_provided/2, malformed_request/2, handle_as_json/2, ping/2]).
 
 
--dispatch ({["executor", "nodes"], {nodes}}).
--dispatch ({["executor", "nodes", "self", "activate"], {nodes, self, activate}}).
--dispatch ({["executor", "nodes", "self", "deactivate"], {nodes, self, deactivate}}).
--dispatch ({["executor", "processes"], {processes}}).
--dispatch ({["executor", "processes", "create"], {processes, create}}).
--dispatch ({["executor", "processes", "stop"], {processes, stop}}).
--dispatch ({["executor", "processes", "call"], {processes, call}}).
--dispatch ({["executor", "processes", "cast"], {processes, cast}}).
--dispatch ({["executor", "ping"], {ping}}).
+-dispatch ({["processes", "nodes"], {nodes}}).
+-dispatch ({["processes", "nodes", "self", "activate"], {nodes, self, activate}}).
+-dispatch ({["processes", "nodes", "self", "deactivate"], {nodes, self, deactivate}}).
+-dispatch ({["processes"], {processes}}).
+-dispatch ({["processes", "create"], {processes, create}}).
+-dispatch ({["processes", "stop"], {processes, stop}}).
+-dispatch ({["processes", "call"], {processes, call}}).
+-dispatch ({["processes", "cast"], {processes, cast}}).
+-dispatch ({["processes", "ping"], {ping}}).
 
 
 -record (state, {target, arguments}).
@@ -78,6 +79,8 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 			case mosaic_webmachine:enforce_request ('GET', [{"count", fun mosaic_webmachine:parse_integer/1}], Request) of
 				{ok, false, [Count]} ->
 					if
+						Count =:= 0 ->
+							{ok, false, State#state{arguments = dict:from_list ([{count, default}])}};
 						(Count > 0), (Count =< 128) ->
 							{ok, false, State#state{arguments = dict:from_list ([{count, Count}])}};
 						true ->
@@ -93,29 +96,30 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 handle_as_json (Request, State = #state{target = Target, arguments = Arguments}) ->
 	Outcome = case Target of
 		{nodes} ->
-			case mosaic_executor:nodes () of
+			case mosaic_cluster_processes:service_nodes () of
 				{ok, Nodes} ->
 					{ok, json_struct, [
+							{self, mosaic_webmachine:format_atom (erlang:node ())},
 							{nodes, lists:map (fun mosaic_webmachine:format_atom/1, Nodes)}]};
 				Error = {error, _Reason} ->
 					Error
 			end;
 		{nodes, self, activate} ->
-			case mosaic_executor:service_activate () of
+			case mosaic_cluster_processes:service_activate () of
 				ok ->
 					ok;
 				Error = {error, _Reason} ->
 					Error
 			end;
 		{nodes, self, deactivate} ->
-			case mosaic_executor:service_deactivate () of
+			case mosaic_cluster_processes:service_deactivate () of
 				ok ->
 					ok;
 				Error = {error, _Reason} ->
 					Error
 			end;
 		{processes} ->
-			case mosaic_executor:select_processes () of
+			case mosaic_cluster_processes:list () of
 				{ok, Keys, []} ->
 					{ok, json_struct, [
 							{keys, lists:map (fun mosaic_webmachine:format_string_identifier/1, Keys)}]};
@@ -130,11 +134,13 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			ProcessType = dict:fetch (type, Arguments),
 			ProcessArgumentsContent = dict:fetch (arguments, Arguments),
 			Count = dict:fetch (count, Arguments),
-			case mosaic_executor:define_and_create_processes (ProcessType, json, ProcessArgumentsContent, Count) of
-				{ok, Keys, _Processes, []} ->
+			case mosaic_cluster_processes:define_and_create (ProcessType, json, ProcessArgumentsContent, Count) of
+				{ok, Processes, []} ->
+					Keys = lists:map (fun ({Key, _Process}) -> Key end, Processes),
 					{ok, json_struct, [
 							{keys, lists:map (fun mosaic_webmachine:format_string_identifier/1, Keys)}]};
-				{ok, Keys, _Processes, Reasons} ->
+				{ok, Processes, Reasons} ->
+					Keys = lists:map (fun ({Key, _Process}) -> Key end, Processes),
 					{ok, json_struct, [
 							{keys, lists:map (fun mosaic_webmachine:format_string_identifier/1, Keys)},
 							{errors, lists:map (fun mosaic_webmachine:format_term/1, Reasons)}]};
@@ -143,7 +149,7 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			end;
 		{processes, stop} ->
 			Key = dict:fetch (key, Arguments),
-			case mosaic_executor:stop_process (Key) of
+			case mosaic_cluster_processes:stop (Key) of
 				ok ->
 					ok;
 				Error = {error, _Reason} ->
@@ -152,7 +158,7 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 		{processes, Action} when ((Action =:= call) orelse (Action =:= cast)) ->
 			Key = dict:fetch (key, Arguments),
 			CallArguments = dict:fetch (arguments, Arguments),
-			case mosaic_executor:resolve_process (Key) of
+			case mosaic_cluster_processes:resolve (Key) of
 				{ok, Process} ->
 					case Action of
 						call ->
@@ -177,11 +183,11 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			end;
 		{ping} ->
 			Count = dict:fetch (count, Arguments),
-			case mosaic_executor:ping (Count) of
+			case mosaic_cluster_processes:service_ping (Count) of
 				{ok, Pongs, Pangs} ->
 					{ok, json_struct, [
 							{pongs, lists:map (
-									fun ({pong, Key, {Partition, Node}}) ->
+									fun ({pong, Key, _Vnode, mosaic_cluster_processes, {Partition, Node}}) ->
 										{struct, [
 												{key, mosaic_webmachine:format_string_identifier (Key)},
 												{partition, mosaic_webmachine:format_integer_identifier (Partition)},
