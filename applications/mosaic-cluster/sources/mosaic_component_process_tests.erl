@@ -132,7 +132,7 @@ configure (Type, create, Identifier, term, defaults, ExtraOptions)
 				{executable, Python},
 				{arguments, [
 					<<"./applications/mosaic-cluster/sources/mosaic_component_harness_tester.py">>,
-					<<"simple-backend">>, Scenario, mosaic_webmachine:format_string_identifier (Identifier)]}]}
+					<<"backend">>, Scenario, mosaic_webmachine:format_string_identifier (Identifier)]}]}
 			| ExtraOptions],
 	case mosaic_component_process:parse_configuration (create, term, Options) of
 		{ok, Configuration} ->

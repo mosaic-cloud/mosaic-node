@@ -10,7 +10,7 @@ _trace_level = 2 # 1 -> debugging; 2 -> information; 3 -> warning; 4 -> error
 
 ## ----------------------------------------
 
-def _simple_backend_parrot (_identifier) :
+def _backend_parrot (_identifier) :
 	while True :
 		_packet = _input ()
 		if _packet is None :
@@ -29,7 +29,7 @@ def _simple_backend_parrot (_identifier) :
 	_output_close ()
 	_input_close ()
 
-def _simple_backend_abacus (_identifier) :
+def _backend_abacus (_identifier) :
 	while True :
 		_packet = _input ()
 		if _packet is None :
@@ -64,19 +64,19 @@ def _simple_backend_abacus (_identifier) :
 	_output_close ()
 	_input_close ()
 
-_simple_backend_scenarios = {
-		"parrot" : _simple_backend_parrot,
-		"abacus" : _simple_backend_abacus,
+_backend_scenarios = {
+		"parrot" : _backend_parrot,
+		"abacus" : _backend_abacus,
 }
 
 ## ----------------------------------------
 
-def _simple_frontend_test_python_parrot () :
+def _frontend_python_parrot () :
 	_output (({
 			"__type__" : "execute",
 			"executable" : sys.executable,
 			"argument0" : None,
-			"arguments" : [sys.argv[0], "simple-backend", "parrot", "identifier"],
+			"arguments" : [sys.argv[0], "backend", "parrot", "identifier"],
 			"environment" : None,
 			"working-directory" : None,
 	}, ""))
@@ -111,18 +111,18 @@ def _simple_frontend_test_python_parrot () :
 		raise Exception ()
 	_input_close ()
 
-def _simple_frontend_test_python_abacus () :
+def _frontend_python_abacus () :
 	_output (({
 			"__type__" : "execute",
 			"executable" : sys.executable,
 			"argument0" : None,
-			"arguments" : [sys.argv[0], "simple-backend", "abacus", "identifier"],
+			"arguments" : [sys.argv[0], "backend", "abacus", "identifier"],
 			"environment" : None,
 			"working-directory" : None,
 	}, ""))
-	__simple_frontend_test_abacus ()
+	__frontend_abacus ()
 
-def _simple_frontend_test_java_abacus () :
+def _frontend_java_abacus () :
 	_output (({
 			"__type__" : "execute",
 			"executable" : "/usr/bin/java",
@@ -135,9 +135,9 @@ def _simple_frontend_test_java_abacus () :
 			"environment" : None,
 			"working-directory" : None,
 	}, ""))
-	__simple_frontend_test_abacus ()
+	__frontend_abacus ()
 
-def __simple_frontend_test_abacus () :
+def __frontend_abacus () :
 	for i in xrange (0, 10) :
 		_output_message = {
 				"__type__" : "exchange",
@@ -172,7 +172,7 @@ def __simple_frontend_test_abacus () :
 		raise Exception ()
 	_input_close ()
 
-def _simple_frontend_test_execute_1 () :
+def _frontend_test_execute_1 () :
 	_output (({
 			"__type__" : "execute",
 			"executable" : "/bin/sleep",
@@ -197,7 +197,7 @@ def _simple_frontend_test_execute_1 () :
 	_output_close ()
 	_input_close ()
 
-def _simple_frontend_test_execute_2 () :
+def _frontend_test_execute_2 () :
 	_output (({
 			"__type__" : "execute",
 			"executable" : "/bin/sleep",
@@ -209,7 +209,7 @@ def _simple_frontend_test_execute_2 () :
 	_output_close ()
 	_input_close ()
 
-def _simple_frontend_test_exchange () :
+def _frontend_test_exchange () :
 	for i in xrange (0, 10) :
 		_output (({
 				"__type__" : "exchange",
@@ -219,12 +219,12 @@ def _simple_frontend_test_exchange () :
 	_output_close ()
 	_input_close ()
 
-def _simple_frontend_test_nodejs () :
+def _frontend_test_nodejs () :
 	_output (({
 			"__type__" : "execute",
 			"executable" : "/usr/bin/node",
-			"argument0" : "[mosaic_component_harness_subprocess]",
-			"arguments" : ["./applications/mosaic-cluster/sources/mosaic_component_backend.js"],
+			"argument0" : None,
+			"arguments" : ["./applications/mosaic-cluster/sources/mosaic_component_harness_backend.js"],
 			"environment" : None,
 			"working-directory" : None,
 	}, ""))
@@ -241,38 +241,38 @@ def _simple_frontend_test_nodejs () :
 	_output_close ()
 	_input_close ()
 
-_simple_frontend_scenarios = {
-		"execute-1" : _simple_frontend_test_execute_1,
-		"execute-2" : _simple_frontend_test_execute_2,
-		"exchange" : _simple_frontend_test_exchange,
-		"python-parrot" : _simple_frontend_test_python_parrot,
-		"python-abacus" : _simple_frontend_test_python_abacus,
-		"java-abacus" : _simple_frontend_test_java_abacus,
-		"nodejs" : _simple_frontend_test_nodejs,
+_frontend_scenarios = {
+		"python-parrot" : _frontend_python_parrot,
+		"python-abacus" : _frontend_python_abacus,
+		"java-abacus" : _frontend_java_abacus,
+		"test-execute-1" : _frontend_test_execute_1,
+		"test-execute-2" : _frontend_test_execute_2,
+		"test-exchange" : _frontend_test_exchange,
+		"test-nodejs" : _frontend_test_nodejs,
 }
 
 ## ----------------------------------------
 
-def _simple_backend (_scenario, _identifier) :
+def _backend (_scenario, _identifier) :
 	
 	global _input_stream
 	global _output_stream
 	
-	_trace_information ("executing simple backend scenario `%s`...", _scenario)
-	_scenario = _simple_backend_scenarios[_scenario]
+	_trace_information ("executing backend scenario `%s`...", _scenario)
+	_scenario = _backend_scenarios[_scenario]
 	
 	_input_stream = sys.stdin
 	_output_stream = sys.stdout
 	
 	_scenario (_identifier)
 
-def _simple_frontend (_scenario) :
+def _frontend (_scenario) :
 	
 	global _input_stream
 	global _output_stream
 	
-	_trace_information ("executing simple frontend scenario `%s`...", _scenario)
-	_scenario = _simple_frontend_scenarios[_scenario]
+	_trace_information ("executing frontend scenario `%s`...", _scenario)
+	_scenario = _frontend_scenarios[_scenario]
 	
 	_trace_debugging ("starting harness...")
 	if True :
@@ -363,17 +363,17 @@ def _main () :
 	if len (sys.argv) < 2 :
 		raise Exception ()
 	_behaviour = sys.argv[1]
-	if _behaviour == "simple-backend" :
+	if _behaviour == "backend" :
 		if len (sys.argv) != 4 :
 			raise Exception ()
 		_scenario = sys.argv[2]
 		_identifier = sys.argv[3]
-		_behaviour = lambda : _simple_backend (_scenario, _identifier)
-	elif _behaviour == "simple-frontend" :
+		_behaviour = lambda : _backend (_scenario, _identifier)
+	elif _behaviour == "frontend" :
 		if len (sys.argv) != 3 :
 			raise Exception ()
 		_scenario = sys.argv[2]
-		_behaviour = lambda : _simple_frontend (_scenario)
+		_behaviour = lambda : _frontend (_scenario)
 	else :
 		raise Exception ()
 	
