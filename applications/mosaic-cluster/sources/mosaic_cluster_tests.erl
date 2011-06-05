@@ -25,7 +25,7 @@ test () ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
 						{define_and_create_processes, dummy, term, defaults, 4}]};
-			{ok, create_pynton_abacus_4} ->
+			{ok, create_python_abacus_4} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
 						{define_and_create_processes, python_abacus, term, defaults, 4}]};

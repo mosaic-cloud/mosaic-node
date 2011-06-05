@@ -136,6 +136,12 @@ handle_info (
 			{noreply, State}
 	end;
 	
+handle_info (
+			{mosaic_component_harness, exit, HarnessToken, ExitCode},
+			State = #state{harness_token = HarnessToken})
+		when is_integer (ExitCode), (ExitCode >= 0) ->
+	{stop, if (ExitCode =:= 0) -> normal; true -> {failed, ExitCode} end, State};
+	
 handle_info ({Reference, Outcome}, State)
 		when is_reference (Reference) ->
 	handle_info ({outbound_return, Reference, Outcome}, State);
