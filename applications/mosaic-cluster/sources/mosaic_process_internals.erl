@@ -102,9 +102,9 @@ handle_call ({mosaic_process, call, Request, RequestData}, Sender, OldState = #s
 			{stop, Reason, Error, OldState#state{callback_state = NewCallbackState}}
 	end;
 	
-handle_call ({mosaic_process, begin_migration, Token, Arguments, Migrator}, _Sender, OldState)
+handle_call ({mosaic_process, begin_migration, Token, Configuration, Migrator}, _Sender, OldState)
 		when is_pid (Migrator) ->
-	case handle_begin_migration (Token, Arguments, Migrator, OldState) of
+	case handle_begin_migration (Token, Configuration, Migrator, OldState) of
 		{continue, Outcome = ok, NewState} ->
 			{reply, Outcome, NewState};
 		{continue, Error = {error, _Reason}, NewState} ->
@@ -175,22 +175,25 @@ handle_info (Message, OldState = #state{callback_module = CallbackModule, callba
 	end.
 
 
-handle_begin_migration (Token, Arguments, Migrator, OldState = #state{status = active, migration_state = none}) ->
+handle_begin_migration (Token, Configuration, Migrator, OldState = #state{status = active, migration_state = none}) ->
 	NewState = OldState#state{
 			status = migrating,
 			migration_state = #migration_state{role = source, status = waiting_begin, token = Token, migrator = none}},
-	handle_begin_migration (Token, Arguments, Migrator, NewState);
+	handle_begin_migration (Token, Configuration, Migrator, NewState);
 	
 handle_begin_migration (
-			Token, Arguments, Migrator,
+			Token, Configuration, Migrator,
 			OldState = #state{
 					status = migrating, callback_module = CallbackModule, callback_state = OldCallbackState,
 					migration_state = OldMigrationState = #migration_state{
 							role = Role, status = waiting_begin, token = Token, migrator = none}})
 		when (Role =:= source) or (Role =:= target) ->
 	Self = erlang:self (),
-	CompletionFunction = fun (Completion) -> Self ! {mosaic_process_internals, continue_migration, Token, Completion}, ok end,
-	case erlang:apply (CallbackModule, begin_migration, [Role, Arguments, CompletionFunction, OldCallbackState]) of
+	CompletionFunction = fun (Completion) ->
+			Self ! {mosaic_process_internals, continue_migration, Token, Completion},
+			ok
+	end,
+	case erlang:apply (CallbackModule, begin_migration, [Role, Configuration, CompletionFunction, OldCallbackState]) of
 		{continue, NewCallbackState} ->
 			Migrator ! {mosaic_process_migrator, 'begin', Token, succeeded},
 			NewMigrationStatus = case Role of source -> waiting_prepared; target -> waiting_completed end,
@@ -220,24 +223,24 @@ handle_begin_migration (
 	end;
 	
 handle_begin_migration (
-			Token, _Arguments, _Migrator,
+			Token, _Configuration, _Migrator,
 			State = #state{status = migrating, migration_state = #migration_state{token = OtherToken}})
 		when (Token =/= OtherToken) ->
 	% !!!!
 	{continue, {error, invalid_token}, State};
 	
-handle_begin_migration (_Token, _Arguments, _Migrator, State) ->
+handle_begin_migration (_Token, _Configuration, _Migrator, State) ->
 	% !!!!
 	{continue, {error, invalid_state}, State}.
 
 
 handle_continue_migration (
-			Token, {prepared, Data},
+			Token, {prepared, Configuration},
 			OldState = #state{
 					status = migrating,
 					migration_state = OldMigrationState = #migration_state{
 							role = source, status = waiting_prepared, token = Token, migrator = Migrator}}) ->
-	Migrator ! {mosaic_process_migrator, continue, Token, {prepared, Data}},
+	Migrator ! {mosaic_process_migrator, continue, Token, {prepared, Configuration}},
 	{continue, undefined, OldState#state{migration_state = OldMigrationState#migration_state{status = waiting_completed}}};
 	
 handle_continue_migration (
@@ -313,7 +316,13 @@ handle_rollback_migration (
 		when (Role =:= source) or (Role =:= target) ->
 	case erlang:apply (CallbackModule, rollback_migration, [OldCallbackState]) of
 		{continue, NewCallbackState} ->
-			Migrator ! {mosaic_process_migrator, rollback, Token, succeeded},
+			ok = if
+				(Migrator =/= none) ->
+					Migrator ! {mosaic_process_migrator, rollback, Token, succeeded},
+					ok;
+				true ->
+					ok
+			end,
 			case Role of
 				source ->
 					NewState = OldState#state{status = active, callback_state = NewCallbackState, migration_state = none},

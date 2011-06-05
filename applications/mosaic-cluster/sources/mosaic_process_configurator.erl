@@ -2,15 +2,16 @@
 -module (mosaic_process_configurator).
 
 
--export ([configure/4, configure/5, register/3, register/4, unregister/2, unregister/3]).
+-export ([configure/5, configure/6, register/3, register/4, unregister/2, unregister/3]).
 
 
-configure (Type, Identifier, ConfigurationEncoding, ConfigurationContent) ->
-	configure (mosaic_process_configurator, Type, Identifier, ConfigurationEncoding, ConfigurationContent).
+configure (Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent) ->
+	configure (mosaic_process_configurator, Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent).
 
-configure (Configurator, Type, Identifier, ConfigurationEncoding, ConfigurationContent)
-		when (is_pid (Configurator) orelse is_atom (Configurator)), is_atom (Type), is_atom (ConfigurationEncoding) ->
-	gen_server:call (Configurator, {mosaic_process_configurator, configure, Type, Identifier, ConfigurationEncoding, ConfigurationContent}).
+configure (Configurator, Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent)
+		when (is_pid (Configurator) orelse is_atom (Configurator)), is_atom (Type), is_atom (ConfigurationEncoding),
+				((Disposition =:= create) orelse (is_record (Disposition, migrate, 2) andalso ((element (2, Disposition) =:= source) orelse (element (2, Disposition) =:= target)))) ->
+	gen_server:call (Configurator, {mosaic_process_configurator, configure, Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent}).
 
 
 register (Type, ConfigurationEncoding, Function) ->

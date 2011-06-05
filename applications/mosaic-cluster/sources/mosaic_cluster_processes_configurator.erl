@@ -39,12 +39,13 @@ code_change (_OldVsn, State = #state{}, _Arguments) ->
 	{ok, State}.
 
 
-handle_call ({mosaic_process_configurator, configure, Type, Identifier, ConfigurationEncoding, ConfigurationContent}, _Sender, State = #state{})
-		when is_atom (Type), is_binary (Identifier), (bit_size (Identifier) =:= 160), is_atom (ConfigurationEncoding) ->
+handle_call ({mosaic_process_configurator, configure, Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent}, _Sender, State = #state{})
+		when is_atom (Type), is_binary (Identifier), (bit_size (Identifier) =:= 160), is_atom (ConfigurationEncoding),
+				((Disposition =:= create) orelse (is_record (Disposition, migrate, 2) andalso ((element (2, Disposition) =:= source) orelse (element (2, Disposition) =:= target)))) ->
 	{ok, FunctionKey} = mosaic_cluster_tools:key ({mosaic_cluster_processes, configurator, Type, ConfigurationEncoding}),
 	case mosaic_cluster_storage:select (FunctionKey) of
-		{ok, undefined, {mosaic_cluster_processes, configurator, Type, ConfigurationEncoding, Function}} when is_function (Function, 4) ->
-			try erlang:apply (Function, [Type, Identifier, ConfigurationEncoding, ConfigurationContent]) of
+		{ok, undefined, {mosaic_cluster_processes, configurator, Type, ConfigurationEncoding, Function}} when is_function (Function, 5) ->
+			try erlang:apply (Function, [Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent]) of
 				Outcome = {ok, Module, _Configuration} when is_atom (Module) ->
 					{reply, Outcome, State};
 				Error = {error, _Reason} ->
@@ -70,12 +71,11 @@ handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding
 		when is_atom (Type), is_atom (ConfigurationEncoding), is_atom (Module), is_atom (Function) ->
 	_ = code:ensure_loaded (Module),
 	ModuleLoaded = erlang:module_loaded (Module),
-	FunctionExported = erlang:function_exported (Module, Function, 5),
+	FunctionExported = erlang:function_exported (Module, Function, 6),
 	if
 		ModuleLoaded, FunctionExported ->
-			Function_ = fun (Type_, Identifier_, ConfigurationEncoding_, ConfigurationContent_)
-					when (Type_ =:= Type), (ConfigurationEncoding_ =:= ConfigurationEncoding) ->
-				erlang:apply (Module, Function, [Type_, Identifier_, ConfigurationEncoding_, ConfigurationContent_, FunctionExtraArguments])
+			Function_ = fun (Type_, Disposition_, Identifier_, ConfigurationEncoding_, ConfigurationContent_) ->
+				erlang:apply (Module, Function, [Type_, Disposition_, Identifier_, ConfigurationEncoding_, ConfigurationContent_, FunctionExtraArguments])
 			end,
 			handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding, Function_}, Sender, State);
 		not ModuleLoaded ->
@@ -86,7 +86,7 @@ handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding
 	
 handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding, Function}, _Sender, State = #state{})
 		when is_atom (Type), is_atom (ConfigurationEncoding), is_function (Function) ->
-	FunctionValid = erlang:is_function (Function, 4),
+	FunctionValid = erlang:is_function (Function, 5),
 	if
 		FunctionValid ->
 			{ok, FunctionKey} = mosaic_cluster_tools:key ({mosaic_cluster_processes, configurator, Type, ConfigurationEncoding}),

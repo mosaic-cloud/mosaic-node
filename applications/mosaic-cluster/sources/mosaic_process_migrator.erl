@@ -103,13 +103,13 @@ source_begin_succeeded_waiting ({mosaic_process_migrator, 'begin', SourceToken, 
 	{next_state, source_prepared_waiting, StateData}.
 
 
-source_prepared_waiting ({mosaic_process_migrator, continue, SourceToken, {prepared, Data}}, StateData = #state{source_token = SourceToken}) ->
-	ok = send_event ({mosaic_process_migrator_internals, target_begin, Data}),
+source_prepared_waiting ({mosaic_process_migrator, continue, SourceToken, {prepared, Configuration}}, StateData = #state{source_token = SourceToken}) ->
+	ok = send_event ({mosaic_process_migrator_internals, target_begin, Configuration}),
 	{next_state, target_begin_waiting, StateData}.
 
 
-target_begin_waiting ({mosaic_process_migrator_internals, target_begin, Data}, StateData = #state{target = Target, target_token = TargetToken}) ->
-	case mosaic_process:begin_migration (Target, TargetToken, Data, erlang:self ()) of
+target_begin_waiting ({mosaic_process_migrator_internals, target_begin, Configuration}, StateData = #state{target = Target, target_token = TargetToken}) ->
+	case mosaic_process:begin_migration (Target, TargetToken, Configuration, erlang:self ()) of
 		ok ->
 			{next_state, target_begin_succeeded_waiting, StateData};
 		{error, Reason} ->
@@ -199,7 +199,7 @@ handle_info (Message, StateName, StateData = #state{source_token = SourceToken, 
 			send_event;
 		{mosaic_process_migrator, 'begin', TargetToken, failed, _Reason} ->
 			send_event;
-		{mosaic_process_migrator, continue, SourceToken, {prepared, _Data}} ->
+		{mosaic_process_migrator, continue, SourceToken, {prepared, _Configuration}} ->
 			send_event;
 		{mosaic_process_migrator, continue, SourceToken, completed} ->
 			send_event;

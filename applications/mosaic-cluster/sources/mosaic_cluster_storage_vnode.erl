@@ -133,7 +133,7 @@ handle_handoff_command ({mosaic_cluster_storage, handoff_request, Vnode, Referen
 			Vnode ! {mosaic_cluster_storage, handoff_request, Reference, succeeded},
 			{reply, ok, State};
 		Error = {error, Reason} ->
-					ok = mosaic_tools:trace_information ("failed object handoff as source; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
+					ok = mosaic_tools:trace_error ("failed object handoff as source; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
 			Vnode ! {mosaic_cluster_storage, handoff_request, Reference, failed, Reason},
 			{reply, Error, State}
 	end;
@@ -160,7 +160,7 @@ handle_handoff_data (DataBinary, State = #state{object_store = ObjectStore}) ->
 					ok = mosaic_tools:trace_information ("succeeded object handoff as target;", [{vnode, Vnode}, {key, Key}]),
 					{reply, ok, State};
 				{mosaic_cluster_storage, handoff_request, Reference, failed, Reason} ->
-					ok = mosaic_tools:trace_information ("failed object handoff as target; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
+					ok = mosaic_tools:trace_error ("failed object handoff as target; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
 					{reply, {error, Reason}, State}
 			end;
 		Error = {error, Reason} ->

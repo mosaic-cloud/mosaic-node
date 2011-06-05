@@ -22,7 +22,7 @@ init (Disposition, Identifier, OriginalConfiguration)
 	try
 		case parse_configuration (Disposition, term, OriginalConfiguration) of
 			{ok, #configuration{harness = HarnessConfiguration, execute = ExecuteSpecification, router = Router}} ->
-				Status = if (Disposition =:= create) -> executing; (Disposition =:= migrate) -> pre_migrate_as_target end,
+				Status = if (Disposition =:= create) -> executing; (Disposition =:= migrate) -> pre_migrating_as_target end,
 				init (prepare, Identifier, {Status, HarnessConfiguration, ExecuteSpecification, Router});
 			Error1 = {error, _Reason1} ->
 				throw (Error1)
@@ -32,19 +32,18 @@ init (Disposition, Identifier, OriginalConfiguration)
 			{stop, Reason}
 	end;
 	
-init (prepare, Identifier, {Status, defaults, ExecuteSpecification, Router}) ->
+init (prepare, Identifier, {Status, HarnessConfiguration, ExecuteSpecification, Router}) ->
 	true = erlang:process_flag (trap_exit, true),
 	try
 		HarnessToken = erlang:make_ref (),
-		HarnessConfiguration = [{controller, erlang:self ()}, {controller_token, HarnessToken}],
-		{ok, Harness} = case mosaic_component_harness:start_link (HarnessConfiguration) of
+		{ok, Harness} = case mosaic_component_harness:start_link ([{controller, erlang:self ()}, {controller_token, HarnessToken} | HarnessConfiguration]) of
 			Outcome = {ok, _Harness} ->
 				Outcome;
 			Error1 = {error, _Reason1} ->
 				throw (Error1)
 		end,
 		ok = if
-			(ExecuteSpecification =/= none) ->
+			(ExecuteSpecification =/= migrate) ->
 				ok = case mosaic_component_harness:execute (Harness, ExecuteSpecification) of
 					ok ->
 						ok;
@@ -308,34 +307,35 @@ handle_info (Message, State) ->
 	{noreply, State}.
 
 
-begin_migration (source, Arguments, CompletionFun, OldState = #state{status = executing, execute = ExecuteSpecification}) ->
-	case Arguments of
+begin_migration (source, OriginalConfiguration, CompletionFun, OldState = #state{status = executing, execute = ExecuteSpecification}) ->
+	case OriginalConfiguration of
 		defaults ->
 			NewState = OldState#state{status = migrating_as_source},
-			ok = CompletionFun ({prepared, [{execute, ExecuteSpecification}]}),
+			Configuration = [{execute, ExecuteSpecification}],
+			ok = CompletionFun ({prepared, Configuration}),
 			ok = CompletionFun (completed),
 			{continue, NewState};
 		_ ->
-			{reject, {invalid_arguments, Arguments}, OldState}
+			{reject, {invalid_configuration, OriginalConfiguration}, OldState}
 	end;
 	
-begin_migration (target, Arguments, CompletionFun, OldState = #state{status = pre_migrating_as_target}) ->
+begin_migration (target, OriginalConfiguration, CompletionFun, OldState = #state{status = pre_migrating_as_target}) ->
 	try
-		{ok, OriginalExecuteSpecification} = case Arguments of
+		{ok, OriginalExecuteSpecification} = case OriginalConfiguration of
 			[{execute, OriginalExecuteSpecification_}] ->
 				{ok, OriginalExecuteSpecification_};
 			_ ->
-				throw ({invalid_arguments, Arguments})
+				throw ({invalid_configuration, OriginalConfiguration})
 		end,
-		{ok, ExecuteSpecification} = case mosaic_component_harness:validate_execute_specification (OriginalExecuteSpecification) of
-			{ok, execute = ExecuteSpecification_} ->
+		{ok, ExecuteSpecification} = case mosaic_component_harness:parse_execute_specification (OriginalExecuteSpecification) of
+			{ok, ExecuteSpecification_} ->
 				{ok, ExecuteSpecification_};
 			Error1 = {error, _Reason1} ->
 				throw (Error1)
 		end,
 		ok = CompletionFun (completed),
 		NewState = OldState#state{status = migrating_as_target, execute = ExecuteSpecification},
-		{ok, NewState}
+		{continue, NewState}
 	catch
 		throw : {error, Reason} ->
 			{reject, Reason, OldState#state{status = migration_failed}}
@@ -353,7 +353,7 @@ commit_migration (OldState = #state{status = migrating_as_source, harness = Harn
 commit_migration (OldState = #state{status = migrating_as_target, harness = Harness, execute = ExecuteSpecification}) ->
 	case mosaic_component_harness:execute (Harness, ExecuteSpecification) of
 		ok ->
-			{continue, OldState};
+			{continue, OldState#state{status = executing}};
 		{error, Reason} ->
 			{terminate, Reason, OldState#state{status = migrating_as_target_failed}}
 	end.
@@ -362,7 +362,7 @@ commit_migration (OldState = #state{status = migrating_as_target, harness = Harn
 rollback_migration (OldState = #state{status = migrating_as_source}) ->
 	{continue, OldState#state{status = executing}};
 	
-rollback_migration (OldState = #state{status = Status}) when (Status =:= pre_migrating_as_target) or (Status =:= migrating_as_target) ->
+rollback_migration (OldState = #state{status = Status}) when (Status =:= pre_migrating_as_target) orelse (Status =:= migrating_as_target) ->
 	{continue, OldState#state{status = migrating_as_target_failed}}.
 
 
@@ -372,7 +372,7 @@ validate_configuration (
 		when ((Disposition =:= create) orelse (Disposition =:= migrate)) ->
 	try
 		ok = if
-			(HarnessConfiguration =:= defaults) ->
+			is_list (HarnessConfiguration) ->
 				ok;
 			true ->
 				throw ({error, {invalid_harness, HarnessConfiguration}})
@@ -412,7 +412,7 @@ validate_configuration (Disposition, _Configuration) ->
 
 parse_configuration (Disposition, term, OriginalOptions)
 		when ((Disposition =:= create) orelse (Disposition =:= migrate)), is_list (OriginalOptions) ->
-	DefaultOptions = [{harness, defaults}, {execute, undefined}, {router, undefined}],
+	DefaultOptions = [{harness, defaults}, {execute, undefined}, {router, defaults}],
 	FinalOptions = OriginalOptions ++ DefaultOptions,
 	case lists:sort (proplists:get_keys (FinalOptions)) of
 		[execute, harness, router] ->
@@ -421,7 +421,9 @@ parse_configuration (Disposition, term, OriginalOptions)
 					undefined ->
 						throw ({error, missing_harness});
 					defaults ->
-						{ok, defaults};
+						{ok, []};
+					HarnessConfiguration_ when is_list (HarnessConfiguration_) ->
+						{ok, HarnessConfiguration_};
 					HarnessConfiguration_ ->
 						throw ({error, {invalid_harness, HarnessConfiguration_}})
 				end,
@@ -434,8 +436,8 @@ parse_configuration (Disposition, term, OriginalOptions)
 						case mosaic_component_harness:parse_execute_specification (ExecuteSpecification__) of
 							{ok, ExecuteSpecification_} ->
 								{ok, ExecuteSpecification_};
-							Error1 = {error, _Reason1} ->
-								throw (Error1)
+							{error, Reason1} ->
+								throw ({error, {invalid_execute, Reason1}})
 						end;
 					ExecuteSpecification__ when (Disposition =:= migrate) ->
 						throw ({error, {unexpected_execute, ExecuteSpecification__}})
@@ -443,6 +445,8 @@ parse_configuration (Disposition, term, OriginalOptions)
 				{ok, Router} = case proplists:get_value (router, FinalOptions) of
 					Router_ when (is_pid (Router_) orelse is_atom (Router_)) ->
 						{ok, Router_};
+					defaults ->
+						{ok, mosaic_process_router};
 					undefined ->
 						throw ({error, missing_router});
 					Router_ ->

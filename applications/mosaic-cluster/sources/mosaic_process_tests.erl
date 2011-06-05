@@ -16,7 +16,7 @@
 		wait_process/1, wait_process/2,
 		call_process/2, call_process/3,
 		cast_process/2, cast_process/3]).
--export ([configure/5]).
+-export ([configure/6]).
 
 
 -test ({test_start_stop, [[{stop_method, stop}, {stop_signal, normal}]]}).
@@ -244,20 +244,26 @@ test () ->
 	mosaic_tests:test_module (mosaic_process_tests).
 
 
-configure (dummy, Identifier, term, defaults, void) ->
+configure (dummy, create, Identifier, term, defaults, defaults) ->
 	Configuration = {
 			{spawn_executable, <<"./.outputs/gcc/applications-elf/mosaic_dummy_process.elf">>},
 			[{arg0, <<"[mosaic_dummy_process#", (mosaic_webmachine:format_string_identifier (Identifier)) / binary, "]">>}]},
 	{ok, mosaic_port_process, Configuration};
 	
-configure (dummy, _Identifier, term, Configuration, void) ->
+configure (dummy, {migrate, source}, _Identifier, term, defaults, defaults) ->
+	{ok, none, defaults};
+	
+configure (dummy, {migrate, target}, _Identifier, term, defaults, defaults) ->
+	{ok, mosaic_port_process, defaults};
+	
+configure (dummy, _Disposition, _Identifier, term, Configuration, defaults) ->
 	{error, {invalid_configuration, Configuration}};
 	
-configure (dummy, Identifier, json, null, void) ->
-	configure (dummy, Identifier, term, defaults, void);
+configure (dummy, Disposition, Identifier, json, null, defaults) ->
+	configure (dummy, Disposition, Identifier, term, defaults, defaults);
 	
-configure (dummy, Identifier, json, {struct, []}, void) ->
-	configure (dummy, Identifier, term, defaults, void);
+configure (dummy, Disposition, Identifier, json, {struct, []}, defaults) ->
+	configure (dummy, Disposition, Identifier, term, defaults, defaults);
 	
-configure (dummy, _Identifier, json, Configuration, void) ->
+configure (dummy, _Disposition, _Identifier, json, Configuration, defaults) ->
 	{error, {invalid_configuration, Configuration}}.

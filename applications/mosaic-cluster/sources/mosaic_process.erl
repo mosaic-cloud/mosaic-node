@@ -94,10 +94,10 @@ cast (Process, Request, RequestData)
 	end.
 
 
-begin_migration (Process, Token, Arguments, Monitor)
+begin_migration (Process, Token, Configuration, Monitor)
 		when is_pid (Process), is_pid (Monitor) ->
 	try
-		case gen_server:call (Process, {mosaic_process, begin_migration, Token, Arguments, Monitor}, infinity) of
+		case gen_server:call (Process, {mosaic_process, begin_migration, Token, Configuration, Monitor}, infinity) of
 			Outcome = ok ->
 				Outcome;
 			Error = {error, _Reason} ->
