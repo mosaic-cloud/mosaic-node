@@ -137,6 +137,17 @@ def _frontend_java_abacus () :
 	}, ""))
 	__frontend_abacus ()
 
+def _frontend_node_abacus () :
+	_output (({
+			"__type__" : "execute",
+			"executable" : "/usr/bin/node",
+			"argument0" : None,
+			"arguments" : ["./applications/mosaic-cluster/sources/mosaic_component_harness_backend.js"],
+			"environment" : None,
+			"working-directory" : None,
+	}, ""))
+	__frontend_abacus ()
+
 def __frontend_abacus () :
 	for i in xrange (0, 10) :
 		_output_message = {
@@ -177,23 +188,22 @@ def _frontend_test_execute_1 () :
 			"__type__" : "execute",
 			"executable" : "/bin/sleep",
 			"argument0" : None,
-			"arguments" : ["60"],
+			"arguments" : ["60s"],
 			"environment" : None,
 			"working-directory" : None,
 	}, ""))
 	_sleep (0.1)
-	for i in xrange (0, 10) :
-		_output (({
-				"__type__" : "exchange",
-				"index" : i,
-		}, ""))
-		_sleep (0.1)
 	_output (({
 			"__type__" : "signal",
 			"signal" : "terminate",
 	}, ""))
 	_sleep (0.1)
-	_packet = _input ()
+	_input_packet = _input ()
+	if _input_packet is None :
+		raise Exception ()
+	_input_message, _input_payload = _input_packet
+	if _input_message["__type__"] != "exit" :
+		raise Exception ()
 	_output_close ()
 	_input_close ()
 
@@ -202,10 +212,35 @@ def _frontend_test_execute_2 () :
 			"__type__" : "execute",
 			"executable" : "/bin/sleep",
 			"argument0" : None,
-			"arguments" : ["60"],
+			"arguments" : ["60s"],
 			"environment" : None,
 			"working-directory" : None,
 	}, ""))
+	_output_close ()
+	_input_close ()
+
+def _frontend_test_execute_3 () :
+	for i in xrange (0, 10) :
+		_output (({
+				"__type__" : "execute",
+				"executable" : "/bin/sleep",
+				"argument0" : None,
+				"arguments" : ["60s"],
+				"environment" : None,
+				"working-directory" : None,
+		}, ""))
+		_sleep (0.1)
+		_output (({
+				"__type__" : "signal",
+				"signal" : "terminate",
+		}, ""))
+		_sleep (0.1)
+		_input_packet = _input ()
+		if _input_packet is None :
+			raise Exception ()
+		_input_message, _input_payload = _input_packet
+		if _input_message["__type__"] != "exit" :
+			raise Exception ()
 	_output_close ()
 	_input_close ()
 
@@ -245,8 +280,10 @@ _frontend_scenarios = {
 		"python-parrot" : _frontend_python_parrot,
 		"python-abacus" : _frontend_python_abacus,
 		"java-abacus" : _frontend_java_abacus,
+		"node-abacus" : _frontend_node_abacus,
 		"test-execute-1" : _frontend_test_execute_1,
 		"test-execute-2" : _frontend_test_execute_2,
+		"test-execute-3" : _frontend_test_execute_3,
 		"test-exchange" : _frontend_test_exchange,
 		"test-nodejs" : _frontend_test_nodejs,
 }
