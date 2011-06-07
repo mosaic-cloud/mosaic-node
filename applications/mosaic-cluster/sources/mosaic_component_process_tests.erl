@@ -17,14 +17,14 @@
 -import (mosaic_process_migrator_tests, [start_link_process_migrator/6, wait_process_migrator/1]).
 
 
-%-test ({test_start_stop, [{defaults}]}).
-%-test ({test_call, [{defaults}]}).
-%-test ({test_cast, [{defaults}]}).
-%-test ({test_migrate, [{defaults}]}).
-%-test ({test_abacus, [{python}]}).
-%-test ({test_abacus, [{java}]}).
-%-test ({test_abacus, [{node}]}).
--test ({test_rabbitmq, [{defaults}]}).
+-test ({test_start_stop, [{defaults}]}).
+-test ({test_call, [{defaults}]}).
+-test ({test_cast, [{defaults}]}).
+-test ({test_migrate, [{defaults}]}).
+-test ({test_abacus, [{python}]}).
+-test ({test_abacus, [{java}]}).
+-test ({test_abacus, [{node}]}).
+%-test ({test_rabbitmq, [{defaults}]}).
 
 
 test_start_stop ({defaults}) ->
@@ -103,10 +103,12 @@ test_abacus ({Flavour}) ->
 test_rabbitmq ({defaults}) ->
 	{ok, Identifier} = mosaic_cluster_tools:key (),
 	{ok, Configuration} = configure (rabbitmq, create, Identifier),
+	{ok, Router} = mosaic_cluster_processes_router:start_link ({local, mosaic_process_router}, defaults),
 	{ok, Resources} = mosaic_cluster_resources:start_link ({local, mosaic_component_resources}, defaults),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
 	ok = timer:sleep (6 * 1000),
 	ok = stop_and_wait_process (Process),
+	true = erlang:exit (Router, normal),
 	true = erlang:exit (Resources, normal),
 	ok.
 

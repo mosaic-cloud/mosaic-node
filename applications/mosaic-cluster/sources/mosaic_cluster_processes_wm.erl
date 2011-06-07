@@ -158,28 +158,23 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 		{processes, Action} when ((Action =:= call) orelse (Action =:= cast)) ->
 			Key = dict:fetch (key, Arguments),
 			CallArguments = dict:fetch (arguments, Arguments),
-			case mosaic_cluster_processes:resolve (Key) of
-				{ok, Process} ->
-					case Action of
-						call ->
-							case mosaic_process:call (Process, CallArguments, <<>>) of
-								{ok, {struct, ReplyAttributes}, _ReplyData} ->
-									{ok, json_struct, ReplyAttributes};
-								{ok, Reply, _ReplyData} ->
-									{error, {invalid_reply, Reply}};
-								Error = {error, _Reason} ->
-									Error
-							end;
-						cast ->
-							case mosaic_process:cast (Process, CallArguments, <<>>) of
-								ok ->
-									ok;
-								Error = {error, _Reason} ->
-									Error
-							end
+			case Action of
+				call ->
+					case mosaic_process_router:call (Key, CallArguments, <<>>, undefined) of
+						{ok, {struct, ReplyAttributes}, _ReplyData} ->
+							{ok, json_struct, ReplyAttributes};
+						{ok, Reply, _ReplyData} ->
+							{error, {invalid_reply, Reply}};
+						Error = {error, _Reason} ->
+							Error
 					end;
-				Error = {error, _Reason} ->
-					Error
+				cast ->
+					case mosaic_process_router:cast (Key, CallArguments, <<>>) of
+						ok ->
+							ok;
+						Error = {error, _Reason} ->
+							Error
+					end
 			end;
 		{ping} ->
 			Count = dict:fetch (count, Arguments),

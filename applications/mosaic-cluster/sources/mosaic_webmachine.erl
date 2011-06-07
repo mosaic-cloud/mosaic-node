@@ -427,6 +427,15 @@ format_term_1 (Object) ->
 	["binary_to_term(", format_term_1 (erlang:term_to_binary (Object)), ")"].
 
 
+coerce_json (true) ->
+	{ok, true};
+	
+coerce_json (false) ->
+	{ok, false};
+	
+coerce_json (null) ->
+	{ok, null};
+	
 coerce_json (Integer)
 		when is_integer (Integer) ->
 	{ok, Integer};

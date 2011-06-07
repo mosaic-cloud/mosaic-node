@@ -2,7 +2,7 @@
 -module (mosaic_cluster_storage).
 
 
--export ([select/1, include/3, exclude/2, update/4, list/0]).
+-export ([select/1, include/3, exclude/2, update/2, update/4, list/0]).
 -export ([service_nodes/0, service_activate/0, service_deactivate/0, service_ping/0, service_ping/1]).
 
 
@@ -88,6 +88,31 @@ update (Key, OldRevision, NewRevision, NewData)
 		when is_binary (Key), (bit_size (Key) =:= 160) ->
 	Outcome = mosaic_cluster_tools:service_request_reply_sync_command (
 			fun (Key_) -> {mosaic_cluster_storage, update, Key_, OldRevision, NewRevision, NewData} end,
+			fun (Key_, _Request, Reply) ->
+				case Reply of
+					ok ->
+						{outcome, Key_};
+					Error = {error, _Reason} ->
+						Error;
+					_ ->
+						{error, {invalid_reply, Reply}}
+				end
+			end,
+			[Key], mosaic_cluster_storage, mosaic_cluster_storage_vnode, 1),
+	case Outcome of
+		{ok, [Key], []} ->
+			ok;
+		{ok, [], [{_Target, Key, Reason}]} ->
+			{error, Reason};
+		{ok, [], []} ->
+			{error, unreachable_vnode}
+	end.
+
+
+update (Key, Mutator)
+		when is_binary (Key), (bit_size (Key) =:= 160), is_function (Mutator, 1) ->
+	Outcome = mosaic_cluster_tools:service_request_reply_sync_command (
+			fun (Key_) -> {mosaic_cluster_storage, update, Key_, Mutator} end,
 			fun (Key_, _Request, Reply) ->
 				case Reply of
 					ok ->

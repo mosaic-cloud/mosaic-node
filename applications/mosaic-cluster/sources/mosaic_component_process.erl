@@ -98,15 +98,6 @@ handle_info (
 		when is_list (MetaData), is_binary (Data),
 				((Status =:= executing) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
 	case lists:sort (MetaData) of
-		[{<<"action">>, <<"return">>}, {<<"correlation">>, Correlation_}, {<<"meta-data">>, Reply}]
-				when is_binary (Correlation_) ->
-			case mosaic_webmachine:parse_string_identifier (Correlation_) of
-				{ok, Correlation} ->
-					handle_info ({mosaic_component_process_internals, inbound_return, Correlation, {ok, Reply, Data}}, State);
-				{error, Reason} ->
-					ok = mosaic_tools:trace_error ("received invalid inbound call return: invalid correlation identifier; ignoring!", [{correlation, Correlation_}, {reason, Reason}]),
-					{noreply, State}
-			end;
 		[{<<"action">>, <<"call">>}, {<<"component">>, Component_}, {<<"correlation">>, Correlation_}, {<<"meta-data">>, Request}]
 				when is_binary (Component_), is_binary (Correlation_) ->
 			case mosaic_webmachine:parse_string_identifier (Component_) of
@@ -129,6 +120,37 @@ handle_info (
 					handle_info ({mosaic_component_process_internals, outbound_cast, Component, Request, Data}, State);
 				{error, Reason} ->
 					ok = mosaic_tools:trace_error ("received invalid outbound cast request: invalid component identifier; ignoring!", [{component, Component_}, {reason, Reason}]),
+					{noreply, State}
+			end;
+		[{<<"action">>, <<"return">>}, {<<"correlation">>, Correlation_}, {<<"meta-data">>, Reply}]
+				when is_binary (Correlation_) ->
+			case mosaic_webmachine:parse_string_identifier (Correlation_) of
+				{ok, Correlation} ->
+					handle_info ({mosaic_component_process_internals, inbound_return, Correlation, {ok, Reply, Data}}, State);
+				{error, Reason} ->
+					ok = mosaic_tools:trace_error ("received invalid inbound call return: invalid correlation identifier; ignoring!", [{correlation, Correlation_}, {reason, Reason}]),
+					{noreply, State}
+			end;
+		[{<<"action">>, <<"register">>}, {<<"correlation">>, Correlation__}, {<<"group">>, Group__}]
+				when is_binary (Correlation__), is_binary (Group__) ->
+			try
+				{ok, Correlation} = case mosaic_webmachine:parse_string_identifier (Correlation__) of
+					{ok, Correlation_} ->
+						{ok, Correlation_};
+					{error, Reason1} ->
+						ok = mosaic_tools:trace_error ("received invalid register: invalid correlation identifier; ignoring!", [{correlation, Correlation__}, {reason, Reason1}]),
+						throw (noreply)
+				end,
+				{ok, Group} = case mosaic_webmachine:parse_string_identifier (Group__) of
+					{ok, Group_} ->
+						{ok, Group_};
+					{error, Reason2} ->
+						ok = mosaic_tools:trace_error ("received invalid register: invalid group identifier; ignoring!", [{grop, Group__}, {reason, Reason2}]),
+						throw (noreply)
+				end,
+				handle_info ({mosaic_component_process_internals, inbound_register, Correlation, Group}, State)
+			catch
+				throw : noreply ->
 					{noreply, State}
 			end;
 		_ ->
@@ -307,6 +329,30 @@ handle_info (
 		when is_binary (Component), (bit_size (Component) =:= 160), is_binary (RequestData) ->
 	ok = mosaic_tools:trace_error ("received unexpected outbound cast request; ignoring!", [{component, Component}, {request, Request}, {request_data, RequestData}, {status, Status}]),
 	{noreply, State};
+	
+handle_info (
+			{mosaic_component_process_internals, inbound_register, Correlation, Group},
+			State = #state{status = Status, harness = Harness})
+		when is_binary (Correlation), (bit_size (Correlation) =:= 160), is_binary (Group), (bit_size (Group) =:= 160),
+				((Status =:= executing) orelse (Status =:= migrating_as_target)) ->
+	case mosaic_process_router:register (Group, erlang:self ()) of
+		ok ->
+			case mosaic_component_harness:exchange (Harness, {[{<<"action">>, <<"register-return">>}, {<<"correlation">>, mosaic_webmachine:format_string_identifier (Correlation)}, {<<"ok">>, true}], <<>>}) of
+				ok ->
+					{noreply, State};
+				_Error = {error, _Reason} ->
+					% !!!!
+					{noreply, State}
+			end;
+		_Error = {error, Reason} ->
+			case mosaic_component_harness:exchange (Harness, {[{<<"action">>, <<"register-return">>}, {<<"correlation">>, mosaic_webmachine:format_string_identifier (Correlation)}, {<<"ok">>, false}, {<<"error">>, mosaic_webmachine:format_term (Reason)}], <<>>}) of
+				ok ->
+					{noreply, State};
+				_Error = {error, _Reason} ->
+					% !!!!
+					{noreply, State}
+			end
+	end;
 	
 handle_info (Message, State) ->
 	ok = mosaic_tools:trace_error ("received invalid message; ignoring!", [{message, Message}]),

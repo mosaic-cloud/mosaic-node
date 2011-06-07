@@ -7,7 +7,7 @@
 -export ([start/0, start/1, start/2, start_link/0, start_link/1, start_link/2]).
 -export ([start_supervised/1, start_supervised/2]).
 -export ([stop/1, stop/2]).
--export ([select/2, include/4, exclude/3, update/5, fold/3, count/1]).
+-export ([select/2, include/4, exclude/3, update/3, update/5, fold/3, count/1]).
 -export ([migrate/3]).
 -export ([init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2, handle_info/2]).
 
@@ -65,6 +65,11 @@ exclude (Store, Key, Revision)
 update (Store, Key, OldRevision, NewRevision, NewData)
 		when (is_pid (Store) orelse is_atom (Store)) ->
 	gen_server:call (Store, {mosaic_object_store, update, Key, OldRevision, NewRevision, NewData}).
+
+
+update (Store, Key, Mutator)
+		when (is_pid (Store) orelse is_atom (Store)), is_function (Mutator, 1) ->
+	gen_server:call (Store, {mosaic_object_store, update, Key, Mutator}).
 
 
 fold (Store, Fun, InputAcc)
@@ -138,6 +143,31 @@ handle_call ({mosaic_object_store, update, Key, OldRevision, NewRevision, NewDat
 			{reply, {error, {mismatched_revision, OtherOldRevision}}, State};
 		[] ->
 			{reply, {error, does_not_exist}, State}
+	end;
+	
+handle_call ({mosaic_object_store, update, Key, Mutator}, _Sender, State = #state{table = Table})
+		when is_function (Mutator, 1) ->
+	{ok, OldRecord} = case ets:lookup (Table, Key) of
+		[OldRecord_ = {Key, _OldRevision, _OldData}] ->
+			{ok, OldRecord_};
+		[] ->
+			{ok, {Key}}
+	end,
+	try Mutator (OldRecord) of
+		{ok, NewRevision, NewData} ->
+			true = ets:insert (Table, {Key, NewRevision, NewData}),
+			{reply, ok, State};
+		Error = {error, _Reason} ->
+			{reply, Error, State};
+		Outcome ->
+			{reply, {error, {invalid_outcome, Outcome}}, State}
+	catch
+		throw : Reason ->
+			{reply, {error, {unexpected_error, Reason}}, State};
+		error : Reason ->
+			{reply, {error, {unexpected_error, Reason}}, State};
+		exit : Reason ->
+			{reply, {error, {unexpected_error, Reason}}, State}
 	end;
 	
 handle_call ({mosaic_object_store, exclude, Key, Revision}, _Sender, State = #state{table = Table}) ->

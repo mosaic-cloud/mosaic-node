@@ -93,6 +93,15 @@ handle_command ({mosaic_cluster_storage, update, Key, OldRevision, NewRevision, 
 			{reply, Error, State}
 	end;
 	
+handle_command ({mosaic_cluster_storage, update, Key, Mutator}, _Sender, State = #state{object_store = ObjectStore})
+		when is_binary (Key), (bit_size (Key) =:= 160), is_function (Mutator, 1) ->
+	case mosaic_object_store:update (ObjectStore, Key, Mutator) of
+		ok ->
+			{reply, ok, State};
+		Error = {error, _Reason} ->
+			{reply, Error, State}
+	end;
+	
 handle_command ({mosaic_cluster, list}, _Sender, State = #state{object_store = ObjectStore}) ->
 	{ok, Keys} = mosaic_object_store:fold (ObjectStore,
 			fun ({Key, _Revision, _Data}, Keys) ->

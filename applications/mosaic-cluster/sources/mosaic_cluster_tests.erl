@@ -37,6 +37,10 @@ test () ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
 						{define_and_create_processes, node_abacus, term, defaults, 4}]};
+			{ok, create_rabbitmq} ->
+				{ok, defaults, [
+						{boot}, {activate}, {ping, default}, {initialize},
+						{define_and_create_processes, rabbitmq, term, defaults, 1}]};
 			{ok, ring_join_leave} ->
 				Self = erlang:node (),
 				case application:get_env (mosaic_cluster, tests_nodes) of
