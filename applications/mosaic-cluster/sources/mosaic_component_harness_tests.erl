@@ -21,7 +21,7 @@
 test_start_stop ({defaults}) ->
 	Self = erlang:self (),
 	SelfToken = erlang:make_ref (),
-	{ok, Harness} = mosaic_component_harness:start_link ([{controller, Self}, {controller_token, SelfToken}]),
+	{ok, Harness} = mosaic_component_harness:start_link ([{identifier, <<0:160>>}, {controller, Self}, {controller_token, SelfToken}]),
 	ok = mosaic_component_harness:stop (Harness),
 	ok = mosaic_tests:wait (Harness),
 	ok.
@@ -30,7 +30,7 @@ test_start_stop ({defaults}) ->
 test_execute ({sleep, wait}) ->
 	Self = erlang:self (),
 	SelfToken = erlang:make_ref (),
-	{ok, Harness} = mosaic_component_harness:start_link ([{controller, Self}, {controller_token, SelfToken}]),
+	{ok, Harness} = mosaic_component_harness:start_link ([{identifier, <<0:160>>}, {controller, Self}, {controller_token, SelfToken}]),
 	ok = mosaic_component_harness:execute (Harness, [{executable, <<"/bin/sleep">>}, {arguments, [<<"0.1s">>]}]),
 	ok = receive {mosaic_component_harness, exit, SelfToken, 0} -> ok end,
 	ok = mosaic_component_harness:stop (Harness),
@@ -40,7 +40,7 @@ test_execute ({sleep, wait}) ->
 test_execute ({sleep, nowait}) ->
 	Self = erlang:self (),
 	SelfToken = erlang:make_ref (),
-	{ok, Harness} = mosaic_component_harness:start_link ([{controller, Self}, {controller_token, SelfToken}]),
+	{ok, Harness} = mosaic_component_harness:start_link ([{identifier, <<0:160>>}, {controller, Self}, {controller_token, SelfToken}]),
 	ok = mosaic_component_harness:execute (Harness, [{executable, <<"/bin/sleep">>}, {arguments, [<<"1h">>]}]),
 	ok = mosaic_component_harness:stop (Harness),
 	ok = mosaic_tests:wait (Harness),
@@ -49,7 +49,7 @@ test_execute ({sleep, nowait}) ->
 test_execute ({cat, nowait}) ->
 	Self = erlang:self (),
 	SelfToken = erlang:make_ref (),
-	{ok, Harness} = mosaic_component_harness:start_link ([{controller, Self}, {controller_token, SelfToken}]),
+	{ok, Harness} = mosaic_component_harness:start_link ([{identifier, <<0:160>>}, {controller, Self}, {controller_token, SelfToken}]),
 	ok = mosaic_component_harness:execute (Harness, [{executable, <<"/bin/cat">>}, {arguments, []}]),
 	ok = mosaic_component_harness:stop (Harness),
 	ok = mosaic_tests:wait (Harness),
@@ -59,7 +59,7 @@ test_execute ({cat, nowait}) ->
 test_signal ({defaults}) ->
 	Self = erlang:self (),
 	SelfToken = erlang:make_ref (),
-	{ok, Harness} = mosaic_component_harness:start_link ([{controller, Self}, {controller_token, SelfToken}]),
+	{ok, Harness} = mosaic_component_harness:start_link ([{identifier, <<0:160>>}, {controller, Self}, {controller_token, SelfToken}]),
 	ok = mosaic_component_harness:execute (Harness, [{executable, <<"/bin/sleep">>}, {arguments, [<<"1h">>]}]),
 	ok = mosaic_component_harness:signal (Harness, terminate),
 	ok = receive {mosaic_component_harness, exit, SelfToken, 15} -> ok end,
@@ -71,7 +71,7 @@ test_signal ({defaults}) ->
 test_exchange ({defaults}) ->
 	Self = erlang:self (),
 	SelfToken = erlang:make_ref (),
-	{ok, Harness} = mosaic_component_harness:start_link ([{controller, Self}, {controller_token, SelfToken}]),
+	{ok, Harness} = mosaic_component_harness:start_link ([{identifier, <<0:160>>}, {controller, Self}, {controller_token, SelfToken}]),
 	ok = mosaic_component_harness:execute (Harness, [{executable, <<"/bin/cat">>}]),
 	ok = mosaic_component_harness:exchange (Harness, {[{attribute_1, value_1}, {attribute_2, value_2}], <<"data">>}),
 	ok = receive {mosaic_component_harness, exchange, SelfToken, {MetaData, Data}} when is_list (MetaData), is_binary (Data) -> ok end,

@@ -36,7 +36,7 @@ init (prepare, Identifier, {Status, HarnessConfiguration, ExecuteSpecification, 
 	true = erlang:process_flag (trap_exit, true),
 	try
 		HarnessToken = erlang:make_ref (),
-		{ok, Harness} = case mosaic_component_harness:start_link ([{controller, erlang:self ()}, {controller_token, HarnessToken} | HarnessConfiguration]) of
+		{ok, Harness} = case mosaic_component_harness:start_link ([{identifier, Identifier}, {controller, erlang:self ()}, {controller_token, HarnessToken} | HarnessConfiguration]) of
 			Outcome = {ok, _Harness} ->
 				Outcome;
 			Error1 = {error, _Reason1} ->

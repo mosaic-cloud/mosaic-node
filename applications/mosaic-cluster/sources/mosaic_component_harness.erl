@@ -53,8 +53,8 @@ exchange (Harness, Specification)
 	gen_fsm:sync_send_event (Harness, {mosaic_component_harness, exchange, Specification}).
 
 
--record (state, {qualified_name, controller, controller_token, port, port_exit_status}).
--record (configuration, {controller, controller_token, executable, argument0, arguments}).
+-record (state, {qualified_name, identifier, controller, controller_token, port, port_exit_status}).
+-record (configuration, {identifier, controller, controller_token, executable, argument0, arguments}).
 -record (execute_specification, {executable, argument0, arguments, environment, working_directory}).
 -record (signal_specification, {signal}).
 -record (exchange_specification, {meta_data, data}).
@@ -66,7 +66,7 @@ init ({QualifiedName, OriginalConfiguration}) ->
 		ok ->
 			case parse_configuration (OriginalConfiguration) of
 				{ok, #configuration{
-						controller = Controller, controller_token = ControllerToken,
+						identifier = Identifier, controller = Controller, controller_token = ControllerToken,
 						executable = Executable, argument0 = Argument0, arguments = Arguments}} ->
 					PortName = {spawn_executable, erlang:binary_to_list (Executable)},
 					PortOptions = [
@@ -77,7 +77,7 @@ init ({QualifiedName, OriginalConfiguration}) ->
 					ok = timer:sleep (100),
 					State = #state{
 							qualified_name = QualifiedName,
-							controller = Controller, controller_token = ControllerToken,
+							identifier = Identifier, controller = Controller, controller_token = ControllerToken,
 							port = Port, port_exit_status = none},
 					{ok, waiting_execute, State};
 				{error, Reason} ->
@@ -173,6 +173,8 @@ executing (
 				[{<<"__type__">>, <<"exchange">>} | OtherMetaData] ->
 					Controller ! {mosaic_component_harness, exchange, ControllerToken, {OtherMetaData, PacketData}},
 					{reply, ok, executing, OldState};
+				[{<<"__type__">>, <<"resources">>} | OtherMetaData] ->
+					handle_resources (OtherMetaData, PacketData, executing, OldState);
 				[{<<"__type__">>, <<"exit">>}, {<<"exit-status">>, ExitStatus}] when PacketData =:= <<"">> ->
 					Controller ! {mosaic_component_harness, exit, ControllerToken, ExitStatus},
 					{reply, ok, waiting_execute, OldState};
@@ -290,6 +292,30 @@ handle_info (Message, _StateName, StateData) ->
 %	end.
 
 
+handle_resources (MetaData, Data, executing, StateData = #state{identifier = Identifier, port = Port}) ->
+	case MetaData of
+		[{<<"action">>, <<"acquire">>}, {<<"correlation">>, Correlation}, {<<"resources">>, ResourcesSpecification}]
+				when is_binary (Correlation), (byte_size (Correlation) =:= 40), (Data =:= <<>>) ->
+			case mosaic_component_resources:acquire (Identifier, Port, json, ResourcesSpecification) of
+				{ok, ResourcesDescriptor} ->
+					trigger_packet (Port, json,
+							{[
+								{<<"__type__">>, <<"resources">>}, {<<"action">>, <<"return">>}, {<<"correlation">>, Correlation},
+								{<<"ok">>, true}, {<<"resources">>, ResourcesDescriptor}]}),
+					{reply, ok, executing, StateData};
+				Error = {error, Reason} ->
+					trigger_packet (Port, json,
+							{[
+								{<<"__type__">>, <<"resources">>}, {<<"action">>, <<"return">>}, {<<"correlation">>, Correlation},
+								{<<"ok">>, false}, {<<"error">>, mosaic_webmachine:format_term (Reason)}]}),
+					{reply, Error, executing, StateData}
+			end;
+		_ ->
+			Reason = {invalid_packet, {MetaData, Data}},
+			{stop, Reason, {error, Reason}, StateData}
+	end.
+
+
 trigger_terminate (Port) ->
 	trigger_packet (Port, json,
 			{[
@@ -347,9 +373,15 @@ trigger_packet (Port, binary, PacketPayload)
 
 validate_configuration (
 			Configuration = #configuration{
-					controller = Controller, controller_token = ControllerToken,
+					identifier = Identifier, controller = Controller, controller_token = ControllerToken,
 					executable = Executable, argument0 = Argument0, arguments = Arguments}) ->
 	try
+		ok = if
+			is_binary (Identifier), (bit_size (Identifier) =:= 160) ->
+				ok;
+			true ->
+				throw ({error, {invalid_identifier, Identifier}})
+		end,
 		ok = if
 			is_pid (Controller) ->
 				ok;
@@ -400,11 +432,19 @@ validate_configuration (Configuration) ->
 
 parse_configuration (OriginalOptions)
 		when is_list (OriginalOptions) ->
-	DefaultOptions = [{executable, defaults}, {argument0, defaults}, {arguments, defaults}],
+	DefaultOptions = [{identifier, undefined}, {executable, defaults}, {argument0, defaults}, {arguments, defaults}],
 	FinalOptions = OriginalOptions ++ DefaultOptions,
 	case lists:sort (proplists:get_keys (FinalOptions)) of
-		[argument0, arguments, controller, controller_token, executable] ->
+		[argument0, arguments, controller, controller_token, executable, identifier] ->
 			try
+				{ok, Identifier} = case proplists:get_value (identifier, FinalOptions) of
+					Identifier_ when is_binary (Identifier_), (bit_size (Identifier_) =:= 160) ->
+						{ok, Identifier_};
+					undefined ->
+						throw ({error, missing_identifier});
+					Identifier_ ->
+						throw ({error, {invalid_identifier, Identifier_}})
+				end,
 				{ok, Controller} = case proplists:get_value (controller, FinalOptions) of
 					Controller_ when is_pid (Controller_) ->
 						{ok, Controller_};
@@ -458,7 +498,7 @@ parse_configuration (OriginalOptions)
 						throw ({error, {invalid_arguments, Arguments_}})
 				end,
 				Configuration = #configuration{
-						controller = Controller, controller_token = ControllerToken,
+						identifier = Identifier, controller = Controller, controller_token = ControllerToken,
 						executable = Executable, argument0 = Argument0, arguments = Arguments},
 				{ok, Configuration}
 			catch

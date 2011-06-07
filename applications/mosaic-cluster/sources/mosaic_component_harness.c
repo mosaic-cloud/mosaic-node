@@ -1411,6 +1411,8 @@ static void _packet_parse_type (
 		_packet->type = _packet_type_execute;
 	else if (strcmp (_type_name, "signal") == 0)
 		_packet->type = _packet_type_signal;
+	else if (strcmp (_type_name, "resources") == 0)
+		_packet->type = _packet_type_exchange;
 	else
 		_packet->type = _packet_type_invalid;
 	_json_outcome = json_object_del (_packet->json, "__type__");

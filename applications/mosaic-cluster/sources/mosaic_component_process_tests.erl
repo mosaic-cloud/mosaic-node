@@ -8,7 +8,8 @@
 		test_call/1,
 		test_cast/1,
 		test_migrate/1,
-		test_abacus/1]).
+		test_abacus/1,
+		test_rabbitmq/1]).
 -export ([configure/6]).
 
 
@@ -16,13 +17,14 @@
 -import (mosaic_process_migrator_tests, [start_link_process_migrator/6, wait_process_migrator/1]).
 
 
--test ({test_start_stop, [{defaults}]}).
--test ({test_call, [{defaults}]}).
--test ({test_cast, [{defaults}]}).
--test ({test_migrate, [{defaults}]}).
--test ({test_abacus, [{python}]}).
--test ({test_abacus, [{java}]}).
--test ({test_abacus, [{node}]}).
+%-test ({test_start_stop, [{defaults}]}).
+%-test ({test_call, [{defaults}]}).
+%-test ({test_cast, [{defaults}]}).
+%-test ({test_migrate, [{defaults}]}).
+%-test ({test_abacus, [{python}]}).
+%-test ({test_abacus, [{java}]}).
+%-test ({test_abacus, [{node}]}).
+-test ({test_rabbitmq, [{defaults}]}).
 
 
 test_start_stop ({defaults}) ->
@@ -98,6 +100,17 @@ test_abacus ({Flavour}) ->
 	ok.
 
 
+test_rabbitmq ({defaults}) ->
+	{ok, Identifier} = mosaic_cluster_tools:key (),
+	{ok, Configuration} = configure (rabbitmq, create, Identifier),
+	{ok, Resources} = mosaic_cluster_resources:start_link ({local, mosaic_component_resources}, defaults),
+	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
+	ok = timer:sleep (6 * 1000),
+	ok = stop_and_wait_process (Process),
+	true = erlang:exit (Resources, normal),
+	ok.
+
+
 configure (Type, create, Identifier) ->
 	{ok, mosaic_component_process, Configuration} = configure (Type, create, Identifier, term, defaults, [{router, erlang:self ()}]),
 	{ok, Configuration};
@@ -144,8 +157,8 @@ configure (Type, create, Identifier, term, defaults, ExtraOptions)
 			Error
 	end;
 	
-configure (Type, create, Identifier, term, defaults, ExtraOptions)
-		when (Type =:= java_abacus), is_list (ExtraOptions) ->
+configure (Type = java_abacus, create, Identifier, term, defaults, ExtraOptions)
+		when is_list (ExtraOptions) ->
 	{ok, Java} = case os:find_executable ("java") of
 		Java_ when is_list (Java_) ->
 			{ok, erlang:list_to_binary (Java_)};
@@ -169,8 +182,8 @@ configure (Type, create, Identifier, term, defaults, ExtraOptions)
 			Error
 	end;
 	
-configure (Type, create, Identifier, term, defaults, ExtraOptions)
-		when (Type =:= node_abacus), is_list (ExtraOptions) ->
+configure (Type = node_abacus, create, Identifier, term, defaults, ExtraOptions)
+		when is_list (ExtraOptions) ->
 	{ok, Node} = case os:find_executable ("node") of
 		Node_ when is_list (Node_) ->
 			{ok, erlang:list_to_binary (Node_)};
@@ -183,7 +196,25 @@ configure (Type, create, Identifier, term, defaults, ExtraOptions)
 			{execute, [
 				{executable, Node},
 				{arguments, [
-					<<"./applications/mosaic-cluster/sources/mosaic_component_harness_backend.js">>]}]}
+					<<"./mosaic_component_abacus.js">>]},
+				{working_directory, <<"./applications/mosaic-cluster/sources">>}]}
+			| ExtraOptions],
+	case mosaic_component_process:parse_configuration (create, term, Options) of
+		{ok, Configuration} ->
+			{ok, mosaic_component_process, Configuration};
+		Error = {error, _Reason} ->
+			Error
+	end;
+	
+configure (Type = rabbitmq, create, Identifier, term, defaults, ExtraOptions)
+		when is_list (ExtraOptions) ->
+	Options = [
+			{harness, [
+				{argument0, <<"[mosaic_component#", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (mosaic_webmachine:format_string_identifier (Identifier)) / binary, "]">>}]},
+			{execute, [
+				{executable, <<"./scripts/run-node">>},
+				{arguments, [mosaic_webmachine:format_string_identifier (Identifier)]},
+				{working_directory, <<"../mosaic-components-rabbitmq">>}]}
 			| ExtraOptions],
 	case mosaic_component_process:parse_configuration (create, term, Options) of
 		{ok, Configuration} ->

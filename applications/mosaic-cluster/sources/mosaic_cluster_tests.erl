@@ -105,6 +105,8 @@ execute ({initialize}) ->
 	ok = mosaic_process_configurator:register (java_abacus, json, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register (node_abacus, term, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register (node_abacus, json, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register (rabbitmq, term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register (rabbitmq, json, {mosaic_component_process_tests, configure, defaults}),
 	ok;
 	
 execute ({ring, include, Node})

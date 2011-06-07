@@ -80,6 +80,7 @@ def _frontend_python_parrot () :
 			"environment" : None,
 			"working-directory" : None,
 	}, ""))
+	_sleep (0.1)
 	for i in xrange (0, 10) :
 		_output_message = {
 				"__type__" : "exchange",
@@ -120,6 +121,7 @@ def _frontend_python_abacus () :
 			"environment" : None,
 			"working-directory" : None,
 	}, ""))
+	_sleep (0.1)
 	__frontend_abacus ()
 
 def _frontend_java_abacus () :
@@ -135,6 +137,7 @@ def _frontend_java_abacus () :
 			"environment" : None,
 			"working-directory" : None,
 	}, ""))
+	_sleep (0.1)
 	__frontend_abacus ()
 
 def _frontend_node_abacus () :
@@ -142,10 +145,11 @@ def _frontend_node_abacus () :
 			"__type__" : "execute",
 			"executable" : "/usr/bin/node",
 			"argument0" : None,
-			"arguments" : ["./applications/mosaic-cluster/sources/mosaic_component_harness_backend.js"],
+			"arguments" : ["./mosaic_component_abacus.js"],
 			"environment" : None,
-			"working-directory" : None,
+			"working-directory" : "./applications/mosaic-cluster/sources",
 	}, ""))
+	_sleep (0.1)
 	__frontend_abacus ()
 
 def __frontend_abacus () :
@@ -216,6 +220,7 @@ def _frontend_test_execute_2 () :
 			"environment" : None,
 			"working-directory" : None,
 	}, ""))
+	_sleep (0.1)
 	_output_close ()
 	_input_close ()
 
@@ -259,10 +264,11 @@ def _frontend_test_nodejs () :
 			"__type__" : "execute",
 			"executable" : "/usr/bin/node",
 			"argument0" : None,
-			"arguments" : ["./applications/mosaic-cluster/sources/mosaic_component_harness_backend.js"],
+			"arguments" : ["./mosaic_component_abacus.js"],
 			"environment" : None,
-			"working-directory" : None,
+			"working-directory" : "./applications/mosaic-cluster/sources",
 	}, ""))
+	_sleep (0.1)
 	for i in xrange (0, 10) :
 		_output_message = {
 				"__type__" : "exchange",
@@ -272,7 +278,58 @@ def _frontend_test_nodejs () :
 		_output_packet = (_output_message, _output_payload)
 		_output (_output_packet)
 		_input_packet = _input ()
+		if _input_packet != _output_packet :
+			raise Exception ()
 		_sleep (0.1)
+	_output_close ()
+	_input_close ()
+
+def _frontend_test_rabbitmq () :
+	_output (({
+			"__type__" : "execute",
+			"executable" : "../mosaic-components-rabbitmq/scripts/run-node",
+			"argument0" : None,
+			"arguments" : None,
+			"environment" : None,
+			"working-directory" : None,
+	}, ""))
+	_sleep (0.1)
+	_input_packet = _input ()
+	if _input_packet is None :
+		raise Exception ()
+	_input_meta_data, _input_data = _input_packet
+	if _input_meta_data["__type__"] != "resources" :
+		raise Exception ()
+	if _input_data != "" :
+		raise Exception ()
+	if _input_meta_data["action"] != "acquire" :
+		raise Exception ()
+	_acquire_correlation = _input_meta_data["correlation"]
+	_acquire_resources = _input_meta_data["resources"]
+	if _acquire_resources != {"broker_socket" : "socket:ipv4:tcp", "management_socket" : "socket:ipv4:tcp"} :
+		raise Exception ()
+	_output (({
+			"__type__" : "resources",
+			"action" : "return",
+			"correlation" : _acquire_correlation,
+			"ok" : True,
+			"resources" : {
+				"broker_socket" : {
+					"ip" : "127.0.0.1",
+					"port" : 15672,
+				},
+				"management_socket" : {
+					"ip" : "127.0.0.1",
+					"port" : 15673,
+				},
+			},
+	}, ""))
+	_input_packet = _input ()
+	if _input_packet == None :
+		raise Exception ()
+	_input_meta_data, _input_data = _input_packet
+	if _input_meta_data["__type__"] != "exit" :
+		raise Exception ()
 	_output_close ()
 	_input_close ()
 
@@ -286,6 +343,7 @@ _frontend_scenarios = {
 		"test-execute-3" : _frontend_test_execute_3,
 		"test-exchange" : _frontend_test_exchange,
 		"test-nodejs" : _frontend_test_nodejs,
+		"test-rabbitmq" : _frontend_test_rabbitmq,
 }
 
 ## ----------------------------------------

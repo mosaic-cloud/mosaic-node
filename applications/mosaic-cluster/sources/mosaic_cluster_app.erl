@@ -25,7 +25,7 @@ start (Disposition, _Configuration) ->
 	{error, {invalid_disposition, Disposition}}.
 
 
-stop (_) ->
+stop (void) ->
 	ok.
 
 
@@ -51,11 +51,17 @@ start_daemons () ->
 		Error2 = {error, _Reason2} ->
 			throw (Error2)
 	end,
-	case mosaic_webmachine:start_supervised () of
-		{ok, _Webmachine} ->
+	ok = case mosaic_cluster_resources:start_supervised () of
+		{ok, _Resources} ->
 			ok;
 		Error3 = {error, _Reason3} ->
 			throw (Error3)
+	end,
+	case mosaic_webmachine:start_supervised () of
+		{ok, _Webmachine} ->
+			ok;
+		Error4 = {error, _Reason4} ->
+			throw (Error4)
 	end,
 	ok.
 
