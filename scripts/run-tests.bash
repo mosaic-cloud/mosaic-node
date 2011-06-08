@@ -7,13 +7,11 @@ fi
 
 _module="${1}"
 
-if test -e "/tmp/mosaic-cluster/tests/ring" ; then
-	rm -R "/tmp/mosaic-cluster/tests/ring"
+if test -e "/tmp/mosaic/cluster/0" ; then
+	rm -R "/tmp/mosaic/cluster/0"
 fi
 
-if ! test -e "/tmp/mosaic-cluster/tests/ring" ; then
-	mkdir -p "/tmp/mosaic-cluster/tests/ring"
-fi
+mkdir -p "/tmp/mosaic/cluster/0/ring"
 
 _erl_argv=(
 	"${_erl}"
@@ -23,7 +21,7 @@ _erl_argv=(
 		-boot start_clean
 		-config "${_outputs}/erlang/applications/mosaic_cluster/priv/mosaic_cluster.config"
 		-mosaic_cluster webmachine_listen "{\"127.0.0.1\", $(( _erl_epmd_port + 1 + (9 - 1) * 2 + 0 ))}"
-		-riak_core ring_state_dir "\"/tmp/mosaic-cluster/tests/ring\""
+		-riak_core ring_state_dir "\"/tmp/mosaic/cluster/0/ring\""
 		-riak_core handoff_port "$(( _erl_epmd_port + 1 + (9 - 1) * 2 + 1 ))"
 		-run "${_module}" test
 		-run init stop
