@@ -6,7 +6,7 @@
 
 
 -export ([
-		init/3, terminate/2, handle_stop/2, handle_call/4, handle_cast/3, handle_info/2,
+		init/3, terminate/2, handle_stop/2, handle_call/5, handle_cast/4, handle_info/2,
 		begin_migration/4, commit_migration/1, rollback_migration/1]).
 
 
@@ -57,9 +57,9 @@ terminate (Reason, State = #state{terminate_delegate = Delegate})
 	Delegate (Reason, State);
 	
 terminate (_Reason, #state{status = Status})
-		when (Status =:= active) orelse (Status =:= stopped)
+		when ((Status =:= active) orelse (Status =:= stopped)
 				orelse (Status =:= migrating_as_source_succeeded) orelse (Status =:= migrating_as_source_failed)
-				orelse (Status =:= migrating_as_target_waiting_begin) orelse (Status =:= migrating_as_target_failed) ->
+				orelse (Status =:= migrating_as_target_waiting_begin) orelse (Status =:= migrating_as_target_failed)) ->
 	ok.
 
 
@@ -87,46 +87,46 @@ handle_stop (_Signal, State = #state{status = Status}) ->
 	{reply, {error, {invalid_status, Status}}, State}.
 
 
-handle_call (Request, RequestData, Sender, State = #state{handle_call_delegate = Delegate})
-		when is_binary (RequestData), (Delegate =/= none) ->
-	Delegate (Request, RequestData, Sender, State);
+handle_call (Operation, Inputs, Data, Sender, State = #state{handle_call_delegate = Delegate})
+		when is_binary (Operation), is_binary (Data), (Delegate =/= none) ->
+	Delegate (Operation, Inputs, Data, Sender, State);
 	
-handle_call (status, <<>>, _Sender, State = #state{status = Status}) ->
+handle_call (<<"status">>, null, <<>>, _Sender, State = #state{status = Status}) ->
 	{reply, {ok, Status, <<>>}, State};
 	
-handle_call ({terminate_delegate, Delegate}, <<>>, _Sender, State)
-		when (Delegate =:= none) orelse is_function (Delegate, 2) ->
-	{reply, {ok, none, <<>>}, State#state{terminate_delegate = Delegate}};
-	
-handle_call ({handle_stop_delegate, Delegate}, <<>>, _Sender, State)
+handle_call (<<"set_terminate_delegate">>, Delegate, <<>>, _Sender, State)
 		when ((Delegate =:= none) orelse is_function (Delegate, 2)) ->
-	{reply, {ok, none, <<>>}, State#state{handle_stop_delegate = Delegate}};
+	{reply, {ok, null, <<>>}, State#state{terminate_delegate = Delegate}};
 	
-handle_call ({handle_call_delegate, Delegate}, <<>>, _Sender, State)
+handle_call (<<"set_handle_stop_delegate">>, Delegate, <<>>, _Sender, State)
+		when ((Delegate =:= none) orelse is_function (Delegate, 2)) ->
+	{reply, {ok, null, <<>>}, State#state{handle_stop_delegate = Delegate}};
+	
+handle_call (<<"set_handle_call_delegate">>, Delegate, <<>>, _Sender, State)
+		when ((Delegate =:= none) orelse is_function (Delegate, 5)) ->
+	{reply, {ok, null, <<>>}, State#state{handle_call_delegate = Delegate}};
+	
+handle_call (<<"set_handle_cast_delegate">>, Delegate, <<>>, _Sender, State)
 		when ((Delegate =:= none) orelse is_function (Delegate, 4)) ->
-	{reply, {ok, none, <<>>}, State#state{handle_call_delegate = Delegate}};
+	{reply, {ok, null, <<>>}, State#state{handle_cast_delegate = Delegate}};
 	
-handle_call ({handle_cast_delegate, Delegate}, <<>>, _Sender, State)
-		when ((Delegate =:= none) orelse is_function (Delegate, 3)) ->
-	{reply, {ok, none, <<>>}, State#state{handle_cast_delegate = Delegate}};
-	
-handle_call ({handle_info_delegate, Delegate}, <<>>, _Sender, State)
+handle_call (<<"set_handle_info_delegate">>, Delegate, <<>>, _Sender, State)
 		when ((Delegate =:= none) orelse is_function (Delegate, 2)) ->
-	{reply, {ok, none, <<>>}, State#state{handle_info_delegate = Delegate}};
+	{reply, {ok, null, <<>>}, State#state{handle_info_delegate = Delegate}};
 	
-handle_call ({begin_migration_delegate, Delegate}, <<>>, _Sender, State)
-		when (Delegate =:= none) orelse is_function (Delegate, 3) ->
-	{reply, {ok, none, <<>>}, State#state{begin_migration_delegate = Delegate}};
+handle_call (<<"set_begin_migration_delegate">>, Delegate, <<>>, _Sender, State)
+		when ((Delegate =:= none) orelse is_function (Delegate, 3)) ->
+	{reply, {ok, null, <<>>}, State#state{begin_migration_delegate = Delegate}};
 	
-handle_call ({commit_migration_delegate, Delegate}, <<>>, _Sender, State)
-		when (Delegate =:= none) orelse is_function (Delegate, 1) ->
-	{reply, {ok, none, <<>>}, State#state{commit_migration_delegate = Delegate}};
+handle_call (<<"set_commit_migration_delegate">>, Delegate, <<>>, _Sender, State)
+		when ((Delegate =:= none) orelse is_function (Delegate, 1)) ->
+	{reply, {ok, null, <<>>}, State#state{commit_migration_delegate = Delegate}};
 	
-handle_call ({rollback_migration_delegate, Delegate}, <<>>, _Sender, State)
-		when (Delegate =:= none) orelse is_function (Delegate, 1) ->
-	{reply, {ok, none, <<>>}, State#state{rollback_migration_delegate = Delegate}};
+handle_call (<<"set_rollback_migration_delegate">>, Delegate, <<>>, _Sender, State)
+		when ((Delegate =:= none) orelse is_function (Delegate, 1)) ->
+	{reply, {ok, null, <<>>}, State#state{rollback_migration_delegate = Delegate}};
 	
-handle_call ({ping, Target, Token1, Return}, <<>>, Sender, State)
+handle_call (<<"ping">>, {Target, Token1, Return}, <<>>, Sender, State)
 		when is_pid (Target), ((Return =:= reply) orelse (Return =:= noreply)) ->
 	Token2 = erlang:make_ref (),
 	Target ! {pong, call, Token1, Token2},
@@ -138,39 +138,41 @@ handle_call ({ping, Target, Token1, Return}, <<>>, Sender, State)
 			{noreply, State}
 	end;
 	
-handle_call ({reply, Reply}, <<>>, _Sender, State) ->
+handle_call (<<"reply">>, Reply, <<>>, _Sender, State) ->
 	{reply, Reply, State};
 	
-handle_call ({stop, Reason, Reply}, <<>>, _Sender, State) ->
+handle_call (<<"stop">>, {Reason, Reply}, <<>>, _Sender, State) ->
 	{stop, Reason, Reply, State};
 	
-handle_call ({delegate, Delegate}, <<>>, _Sender, State)
+handle_call (<<"delegate">>, Delegate, <<>>, _Sender, State)
 		when is_function (Delegate, 1) ->
 	Delegate (State);
 	
-handle_call (Request, RequestData, _Sender, State)
-		when is_binary (RequestData) ->
-	{reply, {error, {invalid_request, Request, RequestData}}, State}.
+handle_call (Operation, Inputs, Data, _Sender, State)
+		when is_binary (Operation), is_binary (Data) ->
+	Error = {error, {invalid_request, {Operation, Inputs, Data}}},
+	{stop, Error, Error, State}.
 
 
-handle_cast (Request, RequestData, State = #state{handle_cast_delegate = Delegate})
-		when is_binary (RequestData), (Delegate =/= none) ->
-	Delegate (Request, RequestData, State);
+handle_cast (Operation, Inputs, Data, State = #state{handle_cast_delegate = Delegate})
+		when is_binary (Operation), is_binary (Data), (Delegate =/= none) ->
+	Delegate (Operation, Inputs, Data, State);
 	
-handle_cast ({ping, Target, Token}, <<>>, State)
+handle_cast (<<"ping">>, {Target, Token}, <<>>, State)
 		when is_pid (Target) ->
 	Target ! {pong, cast, Token, Token},
 	{noreply, State};
 	
-handle_cast ({stop, Reason}, <<>>, State) ->
+handle_cast (<<"stop">>, Reason, <<>>, State) ->
 	{stop, Reason, State};
 	
-handle_cast ({delegate, Delegate}, <<>>, State)
+handle_cast (<<"delegate">>, Delegate, <<>>, State)
 		when is_function (Delegate, 1) ->
 	Delegate (State);
 	
-handle_cast (_Request, _RequestData, State) ->
-	{noreply, State}.
+handle_cast (Operation, Inputs, Data, State)
+		when is_binary (Operation), is_binary (Data) ->
+	{stop, {error, {invalid_request, {Operation, Inputs, Data}}}, State}.
 
 
 handle_info (Message, State = #state{handle_info_delegate = Delegate})
@@ -189,8 +191,8 @@ handle_info ({delegate, Delegate}, State)
 		when is_function (Delegate, 1) ->
 	Delegate (State);
 	
-handle_info (_Message, State) ->
-	{noreply, State}.
+handle_info (Message, State) ->
+	{stop, {invalid_message, Message}, State}.
 
 
 begin_migration (Disposition, Configuration, CompletionFunction, State = #state{begin_migration_delegate = Delegate})

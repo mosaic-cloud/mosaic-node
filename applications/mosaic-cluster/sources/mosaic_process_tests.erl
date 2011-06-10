@@ -15,8 +15,8 @@
 		stop_process/1, stop_process/2,
 		stop_and_wait_process/1, stop_and_wait_process/3,
 		wait_process/1, wait_process/2,
-		call_process/2, call_process/3,
-		cast_process/2, cast_process/3]).
+		call_process/3, call_process/4,
+		cast_process/3, cast_process/4]).
 -export ([configure/6]).
 
 
@@ -24,7 +24,6 @@
 
 
 -test ({test_start_stop, [[{stop_method, stop}, {stop_signal, normal}]]}).
--test ({test_start_stop, [[{stop_method, stop}, {stop_signal, reference}]]}).
 -test ({test_start_stop, [[{stop_method, call}, {stop_signal, normal}]]}).
 -test ({test_start_stop, [[{stop_method, cast}, {stop_signal, normal}]]}).
 -test ({test_start_stop, [[{stop_method, info}, {stop_signal, normal}]]}).
@@ -48,9 +47,6 @@
 -test ({test_migrate_as_target, [{rollback, fail}]}).
 
 
-test_start_stop ([{stop_method, StopMethod}, {stop_signal, reference}]) ->
-	test_start_stop ([{stop_method, StopMethod}, {stop_signal, erlang:make_ref ()}]);
-	
 test_start_stop ([{stop_method, StopMethod}, {stop_signal, StopSignal}]) ->
 	{ok, Process} = start_link_process (mosaic_process_tester, create),
 	ok = case StopMethod of
@@ -60,10 +56,10 @@ test_start_stop ([{stop_method, StopMethod}, {stop_signal, StopSignal}]) ->
 			ok;
 		call ->
 			ReplyToken = erlang:make_ref (),
-			{ok, ReplyToken, <<>>} = call_process (Process, {stop, StopSignal, {ok, ReplyToken, <<>>}}),
+			{ok, ReplyToken, <<>>} = call_process (Process, <<"stop">>, {StopSignal, {ok, ReplyToken, <<>>}}),
 			ok;
 		cast ->
-			ok = cast_process (Process, {stop, StopSignal}),
+			ok = cast_process (Process, <<"stop">>, StopSignal),
 			ok;
 		info ->
 			Process ! {stop, StopSignal},
@@ -93,13 +89,13 @@ test_ping ([{ping_method, PingMethod}]) ->
 	{ok, Process} = start_link_process (mosaic_process_tester, create),
 	{ok, PongMethod, PongToken} = case PingMethod of
 		call_reply ->
-			{ok, {pong, PingToken, PongToken_}, <<>>} = call_process (Process, {ping, Self, PingToken, reply}),
+			{ok, {pong, PingToken, PongToken_}, <<>>} = call_process (Process, <<"ping">>, {Self, PingToken, reply}),
 			{ok, call, PongToken_};
 		call_noreply ->
-			{ok, {pong, PingToken, PongToken_}, <<>>} = call_process (Process, {ping, Self, PingToken, noreply}),
+			{ok, {pong, PingToken, PongToken_}, <<>>} = call_process (Process, <<"ping">>, {Self, PingToken, noreply}),
 			{ok, call, PongToken_};
 		cast ->
-			ok = cast_process (Process, {ping, Self, PingToken}),
+			ok = cast_process (Process, <<"ping">>, {Self, PingToken}),
 			{ok, cast, PingToken};
 		info ->
 			Process ! {ping, Self, PingToken},
@@ -231,17 +227,17 @@ wait_process (Process) ->
 wait_process (Process, Reasons) ->
 	mosaic_tests:enforce_stop_outcome_and_wait (Process, Reasons, ok).
 
-call_process (Process, Request) ->
-	call_process (Process, Request, <<>>).
+call_process (Process, Operation, Inputs) ->
+	call_process (Process, Operation, Inputs, <<>>).
 
-call_process (Process, Request, RequestData) ->
-	mosaic_process:call (Process, Request, RequestData).
+call_process (Process, Operation, Inputs, Data) ->
+	mosaic_process:call (Process, Operation, Inputs, Data).
 
-cast_process (Process, Request) ->
-	cast_process (Process, Request, <<>>).
+cast_process (Process, Operation, Inputs) ->
+	cast_process (Process, Operation, Inputs, <<>>).
 
-cast_process (Process, Request, RequestData) ->
-	mosaic_process:cast (Process, Request, RequestData).
+cast_process (Process, Operation, Inputs, Data) ->
+	mosaic_process:cast (Process, Operation, Inputs, Data).
 
 
 test () ->

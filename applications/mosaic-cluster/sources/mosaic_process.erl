@@ -6,7 +6,7 @@
 -export ([start/4, start/5, start_link/4, start_link/5]).
 -export ([start_supervised/5]).
 -export ([stop/1, stop/2]).
--export ([call/2, call/3, call/4, cast/2, cast/3]).
+-export ([call/3, call/4, call/5, cast/3, cast/4]).
 -export ([begin_migration/4, commit_migration/2, rollback_migration/2]).
 
 
@@ -15,8 +15,8 @@ behaviour_info (callbacks) ->
 		{init, 3},
 		{terminate, 2},
 		{handle_stop, 2},
-		{handle_call, 4},
-		{handle_cast, 3},
+		{handle_call, 5},
+		{handle_cast, 4},
 		{handle_info, 2},
 		{begin_migration, 4},
 		{commit_migration, 1},
@@ -49,19 +49,21 @@ stop (Process, Signal)
 	gen_server:call (Process, {mosaic_process, stop, Signal}).
 
 
-call (Process, Request) ->
-	call (Process, Request, <<>>).
+call (Process, Operation, Inputs) ->
+	call (Process, Operation, Inputs, <<>>).
 
-call (Process, Request, RequestData) ->
-	call (Process, Request, RequestData, default).
+call (Process, Operation, Inputs, Data) ->
+	call (Process, Operation, Inputs, Data, default).
 
-call (Process, Request, RequestData, Timeout)
-		when (is_pid (Process) orelse is_atom (Process)), is_binary (RequestData),
-			((Timeout =:= default) orelse (Timeout =:= infinity) orelse (is_number (Timeout) andalso (Timeout > 0))) ->
+call (Process, Operation, Inputs, Data, Timeout)
+		when (is_pid (Process) orelse is_atom (Process)), is_binary (Operation), is_binary (Data),
+			((Timeout =:= default) orelse (Timeout =:= infinity) orelse (is_integer (Timeout) andalso (Timeout > 0))) ->
 	try
-		case gen_server:call (Process, {mosaic_process, call, Request, RequestData}, case Timeout of default -> 5000; _ -> Timeout end) of
-			Outcome = {ok, _Reply, ReplyData} when is_binary (ReplyData) ->
+		case gen_server:call (Process, {mosaic_process, call, Operation, Inputs, Data}, if (Timeout =:= default) -> 5000; true -> Timeout end) of
+			Outcome = {ok, _Outputs, Data} when is_binary (Data) ->
 				Outcome;
+			Error = {error, _Reason, Data} when is_binary (Data) ->
+				Error;
 			Error = {error, _Reason} ->
 				Error;
 			Outcome ->
@@ -77,13 +79,13 @@ call (Process, Request, RequestData, Timeout)
 	end.
 
 
-cast (Process, Request) ->
-	cast (Process, Request, <<>>).
+cast (Process, Operation, Inputs) ->
+	cast (Process, Operation, Inputs, <<>>).
 
-cast (Process, Request, RequestData)
-		when (is_pid (Process) orelse is_atom (Process)), is_binary (RequestData) ->
+cast (Process, Operation, Inputs, Data)
+		when (is_pid (Process) orelse is_atom (Process)), is_binary (Operation), is_binary (Data) ->
 	try
-		ok = gen_server:cast (Process, {mosaic_process, cast, Request, RequestData})
+		ok = gen_server:cast (Process, {mosaic_process, cast, Operation, Inputs, Data})
 	catch
 		throw : Reason ->
 			{error, Reason};

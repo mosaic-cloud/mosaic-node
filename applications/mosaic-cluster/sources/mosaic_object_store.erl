@@ -198,12 +198,10 @@ handle_call ({mosaic_object_store, migrate_as_target, SourceStore, Key}, _Sender
 			case ets:lookup (Table, Key) of
 				[{Key, SourceRevision, SourceData}] ->
 					{reply, ok, State};
-				[{Key, SourceRevision, _TargetData}] ->
-					% !!!!
-					{reply, ok, State};
-				[{Key, _TargetRevision, _TargetData}] ->
-					% !!!!
-					{reply, ok, State};
+				[{Key, SourceRevision, TargetData}] ->
+					{reply, {error, {mismatched_data, TargetData}}, State};
+				[{Key, TargetRevision, _TargetData}] ->
+					{reply, {error, {mismatched_revision, TargetRevision}}, State};
 				[] ->
 					true = ets:insert (Table, {Key, SourceRevision, SourceData}),
 					{reply, ok, State}

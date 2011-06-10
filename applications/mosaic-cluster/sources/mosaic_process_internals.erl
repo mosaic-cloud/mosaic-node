@@ -87,23 +87,27 @@ handle_call ({mosaic_process, stop, Signal}, _Sender, OldState = #state{callback
 			{stop, Reason, Error, OldState#state{callback_state = NewCallbackState}}
 	end;
 	
-handle_call ({mosaic_process, call, Request, RequestData}, Sender, OldState = #state{callback_module = CallbackModule, callback_state = OldCallbackState})
-		when is_binary (RequestData) ->
-	case erlang:apply (CallbackModule, handle_call, [Request, RequestData, Sender, OldCallbackState]) of
-		{reply, Outcome = {ok, _Reply, ReplyData}, NewCallbackState} when is_binary (ReplyData) ->
+handle_call ({mosaic_process, call, Operation, Inputs, InputData}, Sender, OldState = #state{callback_module = CallbackModule, callback_state = OldCallbackState})
+		when is_binary (Operation), is_binary (InputData) ->
+	case erlang:apply (CallbackModule, handle_call, [Operation, Inputs, InputData, Sender, OldCallbackState]) of
+		{reply, Outcome = {ok, _Outputs, OutputData}, NewCallbackState} when is_binary (OutputData) ->
 			{reply, Outcome, OldState#state{callback_state = NewCallbackState}};
+		{reply, Error = {error, _Reason, ErrorData}, NewCallbackState} when is_binary (ErrorData) ->
+			{reply, Error, NewCallbackState};
 		{reply, Error = {error, _Reason}, NewCallbackState} ->
 			{reply, Error, NewCallbackState};
 		{noreply, NewCallbackState} ->
 			{noreply, OldState#state{callback_state = NewCallbackState}};
-		{stop, Reason, Outcome = {ok, _Reply, ReplyData}, NewCallbackState} when is_binary (ReplyData) ->
+		{stop, Reason, Outcome = {ok, _Outputs, OutputData}, NewCallbackState} when is_binary (OutputData) ->
 			{stop, Reason, Outcome, OldState#state{callback_state = NewCallbackState}};
+		{stop, Reason, Error = {error, _Reason, ErrorData}, NewCallbackState} when is_binary (ErrorData) ->
+			{stop, Reason, Error, OldState#state{callback_state = NewCallbackState}};
 		{stop, Reason, Error = {error, _Reason}, NewCallbackState} ->
 			{stop, Reason, Error, OldState#state{callback_state = NewCallbackState}}
 	end;
 	
 handle_call ({mosaic_process, begin_migration, Token, Configuration, Migrator}, _Sender, OldState)
-		when is_pid (Migrator) ->
+		when is_pid (Migrator), is_reference (Token) ->
 	case handle_begin_migration (Token, Configuration, Migrator, OldState) of
 		{continue, Outcome = ok, NewState} ->
 			{reply, Outcome, NewState};
@@ -115,7 +119,8 @@ handle_call ({mosaic_process, begin_migration, Token, Configuration, Migrator}, 
 			{stop, Reason, Error, NewState}
 	end;
 	
-handle_call ({mosaic_process, commit_migration, Token}, _Sender, OldState) ->
+handle_call ({mosaic_process, commit_migration, Token}, _Sender, OldState)
+		when is_reference (Token) ->
 	case handle_commit_migration (Token, OldState) of
 		{continue, Outcome = ok, NewState} ->
 			{reply, Outcome, NewState};
@@ -127,7 +132,8 @@ handle_call ({mosaic_process, commit_migration, Token}, _Sender, OldState) ->
 			{stop, Reason, Error, NewState}
 	end;
 	
-handle_call ({mosaic_process, rollback_migration, Token}, _Sender, OldState) ->
+handle_call ({mosaic_process, rollback_migration, Token}, _Sender, OldState)
+		when is_reference (Token) ->
 	case handle_rollback_migration (Token, OldState) of
 		{continue, Outcome = ok, NewState} ->
 			{reply, Outcome, NewState};
@@ -140,13 +146,14 @@ handle_call ({mosaic_process, rollback_migration, Token}, _Sender, OldState) ->
 	end;
 	
 handle_call (Request, Sender, State) ->
-	ok = mosaic_transcript:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
-	{reply, {error, {invalid_request, Request}}, State}.
+	ok = mosaic_transcript:trace_error ("received invalid call request; terminating!", [{request, Request}, {sender, Sender}]),
+	Error = {error, {invalid_request, Request}},
+	{stop, Error, Error, State}.
 
 
-handle_cast ({mosaic_process, cast, Request, RequestData}, OldState = #state{callback_module = CallbackModule, callback_state = OldCallbackState})
-		when is_binary (RequestData) ->
-	case erlang:apply (CallbackModule, handle_cast, [Request, RequestData, OldCallbackState]) of
+handle_cast ({mosaic_process, cast, Operation, Inputs, Data}, OldState = #state{callback_module = CallbackModule, callback_state = OldCallbackState})
+		when is_binary (Operation), is_binary (Data) ->
+	case erlang:apply (CallbackModule, handle_cast, [Operation, Inputs, Data, OldCallbackState]) of
 		{noreply, NewCallbackState} ->
 			{noreply, OldState#state{callback_state = NewCallbackState}};
 		{stop, Reason, NewCallbackState} ->
@@ -154,11 +161,12 @@ handle_cast ({mosaic_process, cast, Request, RequestData}, OldState = #state{cal
 	end;
 	
 handle_cast (Request, State) ->
-	ok = mosaic_transcript:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
-	{noreply, State}.
+	ok = mosaic_transcript:trace_error ("received invalid cast request; terminating!", [{request, Request}]),
+	{stop, {error, {invalid_request, Request}}, State}.
 
 
-handle_info ({mosaic_process_internals, continue_migration, Token, Completion}, State) ->
+handle_info ({mosaic_process_internals, continue_migration, Token, Completion}, State)
+		when is_reference (Token) ->
 	case handle_continue_migration (Token, Completion, State) of
 		{continue, undefined, NewState} ->
 			{noreply, NewState};
@@ -226,12 +234,12 @@ handle_begin_migration (
 			Token, _Configuration, _Migrator,
 			State = #state{status = migrating, migration_state = #migration_state{token = OtherToken}})
 		when (Token =/= OtherToken) ->
-	% !!!!
-	{continue, {error, invalid_token}, State};
+	Error = {error, {invalid_token, Token}},
+	{terminate, Error, Error, State};
 	
 handle_begin_migration (_Token, _Configuration, _Migrator, State) ->
-	% !!!!
-	{continue, {error, invalid_state}, State}.
+	Error = {error, invalid_state},
+	{terminate, Error, Error, State}.
 
 
 handle_continue_migration (
@@ -257,18 +265,12 @@ handle_continue_migration (
 			Token, _Outcome,
 			State = #state{status = migrating, migration_state = #migration_state{token = OtherToken}})
 		when (Token =/= OtherToken) ->
-	% !!!!
-	{continue, undefined, State};
-	
-handle_continue_migration (
-			Token, _Outcome,
-			State = #state{status = migrating, migration_state = #migration_state{token = Token}}) ->
-	% !!!!
-	{continue, undefined, State};
+	Error = {error, {invalid_token, Token}},
+	{terminate, Error, Error, State};
 	
 handle_continue_migration (_Token, _Outcome, State) ->
-	% !!!!
-	{continue, undefined, State}.
+	Error = {error, invalid_state},
+	{terminate, Error, Error, State}.
 
 
 handle_commit_migration (
@@ -299,12 +301,12 @@ handle_commit_migration (
 			Token,
 			State = #state{status = migrating, migration_state = #migration_state{token = OtherToken}})
 		when (Token =/= OtherToken) ->
-	% !!!!
-	{continue, {error, invalid_token}, State};
+	Error = {error, {invalid_token, Token}},
+	{terminate, Error, Error, State};
 	
 handle_commit_migration (_Token, State) ->
-	% !!!!
-	{continue, {error, invalid_state}, State}.
+	Error = {error, invalid_state},
+	{terminate, Error, Error, State}.
 
 
 handle_rollback_migration (
@@ -341,9 +343,9 @@ handle_rollback_migration (
 			Token,
 			State = #state{status = migrating, migration_state = #migration_state{token = OtherToken}})
 		when (Token =/= OtherToken) ->
-	% !!!!
-	{continue, {error, invalid_token}, State};
+	Error = {error, {invalid_token, Token}},
+	{terminate, Error, Error, State};
 	
 handle_rollback_migration (_Token, State) ->
-	% !!!!
-	{continue, {error, invalid_state}, State}.
+	Error = {error, invalid_state},
+	{terminate, Error, Error, State}.

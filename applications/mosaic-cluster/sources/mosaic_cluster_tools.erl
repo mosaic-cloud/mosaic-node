@@ -255,7 +255,7 @@ service_list_sync_command (Service, VnodeModule)
 
 service_process_name (Service, Type, Partition)
 		when is_atom (Service), is_atom (Type),
-				is_number (Partition), (Partition >= 0), (Partition < 1461501637330902918203684832716283019655932542976) ->
+				is_integer (Partition), (Partition >= 0), (Partition < 1461501637330902918203684832716283019655932542976) ->
 	{ok, PartitionCount} = ring_size (),
 	PartitionBitsInexact = math:log (PartitionCount) / math:log (2),
 	PartitionBitsTruncated = erlang:trunc (PartitionBitsInexact),

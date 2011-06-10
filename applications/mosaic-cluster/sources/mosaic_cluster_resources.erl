@@ -164,7 +164,9 @@ format_resource_attribute (term, Name, Value)
 	if
 		is_atom (Value) ->
 			{Name, Value};
-		is_number (Value) ->
+		is_integer (Value) ->
+			{Name, Value};
+		is_float (Value) ->
 			{Name, Value};
 		is_binary (Value) ->
 			{Name, Value}
@@ -177,7 +179,9 @@ format_resource_attribute (json, Name, Value)
 			{erlang:atom_to_binary (Name, 'utf8'), Value};
 		is_atom (Value) ->
 			{erlang:atom_to_binary (Name, 'utf8'), erlang:atom_to_binary (Value, 'utf8')};
-		is_number (Value) ->
+		is_integer (Value) ->
+			{erlang:atom_to_binary (Name, 'utf8'), Value};
+		is_float (Value) ->
 			{erlang:atom_to_binary (Name, 'utf8'), Value};
 		is_binary (Value) ->
 			{erlang:atom_to_binary (Name, 'utf8'), Value}
