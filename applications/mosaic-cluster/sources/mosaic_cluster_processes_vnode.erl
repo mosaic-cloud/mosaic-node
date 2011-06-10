@@ -25,7 +25,7 @@ init ([Partition]) ->
 	{ok, ProcessControllerLocalName} = mosaic_cluster_tools:service_process_name (mosaic_cluster_processes, process_controller, Partition),
 	VnodeQualifiedName = {local, VnodeLocalName},
 	ProcessControllerQualifiedName = {local, ProcessControllerLocalName},
-	case mosaic_tools:ensure_registered (VnodeQualifiedName, erlang:self ()) of
+	case mosaic_process_tools:ensure_registered (VnodeQualifiedName, erlang:self ()) of
 		ok ->
 			case mosaic_process_controller:start_supervised (ProcessControllerQualifiedName, defaults) of
 				{ok, ProcessController} ->
@@ -40,13 +40,13 @@ init ([Partition]) ->
 
 
 terminate (_Reason, _State = #state{process_controller = ProcessController, partition = Partition}) ->
-	ok = mosaic_tools:trace_information ("terminating processes vnode...", [{partition, Partition}]),
+	ok = mosaic_transcript:trace_information ("terminating processes vnode...", [{partition, Partition}]),
 	ok = mosaic_process_controller:stop (ProcessController, normal),
 	ok.
 
 
 delete (State = #state{partition = Partition}) ->
-	ok = mosaic_tools:trace_information ("destroying processes vnode...", [{partition, Partition}]),
+	ok = mosaic_transcript:trace_information ("destroying processes vnode...", [{partition, Partition}]),
 	{ok, State}.
 
 
@@ -120,7 +120,7 @@ handle_command ({mosaic_cluster, list}, _Sender, State = #state{process_controll
 	{reply, {ok, Keys}, State};
 	
 handle_command (Request, Sender, State = #state{}) ->
-	ok = mosaic_tools:trace_error ("received invalid command request; ignoring!", [{request, Request}, {sender, Sender}]),
+	ok = mosaic_transcript:trace_error ("received invalid command request; ignoring!", [{request, Request}, {sender, Sender}]),
 	{reply, {error, {invalid_request, Request}}, State}.
 
 
@@ -146,7 +146,7 @@ handle_handoff_command ({riak_core_fold_req_v1, Function, InputAccumulator}, _Se
 	
 handle_handoff_command ({mosaic_cluster_processes, handoff_request, Vnode, Reference, process, Key, PeerProcessController}, _Sender, State = #state{process_controller = ProcessController})
 		when is_pid (Vnode), is_reference (Reference), is_binary (Key), (bit_size (Key) =:= 160), is_pid (PeerProcessController) ->
-	ok = mosaic_tools:trace_information ("requested process handoff as source...", [{vnode, Vnode}, {key, Key}]),
+	ok = mosaic_transcript:trace_information ("requested process handoff as source...", [{vnode, Vnode}, {key, Key}]),
 	case mosaic_cluster_storage:select (Key) of
 		{ok, undefined, {mosaic_cluster_processes, definition, Type, _, _}} ->
 			case mosaic_process_configurator:configure (Type, {migrate, source}, Key, term, defaults) of
@@ -155,37 +155,37 @@ handle_handoff_command ({mosaic_cluster_processes, handoff_request, Vnode, Refer
 						{ok, TargetModule, TargetConfiguration} ->
 							case mosaic_process_controller:migrate (ProcessController, PeerProcessController, Key, SourceConfiguration, TargetModule, TargetConfiguration) of
 								ok ->
-									ok = mosaic_tools:trace_information ("succeeded process handoff as source;", [{vnode, Vnode}, {key, Key}]),
+									ok = mosaic_transcript:trace_information ("succeeded process handoff as source;", [{vnode, Vnode}, {key, Key}]),
 									Vnode ! {mosaic_cluster_processes, handoff_request, Reference, succeeded},
 									{reply, ok, State};
 								Error = {error, Reason} ->
-									ok = mosaic_tools:trace_error ("failed process handoff as source; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
+									ok = mosaic_transcript:trace_error ("failed process handoff as source; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
 									Vnode ! {mosaic_cluster_processes, handoff_request, Reference, failed, Reason},
 									{reply, Error, State}
 							end;
 						Error = {error, Reason} ->
-							ok = mosaic_tools:trace_error ("failed process handoff as source; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
+							ok = mosaic_transcript:trace_error ("failed process handoff as source; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
 							Vnode ! {mosaic_cluster_processes, handoff_request, Reference, failed, Reason},
 							{reply, Error, State}
 					end;
 				Error = {error, Reason} ->
-					ok = mosaic_tools:trace_error ("failed process handoff as source; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
+					ok = mosaic_transcript:trace_error ("failed process handoff as source; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
 					Vnode ! {mosaic_cluster_processes, handoff_request, Reference, failed, Reason},
 					{reply, Error, State}
 			end;
 		{ok, _, _} ->
 			Reason = invalid_storage,
-			ok = mosaic_tools:trace_error ("failed process handoff as source; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
+			ok = mosaic_transcript:trace_error ("failed process handoff as source; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
 			Vnode ! {mosaic_cluster_processes, handoff_request, Reference, failed, Reason},
 			{reply, {error, Reason}, State};
 		Error = {error, Reason} ->
-			ok = mosaic_tools:trace_error ("failed process handoff as source; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
+			ok = mosaic_transcript:trace_error ("failed process handoff as source; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
 			Vnode ! {mosaic_cluster_processes, handoff_request, Reference, failed, Reason},
 			{reply, Error, State}
 	end;
 	
 handle_handoff_command (Request, Sender, State = #state{}) ->
-	ok = mosaic_tools:trace_warning ("received unknown command request during handoff; forwarding!", [{request, Request}, {sender, Sender}]),
+	ok = mosaic_transcript:trace_warning ("received unknown command request during handoff; forwarding!", [{request, Request}, {sender, Sender}]),
 	{forward, State}.
 
 
@@ -199,21 +199,21 @@ handle_handoff_data (DataBinary, State = #state{process_controller = ProcessCont
 	case DataTerm of
 		{mosaic_cluster_processes, Vnode, process, Key} when is_pid (Vnode), is_binary (Key), (bit_size (Key) =:= 160) ->
 			Reference = erlang:make_ref (),
-			ok = mosaic_tools:trace_information ("requesting process handoff as target...", [{vnode, Vnode}, {key, Key}]),
+			ok = mosaic_transcript:trace_information ("requesting process handoff as target...", [{vnode, Vnode}, {key, Key}]),
 			ok = riak_core_vnode:send_command (Vnode, {mosaic_cluster_processes, handoff_request, erlang:self (), Reference, process, Key, ProcessController}),
 			receive
 				{mosaic_cluster_processes, handoff_request, Reference, succeeded} ->
-					ok = mosaic_tools:trace_information ("succeeded process handoff as target;", [{vnode, Vnode}, {key, Key}]),
+					ok = mosaic_transcript:trace_information ("succeeded process handoff as target;", [{vnode, Vnode}, {key, Key}]),
 					{reply, ok, State};
 				{mosaic_cluster_processes, handoff_request, Reference, failed, Reason} ->
-					ok = mosaic_tools:trace_error ("failed process handoff as target; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
+					ok = mosaic_transcript:trace_error ("failed process handoff as target; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
 					{reply, {error, Reason}, State}
 			end;
 		Error = {error, Reason} ->
-			ok = mosaic_tools:trace_error ("received invalid handoff data", [{data, DataBinary}, {reason, Reason}]),
+			ok = mosaic_transcript:trace_error ("received invalid handoff data", [{data, DataBinary}, {reason, Reason}]),
 			{reply, Error, State};
 		_ ->
-			ok = mosaic_tools:trace_error ("received invalid handoff data", [{data, DataBinary}]),
+			ok = mosaic_transcript:trace_error ("received invalid handoff data", [{data, DataBinary}]),
 			{reply, {error, {invalid_handoff_data, DataTerm}}, State}
 	end.
 

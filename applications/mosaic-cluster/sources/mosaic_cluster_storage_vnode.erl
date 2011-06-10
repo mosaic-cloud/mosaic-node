@@ -25,7 +25,7 @@ init ([Partition]) ->
 	{ok, ObjectStoreLocalName} = mosaic_cluster_tools:service_process_name (mosaic_cluster_storage, object_store, Partition),
 	VnodeQualifiedName = {local, VnodeLocalName},
 	ObjectStoreQualifiedName = {local, ObjectStoreLocalName},
-	case mosaic_tools:ensure_registered (VnodeQualifiedName, erlang:self ()) of
+	case mosaic_process_tools:ensure_registered (VnodeQualifiedName, erlang:self ()) of
 		ok ->
 			case mosaic_object_store:start_supervised (ObjectStoreQualifiedName, defaults) of
 				{ok, ObjectStore} ->
@@ -135,20 +135,20 @@ handle_handoff_command ({riak_core_fold_req_v1, Function, InputAccumulator}, _Se
 	
 handle_handoff_command ({mosaic_cluster_storage, handoff_request, Vnode, Reference, object, Key, PeerObjectStore}, _Sender, State = #state{object_store = ObjectStore})
 		when is_pid (Vnode), is_reference (Reference), is_binary (Key), (bit_size (Key) =:= 160), is_pid (PeerObjectStore) ->
-	ok = mosaic_tools:trace_information ("requested object handoff as source...", [{vnode, Vnode}, {key, Key}]),
+	ok = mosaic_transcript:trace_information ("requested object handoff as source...", [{vnode, Vnode}, {key, Key}]),
 	case mosaic_object_store:migrate (ObjectStore, PeerObjectStore, Key) of
 		ok ->
-			ok = mosaic_tools:trace_information ("succeeded object handoff as source;", [{vnode, Vnode}, {key, Key}]),
+			ok = mosaic_transcript:trace_information ("succeeded object handoff as source;", [{vnode, Vnode}, {key, Key}]),
 			Vnode ! {mosaic_cluster_storage, handoff_request, Reference, succeeded},
 			{reply, ok, State};
 		Error = {error, Reason} ->
-					ok = mosaic_tools:trace_error ("failed object handoff as source; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
+					ok = mosaic_transcript:trace_error ("failed object handoff as source; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
 			Vnode ! {mosaic_cluster_storage, handoff_request, Reference, failed, Reason},
 			{reply, Error, State}
 	end;
 	
 handle_handoff_command (Request, Sender, State = #state{}) ->
-	ok = mosaic_tools:trace_warning ("received unknown command request during handoff; forwarding!", [{request, Request}, {sender, Sender}]),
+	ok = mosaic_transcript:trace_warning ("received unknown command request during handoff; forwarding!", [{request, Request}, {sender, Sender}]),
 	{forward, State}.
 
 
@@ -162,21 +162,21 @@ handle_handoff_data (DataBinary, State = #state{object_store = ObjectStore}) ->
 	case DataTerm of
 		{mosaic_cluster_storage, Vnode, object, Key} when is_pid (Vnode), is_binary (Key), (bit_size (Key) =:= 160) ->
 			Reference = erlang:make_ref (),
-			ok = mosaic_tools:trace_information ("requesting object handoff as target...", [{vnode, Vnode}, {key, Key}]),
+			ok = mosaic_transcript:trace_information ("requesting object handoff as target...", [{vnode, Vnode}, {key, Key}]),
 			ok = riak_core_vnode:send_command (Vnode, {mosaic_cluster_storage, handoff_request, erlang:self (), Reference, object, Key, ObjectStore}),
 			receive
 				{mosaic_cluster_storage, handoff_request, Reference, succeeded} ->
-					ok = mosaic_tools:trace_information ("succeeded object handoff as target;", [{vnode, Vnode}, {key, Key}]),
+					ok = mosaic_transcript:trace_information ("succeeded object handoff as target;", [{vnode, Vnode}, {key, Key}]),
 					{reply, ok, State};
 				{mosaic_cluster_storage, handoff_request, Reference, failed, Reason} ->
-					ok = mosaic_tools:trace_error ("failed object handoff as target; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
+					ok = mosaic_transcript:trace_error ("failed object handoff as target; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),
 					{reply, {error, Reason}, State}
 			end;
 		Error = {error, Reason} ->
-			ok = mosaic_tools:trace_error ("received invalid handoff data", [{data, DataBinary}, {reason, Reason}]),
+			ok = mosaic_transcript:trace_error ("received invalid handoff data", [{data, DataBinary}, {reason, Reason}]),
 			{reply, Error, State};
 		_ ->
-			ok = mosaic_tools:trace_error ("received invalid handoff data", [{data, DataBinary}]),
+			ok = mosaic_transcript:trace_error ("received invalid handoff data", [{data, DataBinary}]),
 			{reply, {error, {invalid_handoff_data, DataTerm}}, State}
 	end.
 

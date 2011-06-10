@@ -27,14 +27,14 @@ start (Module, Disposition, Identifier, Configuration) ->
 	start (noname, Module, Disposition, Identifier, Configuration).
 
 start (QualifiedName, Module, Disposition, Identifier, Configuration) ->
-	mosaic_tools:start (gen_server, mosaic_process_internals, QualifiedName, {Module, Disposition, Identifier, Configuration}).
+	mosaic_process_tools:start (gen_server, mosaic_process_internals, QualifiedName, {Module, Disposition, Identifier, Configuration}).
 
 
 start_link (Module, Disposition, Identifier, Configuration) ->
 	start_link (noname, Module, Disposition, Identifier, Configuration).
 
 start_link (QualifiedName, Module, Disposition, Identifier, Configuration) ->
-	mosaic_tools:start_link (gen_server, mosaic_process_internals, QualifiedName, {Module, Disposition, Identifier, Configuration}).
+	mosaic_process_tools:start_link (gen_server, mosaic_process_internals, QualifiedName, {Module, Disposition, Identifier, Configuration}).
 
 
 start_supervised (QualifiedName, Module, Disposition, Identifier, Configuration) ->

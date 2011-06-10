@@ -3,7 +3,7 @@
 <<"<!DOCTYPE html>
 <html id=\"jsconsole\">
 	<head>
-		<title>", (mosaic_webmachine:format_atom (erlang:node ())) / binary, "</title>
+		<title>", (enforce_ok_1 (mosaic_generic_coders:encode_atom (erlang:node ()))) / binary, "</title>
 		<meta id=\"meta\" name=\"viewport\" content=\"width=device-width; height=device-height; user-scalable=no; initial-scale=1.0\" />
 		<link rel=\"stylesheet\" href=\"http://jsconsole.com/console.css\" type=\"text/css\" />
 	</head>

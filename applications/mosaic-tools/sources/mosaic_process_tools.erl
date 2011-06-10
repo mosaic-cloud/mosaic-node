@@ -1,13 +1,12 @@
 
--module (mosaic_tools).
+-module (mosaic_process_tools).
+
 
 -export ([resolve_registered/1]).
 -export ([ensure_registered/1, ensure_registered/2]).
 -export ([enforce_registered/1, enforce_registered/2]).
 -export ([start/4, start_link/4]).
 -export ([wait/1, wait/2]).
--export ([trace_error/1, trace_error/2, trace_warning/1, trace_warning/2, trace_information/1, trace_information/2]).
--export ([trace_debugging/1, trace_debugging/2]).
 
 
 start (Type, Module, QualifiedName, Configuration)
@@ -103,7 +102,7 @@ wait (Process, Timeout)
 resolve_registered (QualifiedName = {local, LocalName})
 		when is_atom (LocalName) ->
 	case erlang:whereis (LocalName) of
-		Process when (is_pid (Process) or is_port (Process)) ->
+		Process when (is_pid (Process) orelse is_port (Process)) ->
 			{ok, Process};
 		undefined ->
 			{error, {unregistered_process, QualifiedName}}
@@ -114,11 +113,11 @@ ensure_registered (QualifiedName) ->
 	ensure_registered (QualifiedName, erlang:self ()).
 
 ensure_registered (QualifiedName = {local, LocalName}, Process)
-		when is_atom (LocalName), (is_pid (Process) or is_port (Process)) ->
+		when is_atom (LocalName), (is_pid (Process) orelse is_port (Process)) ->
 	case erlang:whereis (LocalName) of
 		Process ->
 			ok;
-		OtherProcess when (is_pid (OtherProcess) or is_port (OtherProcess)) ->
+		OtherProcess when (is_pid (OtherProcess) orelse is_port (OtherProcess)) ->
 			{error, {mismatched_process_name, QualifiedName, Process, OtherProcess}};
 		undefined ->
 			true = erlang:register (LocalName, Process),
@@ -126,7 +125,7 @@ ensure_registered (QualifiedName = {local, LocalName}, Process)
 	end;
 	
 ensure_registered (noname, Process)
-		when is_pid (Process) or is_port (Process) ->
+		when is_pid (Process) orelse is_port (Process) ->
 	ok.
 
 
@@ -138,68 +137,12 @@ enforce_registered (QualifiedName = {local, LocalName}, Process)
 	case erlang:whereis (LocalName) of
 		Process ->
 			ok;
-		OtherProcess when (is_pid (OtherProcess) or is_port (OtherProcess)) ->
+		OtherProcess when (is_pid (OtherProcess) orelse is_port (OtherProcess)) ->
 			{error, {mismatched_process_name, QualifiedName, Process, OtherProcess}};
 		undefined ->
 			{error, {unregistered_process, QualifiedName}}
 	end;
 	
 enforce_registered (noname, Process)
-		when (is_pid (Process) or is_port (Process)) ->
-	ok.
-
-
-trace_debugging (Message) ->
-	trace_debugging (Message, []).
-
-trace_debugging (Message, Report) ->
-	trace (debugging, Message, Report).
-
-trace_information (Message) ->
-	trace_information (Message, []).
-
-trace_information (Message, Report) ->
-	trace (information, Message, Report).
-
-trace_warning (Message) ->
-	trace_warning (Message, []).
-
-trace_warning (Message, Report) ->
-	trace (warning, Message, Report).
-
-trace_error (Message) ->
-	trace_error (Message, []).
-
-trace_error (Message, Report) ->
-	trace (error, Message, Report).
-
-
-trace (Level, MessageSpecification, Report)
-		when is_tuple (MessageSpecification), (tuple_size (MessageSpecification) > 0), is_list (element (1, MessageSpecification)) ->
-	[MessageFormat | MessageArguments] = erlang:tuple_to_list (MessageSpecification),
-	Message = lists:flatten (io_lib:format (MessageFormat, MessageArguments)),
-	trace (Level, Message, Report);
-	
-trace (Level, Message, Report)
-		when is_list (Message), is_list (Report) ->
-	Self = erlang:self (),
-	{ok, [_ | StackTrace]} = try throw (stacktrace) catch throw : stacktrace -> {ok, erlang:get_stacktrace ()} end,
-	trace (Level, Self, StackTrace, Message, Report).
-
-
-trace (Level, Process, [LastStackTrace | _], Message, Report) ->
-	ok = case Level of
-		debugging ->
-			ok = error_logger:info_report ([Message, {source, Process, LastStackTrace, Level} | Report]),
-			ok;
-		information ->
-			ok = error_logger:info_report ([Message, {source, Process, LastStackTrace, Level} | Report]),
-			ok;
-		warning ->
-			ok = error_logger:warning_report ([Message, {source, Process, LastStackTrace, Level} | Report]),
-			ok;
-		error ->
-			ok = error_logger:error_report ([Message, {source, Process, LastStackTrace, Level} | Report]),
-			ok
-	end,
+		when (is_pid (Process) orelse is_port (Process)) ->
 	ok.

@@ -109,7 +109,7 @@ init ([{Type}])
 	init ([{{local, Type}, Type}]);
 	
 init ([{QualifiedName, mosaic_sup}]) ->
-	ok = mosaic_tools:enforce_registered (QualifiedName),
+	ok = mosaic_process_tools:enforce_registered (QualifiedName),
 	{ok, {{one_for_all, 1, 60}, [
 		child_spec (supervisor, mosaic_process_sup, supervisor, start_link,
 				[{local, mosaic_process_sup}, mosaic_sup, [{mosaic_process_sup}]]),
@@ -123,26 +123,26 @@ init ([{QualifiedName, mosaic_sup}]) ->
 				[{local, mosaic_vnode_master_sup}, mosaic_sup, [{mosaic_vnode_master_sup}]])]}};
 	
 init ([{QualifiedName, mosaic_process_sup}]) ->
-	ok = mosaic_tools:enforce_registered (QualifiedName),
+	ok = mosaic_process_tools:enforce_registered (QualifiedName),
 	{ok, {{simple_one_for_one, 60, 60}, [
 			child_spec ({worker, temporary}, undefined, mosaic_process, start_link, [])]}};
 	
 init ([{QualifiedName, mosaic_process_controller_sup}]) ->
-	ok = mosaic_tools:enforce_registered (QualifiedName),
+	ok = mosaic_process_tools:enforce_registered (QualifiedName),
 	{ok, {{simple_one_for_one, 60, 60}, [
 			child_spec ({worker, temporary}, undefined, mosaic_process_controller, start_link, [])]}};
 	
 init ([{QualifiedName, mosaic_object_store_sup}]) ->
-	ok = mosaic_tools:enforce_registered (QualifiedName),
+	ok = mosaic_process_tools:enforce_registered (QualifiedName),
 	{ok, {{simple_one_for_one, 60, 60}, [
 			child_spec ({worker, temporary}, undefined, mosaic_object_store, start_link, [])]}};
 	
 init ([{QualifiedName, mosaic_daemon_sup}]) ->
-	ok = mosaic_tools:enforce_registered (QualifiedName),
+	ok = mosaic_process_tools:enforce_registered (QualifiedName),
 	{ok, {{one_for_one, 60, 60}, []}};
 	
 init ([{QualifiedName, mosaic_vnode_master_sup}]) ->
-	ok = mosaic_tools:enforce_registered (QualifiedName),
+	ok = mosaic_process_tools:enforce_registered (QualifiedName),
 	{ok, {{one_for_one, 1, 60}, []}}.
 
 

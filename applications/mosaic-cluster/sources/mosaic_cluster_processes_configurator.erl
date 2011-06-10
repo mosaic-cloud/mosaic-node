@@ -15,14 +15,14 @@ start_supervised (Configuration) ->
 	mosaic_sup:start_child_daemon (mosaic_cluster_processes_configurator, {local, mosaic_process_configurator}, [Configuration], permanent).
 
 start_link (QualifiedName, Configuration) ->
-	mosaic_tools:start_link (gen_server, mosaic_cluster_processes_configurator, QualifiedName, Configuration).
+	mosaic_process_tools:start_link (gen_server, mosaic_cluster_processes_configurator, QualifiedName, Configuration).
 
 
 -record (state, {qualified_name}).
 
 
 init ({QualifiedName, defaults}) ->
-	case mosaic_tools:ensure_registered (QualifiedName) of
+	case mosaic_process_tools:ensure_registered (QualifiedName) of
 		ok ->
 			State = #state{qualified_name = QualifiedName},
 			{ok, State};
@@ -61,7 +61,7 @@ handle_call ({mosaic_process_configurator, configure, Type, Disposition, Identif
 					{reply, {error, {configurator_failed, {exit, CatchedTerm, erlang:get_stacktrace ()}}}, State}
 			end;
 		{ok, _, _} ->
-			ok = mosaic_tools:trace_error ("selected invalid configurator; ignoring!", [{type, Type}, {configuration_encoding, ConfigurationEncoding}]),
+			ok = mosaic_transcript:trace_error ("selected invalid configurator; ignoring!", [{type, Type}, {configuration_encoding, ConfigurationEncoding}]),
 			{reply, {error, configurator_not_registered}, State};
 		{error, does_not_exist} ->
 			{reply, {error, configurator_not_registered}, State}
@@ -111,15 +111,15 @@ handle_call ({mosaic_process_configurator, unregister, Type, ConfigurationEncodi
 	end;
 	
 handle_call (Request, Sender, State = #state{}) ->
-	ok = mosaic_tools:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
+	ok = mosaic_transcript:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
 	{reply, {error, {invalid_request, Request}}, State}.
 
 
 handle_cast (Request, State = #state{}) ->
-	ok = mosaic_tools:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
+	ok = mosaic_transcript:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
 	{noreply, State}.
 
 
 handle_info (Message, State = #state{}) ->
-	ok = mosaic_tools:trace_error ("received invalid message; ignoring!", [{message, Message}]),
+	ok = mosaic_transcript:trace_error ("received invalid message; ignoring!", [{message, Message}]),
 	{noreply, State}.

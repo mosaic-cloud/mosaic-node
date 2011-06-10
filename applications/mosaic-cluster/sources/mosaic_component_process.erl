@@ -11,6 +11,9 @@
 		begin_migration/4, commit_migration/1, rollback_migration/1]).
 
 
+-import (mosaic_enforcements, [enforce_ok_1/1]).
+
+
 -record (state, {identifier, status, harness, harness_token, execute, router, inbound_pending_calls, outbound_pending_calls}).
 -record (configuration, {harness, execute, router}).
 -record (inbound_pending_call, {correlation, sender}).
@@ -21,9 +24,9 @@ init (Disposition, Identifier, OriginalConfiguration)
 		when ((Disposition =:= create) orelse (Disposition =:= migrate))->
 	try
 		case parse_configuration (Disposition, term, OriginalConfiguration) of
-			{ok, #configuration{harness = HarnessConfiguration, execute = ExecuteSpecification, router = Router}} ->
+			{ok, #configuration{harness = HarnessOptions, execute = ExecuteSpecification, router = Router}} ->
 				Status = if (Disposition =:= create) -> executing; (Disposition =:= migrate) -> pre_migrating_as_target end,
-				init (prepare, Identifier, {Status, HarnessConfiguration, ExecuteSpecification, Router});
+				init (prepare, Identifier, {Status, HarnessOptions, ExecuteSpecification, Router});
 			Error1 = {error, _Reason1} ->
 				throw (Error1)
 		end
@@ -32,23 +35,29 @@ init (Disposition, Identifier, OriginalConfiguration)
 			{stop, Reason}
 	end;
 	
-init (prepare, Identifier, {Status, HarnessConfiguration, ExecuteSpecification, Router}) ->
+init (prepare, Identifier, {Status, HarnessOptions, ExecuteSpecification, Router}) ->
 	true = erlang:process_flag (trap_exit, true),
 	try
 		HarnessToken = erlang:make_ref (),
-		{ok, Harness} = case mosaic_component_harness:start_link ([{identifier, Identifier}, {controller, erlang:self ()}, {controller_token, HarnessToken} | HarnessConfiguration]) of
-			Outcome = {ok, _Harness} ->
-				Outcome;
+		{ok, HarnessConfiguration} = case mosaic_harness_coders:decode_configuration (term, [{controller, erlang:self ()}, {controller_token, HarnessToken} | HarnessOptions]) of
+			Outcome1 = {ok, _HarnessConfiguration} ->
+				Outcome1;
 			Error1 = {error, _Reason1} ->
 				throw (Error1)
 		end,
+		{ok, Harness} = case mosaic_harness_frontend:start_link (HarnessConfiguration) of
+			Outcome2 = {ok, _Harness} ->
+				Outcome2;
+			Error2 = {error, _Reason2} ->
+				throw (Error2)
+		end,
 		ok = if
 			(ExecuteSpecification =/= migrate) ->
-				ok = case mosaic_component_harness:execute (Harness, ExecuteSpecification) of
+				ok = case mosaic_harness_frontend:execute (Harness, ExecuteSpecification) of
 					ok ->
 						ok;
-					Error2 = {error, _Reason2} ->
-						throw (Error2)
+					Error3 = {error, _Reason3} ->
+						throw (Error3)
 				end;
 			true ->
 				ok
@@ -67,9 +76,20 @@ init (prepare, Identifier, {Status, HarnessConfiguration, ExecuteSpecification, 
 	end.
 
 
-terminate (_Reason, _State = #state{harness = Harness}) ->
-	_ = mosaic_component_harness:stop (Harness),
-	_ = mosaic_tools:wait (Harness, 5000),
+terminate (_Reason, _State = #state{harness = none}) ->
+	ok;
+	
+terminate (_Reason, _State = #state{harness = Harness})
+		when is_pid (Harness) ->
+	ok = try
+		_ = mosaic_harness_frontend:stop (Harness, normal),
+		_ = mosaic_process_tools:wait (Harness, 5000),
+		true = erlang:exit (Harness, kill),
+		ok
+	catch
+		exit : {noproc, _} ->
+			ok
+	end,
 	ok.
 
 
@@ -93,59 +113,59 @@ handle_cast (Request, RequestData, State) ->
 
 
 handle_info (
-			{mosaic_component_harness, exchange, HarnessToken, {MetaData, Data}},
+			{mosaic_harness_frontend, HarnessToken, push_packet, {exchange, MetaData, Data}},
 			State = #state{status = Status, harness_token = HarnessToken})
 		when is_list (MetaData), is_binary (Data),
 				((Status =:= executing) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
 	case lists:sort (MetaData) of
 		[{<<"action">>, <<"call">>}, {<<"component">>, Component_}, {<<"correlation">>, Correlation_}, {<<"meta-data">>, Request}]
 				when is_binary (Component_), is_binary (Correlation_) ->
-			case mosaic_webmachine:parse_string_identifier (Component_) of
+			case mosaic_component_coders:decode_component (Component_) of
 				{ok, Component} ->
-					case mosaic_webmachine:parse_string_identifier (Correlation_) of
+					case mosaic_component_coders:decode_correlation (Correlation_) of
 						{ok, Correlation} ->
 							handle_info ({mosaic_component_process_internals, outbound_call, Component, Correlation, Request, Data}, State);
 						{error, Reason} ->
-							ok = mosaic_tools:trace_error ("received invalid outbound call request: invalid correlation identifier; ignoring!", [{correlation, Correlation_}, {reason, Reason}]),
+							ok = mosaic_transcript:trace_error ("received invalid outbound call request: invalid correlation identifier; ignoring!", [{correlation, Correlation_}, {reason, Reason}]),
 							{noreply, State}
 					end;
 				{error, Reason} ->
-					ok = mosaic_tools:trace_error ("received invalid outbound call request: invalid component identifier; ignoring!", [{component, Component_}, {reason, Reason}]),
+					ok = mosaic_transcript:trace_error ("received invalid outbound call request: invalid component identifier; ignoring!", [{component, Component_}, {reason, Reason}]),
 					{noreply, State}
 			end;
 		[{<<"action">>, <<"cast">>}, {<<"component">>, Component_}, {<<"meta-data">>, Request}]
 				when is_binary (Component_) ->
-			case mosaic_webmachine:parse_string_identifier (Component_) of
+			case mosaic_component_coders:decode_component (Component_) of
 				{ok, Component} ->
 					handle_info ({mosaic_component_process_internals, outbound_cast, Component, Request, Data}, State);
 				{error, Reason} ->
-					ok = mosaic_tools:trace_error ("received invalid outbound cast request: invalid component identifier; ignoring!", [{component, Component_}, {reason, Reason}]),
+					ok = mosaic_transcript:trace_error ("received invalid outbound cast request: invalid component identifier; ignoring!", [{component, Component_}, {reason, Reason}]),
 					{noreply, State}
 			end;
 		[{<<"action">>, <<"return">>}, {<<"correlation">>, Correlation_}, {<<"meta-data">>, Reply}]
 				when is_binary (Correlation_) ->
-			case mosaic_webmachine:parse_string_identifier (Correlation_) of
+			case mosaic_component_coders:decode_correlation (Correlation_) of
 				{ok, Correlation} ->
 					handle_info ({mosaic_component_process_internals, inbound_return, Correlation, {ok, Reply, Data}}, State);
 				{error, Reason} ->
-					ok = mosaic_tools:trace_error ("received invalid inbound call return: invalid correlation identifier; ignoring!", [{correlation, Correlation_}, {reason, Reason}]),
+					ok = mosaic_transcript:trace_error ("received invalid inbound call return: invalid correlation identifier; ignoring!", [{correlation, Correlation_}, {reason, Reason}]),
 					{noreply, State}
 			end;
 		[{<<"action">>, <<"register">>}, {<<"correlation">>, Correlation__}, {<<"group">>, Group__}]
 				when is_binary (Correlation__), is_binary (Group__) ->
 			try
-				{ok, Correlation} = case mosaic_webmachine:parse_string_identifier (Correlation__) of
+				{ok, Correlation} = case mosaic_component_coders:decode_correlation (Correlation__) of
 					{ok, Correlation_} ->
 						{ok, Correlation_};
 					{error, Reason1} ->
-						ok = mosaic_tools:trace_error ("received invalid register: invalid correlation identifier; ignoring!", [{correlation, Correlation__}, {reason, Reason1}]),
+						ok = mosaic_transcript:trace_error ("received invalid register: invalid correlation identifier; ignoring!", [{correlation, Correlation__}, {reason, Reason1}]),
 						throw (noreply)
 				end,
-				{ok, Group} = case mosaic_webmachine:parse_string_identifier (Group__) of
+				{ok, Group} = case mosaic_component_coders:decode_group (Group__) of
 					{ok, Group_} ->
 						{ok, Group_};
 					{error, Reason2} ->
-						ok = mosaic_tools:trace_error ("received invalid register: invalid group identifier; ignoring!", [{grop, Group__}, {reason, Reason2}]),
+						ok = mosaic_transcript:trace_error ("received invalid register: invalid group identifier; ignoring!", [{grop, Group__}, {reason, Reason2}]),
 						throw (noreply)
 				end,
 				handle_info ({mosaic_component_process_internals, inbound_register, Correlation, Group}, State)
@@ -154,12 +174,12 @@ handle_info (
 					{noreply, State}
 			end;
 		_ ->
-			ok = mosaic_tools:trace_error ("received invalid exchange meta-data; ignoring!", [{meta_data, MetaData}, {data, Data}]),
+			ok = mosaic_transcript:trace_error ("received invalid exchange meta-data; ignoring!", [{meta_data, MetaData}, {data, Data}]),
 			{noreply, State}
 	end;
 	
 handle_info (
-			{mosaic_component_harness, exit, HarnessToken, ExitCode},
+			{mosaic_harness_frontend, HarnessToken, exit, ExitCode},
 			State = #state{harness_token = HarnessToken})
 		when is_integer (ExitCode), (ExitCode >= 0) ->
 	{stop, if (ExitCode =:= 0) -> normal; true -> {failed, ExitCode} end, State};
@@ -173,12 +193,12 @@ handle_info (
 			OldState = #state{status = Status, harness = Harness, inbound_pending_calls = OldPendingCalls})
 		when is_binary (RequestData),
 				((Status =:= executing) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
-	{ok, Correlation} = mosaic_cluster_tools:key (),
-	MetaData = [{<<"action">>, <<"call">>}, {<<"correlation">>, mosaic_webmachine:format_string_identifier (Correlation)}, {<<"meta-data">>, Request}],
+	{ok, Correlation} = mosaic_component_coders:generate_correlation (),
+	MetaData = [{<<"action">>, <<"call">>}, {<<"correlation">>, enforce_ok_1 (mosaic_component_coders:encode_correlation (Correlation))}, {<<"meta-data">>, Request}],
 	PendingCall = #inbound_pending_call{correlation = Correlation, sender = Sender},
 	NewPendingCalls = orddict:store (Correlation, PendingCall, OldPendingCalls),
 	NewState = OldState#state{inbound_pending_calls = NewPendingCalls},
-	case mosaic_component_harness:exchange (Harness, {MetaData, RequestData}) of
+	case mosaic_harness_frontend:push_packet (Harness, {exchange, MetaData, RequestData}) of
 		ok ->
 			{noreply, NewState};
 		Error = {error, _Reason} ->
@@ -189,14 +209,14 @@ handle_info (
 			{mosaic_component_process_internals, inbound_call, Request, RequestData, Sender},
 			State = #state{status = Status})
 		when is_binary (RequestData) ->
-	ok = mosaic_tools:trace_error ("received unexpected inbound call; ignoring!", [{request, Request}, {request_data, RequestData}, {sender, Sender}]),
+	ok = mosaic_transcript:trace_error ("received unexpected inbound call; ignoring!", [{request, Request}, {request_data, RequestData}, {sender, Sender}]),
 	_ = gen_server:reply (Sender, {error, {invalid_status, Status}}),
 	{noreply, State};
 	
 handle_info (
 			{mosaic_component_process_internals, inbound_return, Correlation, Outcome},
 			OldState = #state{status = Status, inbound_pending_calls = OldPendingCalls})
-		when is_binary (Correlation), (bit_size (Correlation) =:= 160),
+		when is_binary (Correlation), (bit_size (Correlation) =:= 128),
 				((Status =:= executing) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
 	case orddict:find (Correlation, OldPendingCalls) of
 		{ok, #inbound_pending_call{correlation = Correlation, sender = Sender}} ->
@@ -208,28 +228,28 @@ handle_info (
 					_ = gen_server:reply (Sender, Outcome),
 					ok;
 				_ ->
-					ok = mosaic_tools:trace_error ("received invalid inbound return: invalid outcome; ignoring!", [{correlation, Correlation}, {outcome, Outcome}]),
+					ok = mosaic_transcript:trace_error ("received invalid inbound return: invalid outcome; ignoring!", [{correlation, Correlation}, {outcome, Outcome}]),
 					ok
 			end,
 			NewPendingCalls = orddict:erase (Correlation, OldPendingCalls),
 			NewState = OldState#state{inbound_pending_calls = NewPendingCalls},
 			{noreply, NewState};
 		error ->
-			ok = mosaic_tools:trace_error ("received invalid inbound return: invalid correlation; ignoring!", [{correlation, Correlation}, {outcome, Outcome}]),
+			ok = mosaic_transcript:trace_error ("received invalid inbound return: invalid correlation; ignoring!", [{correlation, Correlation}, {outcome, Outcome}]),
 			{noreply, OldState}
 	end;
 	
 handle_info (
 			{mosaic_component_process_internals, inbound_return, Correlation, _Outcome},
 			State = #state{status = _Status})
-		when is_binary (Correlation), (bit_size (Correlation) =:= 160) ->
+		when is_binary (Correlation), (bit_size (Correlation) =:= 128) ->
 	% !!!!
 	{noreply, State};
 	
 handle_info (
 			{mosaic_component_process_internals, outbound_call, Component, Correlation, Request, RequestData},
 			OldState = #state{status = Status, router = Router, outbound_pending_calls = OldPendingCalls})
-		when is_binary (Component), (bit_size (Component) =:= 160), is_binary (Correlation), (bit_size (Correlation) =:= 160), is_binary (RequestData),
+		when is_binary (Component), (bit_size (Component) =:= 160), is_binary (Correlation), (bit_size (Correlation) =:= 128), is_binary (RequestData),
 				((Status =:= executing) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
 	Reference = erlang:make_ref (),
 	Sender = {erlang:self (), Reference},
@@ -246,7 +266,7 @@ handle_info (
 handle_info (
 			{mosaic_component_process_internals, outbound_call, Component, Correlation, _Request, RequestData},
 			State = #state{status = _Status})
-		when is_binary (Component), (bit_size (Component) =:= 160), is_binary (Correlation), (bit_size (Correlation) =:= 160), is_binary (RequestData) ->
+		when is_binary (Component), (bit_size (Component) =:= 160), is_binary (Correlation), (bit_size (Correlation) =:= 128), is_binary (RequestData) ->
 	% !!!!
 	{noreply, State};
 	
@@ -259,8 +279,8 @@ handle_info (
 		{ok, #outbound_pending_call{reference = Reference, correlation = Correlation}} ->
 			ok = case Outcome of
 				{ok, Reply, ReplyData} when is_binary (ReplyData) ->
-					MetaData = [{<<"action">>, <<"return">>}, {<<"correlation">>, mosaic_webmachine:format_string_identifier (Correlation)}, {<<"meta-data">>, Reply}],
-					case mosaic_component_harness:exchange (Harness, {MetaData, ReplyData}) of
+					MetaData = [{<<"action">>, <<"return">>}, {<<"correlation">>, enforce_ok_1 (mosaic_component_coders:encode_correlation (Correlation))}, {<<"meta-data">>, Reply}],
+					case mosaic_harness_frontend:push_packet (Harness, {exchange, MetaData, ReplyData}) of
 						ok ->
 							ok;
 						{error, _Reason} ->
@@ -295,7 +315,7 @@ handle_info (
 		when is_binary (RequestData),
 				((Status =:= executing) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
 	MetaData = [{<<"action">>, <<"cast">>}, {<<"meta-data">>, Request}],
-	case mosaic_component_harness:exchange (Harness, {MetaData, RequestData}) of
+	case mosaic_harness_frontend:push_packet (Harness, {exchange, MetaData, RequestData}) of
 		ok ->
 			{noreply, State};
 		_Error = {error, _Reason} ->
@@ -327,17 +347,17 @@ handle_info (
 			{mosaic_component_process_internals, outbound_cast, Component, Request, RequestData},
 			State = #state{status = Status})
 		when is_binary (Component), (bit_size (Component) =:= 160), is_binary (RequestData) ->
-	ok = mosaic_tools:trace_error ("received unexpected outbound cast request; ignoring!", [{component, Component}, {request, Request}, {request_data, RequestData}, {status, Status}]),
+	ok = mosaic_transcript:trace_error ("received unexpected outbound cast request; ignoring!", [{component, Component}, {request, Request}, {request_data, RequestData}, {status, Status}]),
 	{noreply, State};
 	
 handle_info (
 			{mosaic_component_process_internals, inbound_register, Correlation, Group},
 			State = #state{status = Status, harness = Harness})
-		when is_binary (Correlation), (bit_size (Correlation) =:= 160), is_binary (Group), (bit_size (Group) =:= 160),
+		when is_binary (Correlation), (bit_size (Correlation) =:= 128), is_binary (Group), (bit_size (Group) =:= 160),
 				((Status =:= executing) orelse (Status =:= migrating_as_target)) ->
 	case mosaic_process_router:register (Group, erlang:self ()) of
 		ok ->
-			case mosaic_component_harness:exchange (Harness, {[{<<"action">>, <<"register-return">>}, {<<"correlation">>, mosaic_webmachine:format_string_identifier (Correlation)}, {<<"ok">>, true}], <<>>}) of
+			case mosaic_harness_frontend:push_packet (Harness, {exchange, [{<<"action">>, <<"register-return">>}, {<<"correlation">>, enforce_ok_1 (mosaic_component_coders:encode_correlation (Correlation))}, {<<"ok">>, true}], <<>>}) of
 				ok ->
 					{noreply, State};
 				_Error = {error, _Reason} ->
@@ -345,7 +365,7 @@ handle_info (
 					{noreply, State}
 			end;
 		_Error = {error, Reason} ->
-			case mosaic_component_harness:exchange (Harness, {[{<<"action">>, <<"register-return">>}, {<<"correlation">>, mosaic_webmachine:format_string_identifier (Correlation)}, {<<"ok">>, false}, {<<"error">>, mosaic_webmachine:format_term (Reason)}], <<>>}) of
+			case mosaic_harness_frontend:push_packet (Harness, {exchange, [{<<"action">>, <<"register-return">>}, {<<"correlation">>, enforce_ok_1 (mosaic_component_coders:encode_correlation (Correlation))}, {<<"ok">>, false}, {<<"error">>, enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reason))}], <<>>}) of
 				ok ->
 					{noreply, State};
 				_Error = {error, _Reason} ->
@@ -355,33 +375,32 @@ handle_info (
 	end;
 	
 handle_info (Message, State) ->
-	ok = mosaic_tools:trace_error ("received invalid message; ignoring!", [{message, Message}]),
+	ok = mosaic_transcript:trace_error ("received invalid message; ignoring!", [{message, Message}]),
 	{noreply, State}.
 
 
-begin_migration (source, OriginalConfiguration, CompletionFun, OldState = #state{status = executing, execute = ExecuteSpecification}) ->
-	case OriginalConfiguration of
+begin_migration (source, Configuration, CompletionFun, OldState = #state{status = executing, execute = ExecuteSpecification}) ->
+	case Configuration of
 		defaults ->
 			NewState = OldState#state{status = migrating_as_source},
-			Configuration = [{execute, ExecuteSpecification}],
-			ok = CompletionFun ({prepared, Configuration}),
+			ok = CompletionFun ({prepared, [{execute, ExecuteSpecification}]}),
 			ok = CompletionFun (completed),
 			{continue, NewState};
 		_ ->
-			{reject, {invalid_configuration, OriginalConfiguration}, OldState}
+			{reject, {invalid_configuration, Configuration}, OldState}
 	end;
 	
-begin_migration (target, OriginalConfiguration, CompletionFun, OldState = #state{status = pre_migrating_as_target}) ->
+begin_migration (target, Configuration, CompletionFun, OldState = #state{status = pre_migrating_as_target}) ->
 	try
-		{ok, OriginalExecuteSpecification} = case OriginalConfiguration of
-			[{execute, OriginalExecuteSpecification_}] ->
-				{ok, OriginalExecuteSpecification_};
-			_ ->
-				throw ({invalid_configuration, OriginalConfiguration})
-		end,
-		{ok, ExecuteSpecification} = case mosaic_component_harness:parse_execute_specification (OriginalExecuteSpecification) of
-			{ok, ExecuteSpecification_} ->
+		{ok, ExecuteSpecification} = case Configuration of
+			[{execute, ExecuteSpecification_}] ->
 				{ok, ExecuteSpecification_};
+			_ ->
+				throw ({invalid_configuration, Configuration})
+		end,
+		ok = case mosaic_harness_coders:validate_execute_specification (ExecuteSpecification) of
+			ok ->
+				ok;
 			Error1 = {error, _Reason1} ->
 				throw (Error1)
 		end,
@@ -395,15 +414,17 @@ begin_migration (target, OriginalConfiguration, CompletionFun, OldState = #state
 
 
 commit_migration (OldState = #state{status = migrating_as_source, harness = Harness}) ->
-	case mosaic_component_harness:stop (Harness, normal) of
+	case mosaic_harness_frontend:stop (Harness, normal) of
 		ok ->
+			_ = mosaic_process_tools:wait (Harness, 5000),
+			true = erlang:exit (Harness, kill),
 			{continue, OldState#state{status = migrating_as_source_succeeded}};
 		{error, Reason} ->
 			{terminate, Reason, OldState#state{status = migrating_as_source_failed}}
 	end;
 	
 commit_migration (OldState = #state{status = migrating_as_target, harness = Harness, execute = ExecuteSpecification}) ->
-	case mosaic_component_harness:execute (Harness, ExecuteSpecification) of
+	case mosaic_harness_frontend:execute (Harness, ExecuteSpecification) of
 		ok ->
 			{continue, OldState#state{status = executing}};
 		{error, Reason} ->
@@ -420,18 +441,18 @@ rollback_migration (OldState = #state{status = Status}) when (Status =:= pre_mig
 
 validate_configuration (
 			Disposition,
-			#configuration{harness = HarnessConfiguration, execute = ExecuteSpecification, router = Router})
+			#configuration{harness = HarnessOptions, execute = ExecuteSpecification, router = Router})
 		when ((Disposition =:= create) orelse (Disposition =:= migrate)) ->
 	try
 		ok = if
-			is_list (HarnessConfiguration) ->
+			is_list (HarnessOptions) ->
 				ok;
 			true ->
-				throw ({error, {invalid_harness, HarnessConfiguration}})
+				throw ({error, {invalid_harness, HarnessOptions}})
 		end,
 		ok = if
 			(Disposition =:= create) ->
-				ok = case mosaic_component_harness:validate_execute_specification (ExecuteSpecification) of
+				ok = case mosaic_harness_coders:validate_execute_specification (ExecuteSpecification) of
 					ok ->
 						ok;
 					Error1 = {error, _Reason1} ->
@@ -469,15 +490,15 @@ parse_configuration (Disposition, term, OriginalOptions)
 	case lists:sort (proplists:get_keys (FinalOptions)) of
 		[execute, harness, router] ->
 			try
-				{ok, HarnessConfiguration} = case proplists:get_value (harness, FinalOptions) of
+				{ok, HarnessOptions} = case proplists:get_value (harness, FinalOptions) of
 					undefined ->
 						throw ({error, missing_harness});
 					defaults ->
 						{ok, []};
-					HarnessConfiguration_ when is_list (HarnessConfiguration_) ->
-						{ok, HarnessConfiguration_};
-					HarnessConfiguration_ ->
-						throw ({error, {invalid_harness, HarnessConfiguration_}})
+					HarnessOptions_ when is_list (HarnessOptions_) ->
+						{ok, HarnessOptions_};
+					HarnessOptions_ ->
+						throw ({error, {invalid_harness, HarnessOptions_}})
 				end,
 				{ok, ExecuteSpecification} = case proplists:get_value (execute, FinalOptions) of
 					undefined when (Disposition =:= create) ->
@@ -485,7 +506,7 @@ parse_configuration (Disposition, term, OriginalOptions)
 					undefined when (Disposition =:= migrate) ->
 						{ok, migrate};
 					ExecuteSpecification__ when (Disposition =:= create) ->
-						case mosaic_component_harness:parse_execute_specification (ExecuteSpecification__) of
+						case mosaic_harness_coders:decode_execute_specification (term, ExecuteSpecification__) of
 							{ok, ExecuteSpecification_} ->
 								{ok, ExecuteSpecification_};
 							{error, Reason1} ->
@@ -505,7 +526,7 @@ parse_configuration (Disposition, term, OriginalOptions)
 						throw ({error, {invalid_router, Router_}})
 				end,
 				Configuration = #configuration{
-						harness = HarnessConfiguration,
+						harness = HarnessOptions,
 						execute = ExecuteSpecification,
 						router = Router},
 				{ok, Configuration}

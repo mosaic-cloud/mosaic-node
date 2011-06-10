@@ -16,14 +16,14 @@ start () ->
 	start (noname).
 
 start (QualifiedName) ->
-	mosaic_tools:start (gen_event, none, QualifiedName, void).
+	mosaic_process_tools:start (gen_event, none, QualifiedName, void).
 
 
 start_link () ->
 	start_link (noname).
 
 start_link (QualifiedName) ->
-	mosaic_tools:start_link (gen_event, none, QualifiedName, void).
+	mosaic_process_tools:start_link (gen_event, none, QualifiedName, void).
 
 start_link (QualifiedName, void) ->
 	start_link (QualifiedName).
@@ -82,9 +82,9 @@ handle_event (Event, {Function, OldState}) ->
 	{ok, {Function, NewState}}.
 
 handle_call (Request, Closure) ->
-	ok = mosaic_tools:trace_error ("received invalid call request; ignoring!", [{request, Request}]),
+	ok = mosaic_transcript:trace_error ("received invalid call request; ignoring!", [{request, Request}]),
 	{ok, {error, {invalid_request, Request}}, Closure}.
 
 handle_info (Message, Closure) ->
-	ok = mosaic_tools:trace_error ("received invalid message; ignoring!", [{message, Message}]),
+	ok = mosaic_transcript:trace_error ("received invalid message; ignoring!", [{message, Message}]),
 	{ok, Closure}.

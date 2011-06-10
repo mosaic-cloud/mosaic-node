@@ -15,6 +15,7 @@
 
 -import (mosaic_process_tests, [start_link_process/4, stop_and_wait_process/1, wait_process/1, call_process/3, cast_process/3]).
 -import (mosaic_process_migrator_tests, [start_link_process_migrator/6, wait_process_migrator/1]).
+-import (mosaic_enforcements, [enforce_ok_1/1]).
 
 
 -test ({test_start_stop, [{defaults}]}).
@@ -28,7 +29,7 @@
 
 
 test_start_stop ({defaults}) ->
-	{ok, Identifier} = mosaic_cluster_tools:key (),
+	{ok, Identifier} = mosaic_component_coders:generate_component (),
 	{ok, Configuration} = configure (python_parrot, create, Identifier),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
 	ok = stop_and_wait_process (Process),
@@ -36,7 +37,7 @@ test_start_stop ({defaults}) ->
 
 
 test_call ({defaults}) ->
-	{ok, Identifier} = mosaic_cluster_tools:key (),
+	{ok, Identifier} = mosaic_component_coders:generate_component (),
 	{ok, Configuration} = configure (python_parrot, create, Identifier),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
 	Request = {struct, [{<<"key-1">>, 1}, {<<"key-a">>, <<"a">>}]},
@@ -47,7 +48,7 @@ test_call ({defaults}) ->
 
 
 test_cast ({defaults}) ->
-	{ok, Identifier} = mosaic_cluster_tools:key (),
+	{ok, Identifier} = mosaic_component_coders:generate_component (),
 	{ok, Configuration} = configure (python_parrot, create, Identifier),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
 	Request = {struct, [{<<"key-1">>, 1}, {<<"key-a">>, <<"a">>}]},
@@ -59,7 +60,7 @@ test_cast ({defaults}) ->
 
 
 test_migrate ({defaults}) ->
-	{ok, Identifier} = mosaic_cluster_tools:key (),
+	{ok, Identifier} = mosaic_component_coders:generate_component (),
 	{ok, SourceConfiguration} = configure (python_parrot, create, Identifier),
 	{ok, TargetConfiguration} = configure (python_parrot, migrate, Identifier),
 	Self = erlang:self (),
@@ -86,7 +87,7 @@ test_abacus ({Flavour}) ->
 		node ->
 			{ok, node_abacus}
 	end,
-	{ok, Identifier} = mosaic_cluster_tools:key (),
+	{ok, Identifier} = mosaic_component_coders:generate_component (),
 	{ok, Configuration} = configure (Type, create, Identifier),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
 	Request = {struct, [{<<"operator">>, <<"+">>}, {<<"operands">>, [1, 2]}]},
@@ -101,7 +102,7 @@ test_abacus ({Flavour}) ->
 
 
 test_rabbitmq ({defaults}) ->
-	{ok, Identifier} = mosaic_cluster_tools:key (),
+	{ok, Identifier} = mosaic_component_coders:generate_component (),
 	{ok, Configuration} = configure (rabbitmq, create, Identifier),
 	{ok, Router} = mosaic_cluster_processes_router:start_link ({local, mosaic_process_router}, defaults),
 	{ok, Resources} = mosaic_cluster_resources:start_link ({local, mosaic_component_resources}, defaults),
@@ -145,12 +146,12 @@ configure (Type, create, Identifier, term, defaults, ExtraOptions)
 	end,
 	Options = [
 			{harness, [
-				{argument0, <<"[mosaic_component#", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (mosaic_webmachine:format_string_identifier (Identifier)) / binary, "]">>}]},
+				{argument0, <<"[mosaic_component#", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
 			{execute, [
 				{executable, Python},
 				{arguments, [
-					<<"./applications/mosaic-cluster/sources/mosaic_component_harness_tester.py">>,
-					<<"backend">>, Scenario, mosaic_webmachine:format_string_identifier (Identifier)]}]}
+					<<"./applications/mosaic-harness/sources/mosaic_harness_tester.py">>,
+					<<"backend">>, Scenario, enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]}]}
 			| ExtraOptions],
 	case mosaic_component_process:parse_configuration (create, term, Options) of
 		{ok, Configuration} ->
@@ -169,7 +170,7 @@ configure (Type = java_abacus, create, Identifier, term, defaults, ExtraOptions)
 	end,
 	Options = [
 			{harness, [
-				{argument0, <<"[mosaic_component#", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (mosaic_webmachine:format_string_identifier (Identifier)) / binary, "]">>}]},
+				{argument0, <<"[mosaic_component#", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
 			{execute, [
 				{executable, Java},
 				{arguments, [
@@ -194,7 +195,7 @@ configure (Type = node_abacus, create, Identifier, term, defaults, ExtraOptions)
 	end,
 	Options = [
 			{harness, [
-				{argument0, <<"[mosaic_component#", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (mosaic_webmachine:format_string_identifier (Identifier)) / binary, "]">>}]},
+				{argument0, <<"[mosaic_component#", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
 			{execute, [
 				{executable, Node},
 				{arguments, [
@@ -212,10 +213,10 @@ configure (Type = rabbitmq, create, Identifier, term, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	Options = [
 			{harness, [
-				{argument0, <<"[mosaic_component#", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (mosaic_webmachine:format_string_identifier (Identifier)) / binary, "]">>}]},
+				{argument0, <<"[mosaic_component#", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
 			{execute, [
 				{executable, <<"./scripts/run-node">>},
-				{arguments, [mosaic_webmachine:format_string_identifier (Identifier)]},
+				{arguments, [enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]},
 				{working_directory, <<"../mosaic-components-rabbitmq">>}]}
 			| ExtraOptions],
 	case mosaic_component_process:parse_configuration (create, term, Options) of
@@ -231,7 +232,7 @@ configure (_Type, {migrate, source}, _Identifier, term, defaults, _ExtraOptions)
 configure (Type, {migrate, target}, Identifier, term, defaults, ExtraOptions) ->
 	Options = [
 			{harness, [
-				{argument0, <<"[mosaic_component#", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (mosaic_webmachine:format_string_identifier (Identifier)) / binary, "]">>}]}
+				{argument0, <<"[mosaic_component#", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]}
 			| ExtraOptions],
 	case mosaic_component_process:parse_configuration (migrate, term, Options) of
 		{ok, Configuration} ->

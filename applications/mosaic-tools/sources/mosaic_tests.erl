@@ -13,7 +13,7 @@ test_module (Module)
 		when is_atom (Module) ->
 	try
 		DefaultTimeout = 10000,
-		ok = mosaic_tools:trace_debugging ({"testing module `~w`...", Module}),
+		ok = mosaic_transcript:trace_debugging ({"testing module `~w`...", Module}),
 		ModuleLoaded = erlang:module_loaded (Module),
 		ok = if
 			ModuleLoaded ->
@@ -21,7 +21,7 @@ test_module (Module)
 			true ->
 				throw ({error, {invalid_module, Module}})
 		end,
-		ok = mosaic_tools:trace_debugging ({"collecting module `~w` tests...", Module}),
+		ok = mosaic_transcript:trace_debugging ({"collecting module `~w` tests...", Module}),
 		Tests = lists:flatten (
 				lists:map (
 					fun
@@ -38,19 +38,19 @@ test_module (Module)
 							[]
 				end,
 				erlang:apply (Module, module_info, [attributes]))),
-		ok = mosaic_tools:trace_debugging ({"executing module `~w` tests...", Module}),
+		ok = mosaic_transcript:trace_debugging ({"executing module `~w` tests...", Module}),
 		ok = execute_tests (Tests),
-		ok = mosaic_tools:trace_debugging ({"succeeded testing module `~w`;", Module}),
+		ok = mosaic_transcript:trace_debugging ({"succeeded testing module `~w`;", Module}),
 		ok
 	catch
 		throw : Error = {error, {failed_test, {Module, Function, Arguments, _Timeout}, Reason}} ->
-			ok = mosaic_tools:trace_error ({"failed testing module `~w`: failed test `~w:~w ~w`;", Module, Module, Function, Arguments}, [{reason, Reason}]),
+			ok = mosaic_transcript:trace_error ({"failed testing module `~w`: failed test `~w:~w ~w`;", Module, Module, Function, Arguments}, [{reason, Reason}]),
 			Error;
 		throw : Error = {error, {invalid_test, Test}} ->
-			ok = mosaic_tools:trace_error ({"failed testing module `~w`: invalid test;", Module}, [{test, Test}]),
+			ok = mosaic_transcript:trace_error ({"failed testing module `~w`: invalid test;", Module}, [{test, Test}]),
 			Error;
 		throw : Error = {error, {invalid_module, Module}} ->
-			ok = mosaic_tools:trace_error ({"failed testing module `~w`: invalid module;", Module}),
+			ok = mosaic_transcript:trace_error ({"failed testing module `~w`: invalid module;", Module}),
 			Error
 	end.
 
@@ -58,17 +58,17 @@ test_module (Module)
 test_scenario (Scenario, Tests)
 		when is_atom (Scenario), is_list (Tests) ->
 	try
-		ok = mosaic_tools:trace_debugging ({"testing scenario `~w`...", Scenario}),
-		ok = mosaic_tools:trace_debugging ({"executing scenario `~w` tests...", Scenario}),
+		ok = mosaic_transcript:trace_debugging ({"testing scenario `~w`...", Scenario}),
+		ok = mosaic_transcript:trace_debugging ({"executing scenario `~w` tests...", Scenario}),
 		ok = execute_tests (Tests),
-		ok = mosaic_tools:trace_debugging ({"succeeded testing scenario `~w`;", Scenario}),
+		ok = mosaic_transcript:trace_debugging ({"succeeded testing scenario `~w`;", Scenario}),
 		ok
 	catch
 		throw : Error = {error, {failed_test, {Module, Function, Arguments, _Timeout}, Reason}} ->
-			ok = mosaic_tools:trace_error ({"failed testing scenario `~w`: failed test `~w:~w ~w`;", Scenario, Module, Function, Arguments}, [{reason, Reason}]),
+			ok = mosaic_transcript:trace_error ({"failed testing scenario `~w`: failed test `~w:~w ~w`;", Scenario, Module, Function, Arguments}, [{reason, Reason}]),
 			Error;
 		throw : Error = {error, {invalid_test, Test}} ->
-			ok = mosaic_tools:trace_error ({"failed testing scenario `~w`: invalid test;", Scenario}, [{test, Test}]),
+			ok = mosaic_transcript:trace_error ({"failed testing scenario `~w`: invalid test;", Scenario}, [{test, Test}]),
 			Error
 	end.
 
@@ -79,7 +79,7 @@ execute_tests ([]) ->
 execute_tests ([Test = {Module, Function, Arguments, Timeout} | RemainingTests])
 		when is_atom (Module), is_atom (Function), is_list (Arguments),
 				((Timeout =:= infinity) orelse (is_integer (Timeout) andalso (Timeout > 0))) ->
-	ok = mosaic_tools:trace_debugging ({"executing test `~w:~w ~w` (timeout ~ws)...", Module, Function, Arguments, if is_integer (Timeout) -> Timeout / 1000; true -> Timeout end}),
+	ok = mosaic_transcript:trace_debugging ({"executing test `~w:~w ~w` (timeout ~ws)...", Module, Function, Arguments, if is_integer (Timeout) -> Timeout / 1000; true -> Timeout end}),
 	SpawnTime = erlang:now (),
 	SlaveToken = erlang:make_ref (),
 	SlaveProcess = erlang:spawn_link (
@@ -124,10 +124,10 @@ execute_tests ([Test = {Module, Function, Arguments, Timeout} | RemainingTests])
 	Elapsed = timer:now_diff (JoinTime, SpawnTime) / 1000000,
 	case Outcome of
 		ok ->
-			ok = mosaic_tools:trace_debugging ({"succeeded test `~w:~w ~w` (elapsed ~ws);", Module, Function, Arguments, Elapsed}),
+			ok = mosaic_transcript:trace_debugging ({"succeeded test `~w:~w ~w` (elapsed ~ws);", Module, Function, Arguments, Elapsed}),
 			execute_tests (RemainingTests);
 		Error = {error, {failed_test, Test, Reason}} ->
-			ok = mosaic_tools:trace_error ({"failed test `~w:~w ~w` (elapsed ~ws);", Module, Function, Arguments, Elapsed}, [{reason, Reason}]),
+			ok = mosaic_transcript:trace_error ({"failed test `~w:~w ~w` (elapsed ~ws);", Module, Function, Arguments, Elapsed}, [{reason, Reason}]),
 			throw (Error)
 	end;
 	
@@ -140,7 +140,7 @@ wait (Process) ->
 
 wait (Process, Reasons)
 		when (is_pid (Process) or is_port (Process)), ((Reasons =:= any) orelse (Reasons =:= normal) orelse is_list (Reasons)) ->
-	case mosaic_tools:wait (Process) of
+	case mosaic_process_tools:wait (Process) of
 		{ok, Reason} ->
 			case Reasons of
 				any ->
@@ -174,7 +174,7 @@ sleep (Timeout)
 enforce_start_outcome (QualifiedName, Outcome) ->
 	case Outcome of
 		{ok, Process} when is_pid (Process) ->
-			case mosaic_tools:enforce_registered (QualifiedName, Process) of
+			case mosaic_process_tools:enforce_registered (QualifiedName, Process) of
 				ok ->
 					Outcome;
 				Error = {error, _Reason} ->
@@ -227,7 +227,7 @@ trace (Process)
 	Loop = fun (Loop) ->
 		receive
 			Trace ->
-				ok = mosaic_tools:trace_debugging ("traced process...", [{process, Process}, {trace, Trace}]),
+				ok = mosaic_transcript:trace_debugging ("traced process...", [{process, Process}, {trace, Trace}]),
 				Loop (Loop)
 		end
 	end,

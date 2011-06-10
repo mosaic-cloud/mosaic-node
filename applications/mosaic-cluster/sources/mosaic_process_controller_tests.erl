@@ -33,7 +33,7 @@ test_start_stop ({defaults}) ->
 
 
 test_create (Outcome) ->
-	Identifier = crypto:rand_bytes (160 div 8),
+	{ok, Identifier} = mosaic_component_coders:generate_component (),
 	{ok, Supervisor} = mosaic_sup:start_link (mosaic_process_sup),
 	{ok, Controller} = mosaic_process_controller:start_link (),
 	ok = case Outcome of
@@ -56,7 +56,7 @@ test_create (Outcome) ->
 
 
 test_migrate ({once}) ->
-	Identifier = crypto:rand_bytes (160 div 8),
+	{ok, Identifier} = mosaic_component_coders:generate_component (),
 	{ok, Supervisor} = mosaic_sup:start_link (mosaic_process_sup),
 	{ok, SourceController} = start_link_process_controller (),
 	{ok, TargetController} = start_link_process_controller (),
@@ -74,7 +74,7 @@ test_migrate ({once}) ->
 	ok;
 	
 test_migrate ({twice}) ->
-	Identifier = crypto:rand_bytes (160 div 8),
+	{ok, Identifier} = mosaic_component_coders:generate_component (),
 	{ok, Supervisor} = mosaic_sup:start_link (mosaic_process_sup),
 	{ok, SourceController} = start_link_process_controller (),
 	{ok, TargetController} = start_link_process_controller (),

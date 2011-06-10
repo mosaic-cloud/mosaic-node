@@ -15,14 +15,14 @@ start_supervised (Configuration) ->
 	mosaic_sup:start_child_daemon (mosaic_cluster_resources, {local, mosaic_component_resources}, [Configuration], permanent).
 
 start_link (QualifiedName, Configuration) ->
-	mosaic_tools:start_link (gen_server, mosaic_cluster_resources, QualifiedName, Configuration).
+	mosaic_process_tools:start_link (gen_server, mosaic_cluster_resources, QualifiedName, Configuration).
 
 
 -record (state, {qualified_name, table}).
 
 
 init ({QualifiedName, defaults}) ->
-	case mosaic_tools:ensure_registered (QualifiedName) of
+	case mosaic_process_tools:ensure_registered (QualifiedName) of
 		ok ->
 			Table = ets:new (mosaic_cluster_resources, [set, protected, named_table]),
 			State = #state{qualified_name = QualifiedName, table = Table},
@@ -60,17 +60,17 @@ handle_call ({mosaic_component_resources, acquire, OwnerIdentifier, OwnerProcess
 	end;
 	
 handle_call (Request, Sender, State = #state{}) ->
-	ok = mosaic_tools:trace_error ("received invalid request; ignoring!", [{request, Request}, {sender, Sender}]),
+	ok = mosaic_transcript:trace_error ("received invalid request; ignoring!", [{request, Request}, {sender, Sender}]),
 	{reply, {error, {invalid_request, Request}}, State}.
 
 
 handle_cast (Request, State = #state{}) ->
-	ok = mosaic_tools:trace_error ("received invalid request; ignoring!", [{request, Request}]),
+	ok = mosaic_transcript:trace_error ("received invalid request; ignoring!", [{request, Request}]),
 	{noreply, State}.
 
 
 handle_info (Message, State = #state{}) ->
-	ok = mosaic_tools:trace_error ("received invalid message; ignoring!", [{message, Message}]),
+	ok = mosaic_transcript:trace_error ("received invalid message; ignoring!", [{message, Message}]),
 	{noreply, State}.
 
 

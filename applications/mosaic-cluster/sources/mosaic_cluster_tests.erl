@@ -76,7 +76,7 @@ test () ->
 		ok
 	catch
 		throw : _Error3 = {error, Reason3} ->
-			ok = mosaic_tools:trace_error ("failed executing scenario; stopping!", [{reason, Reason3}]),
+			ok = mosaic_transcript:trace_error ("failed executing scenario; stopping!", [{reason, Reason3}]),
 			ok = timer:sleep (100),
 			ok = init:halt (),
 			ok

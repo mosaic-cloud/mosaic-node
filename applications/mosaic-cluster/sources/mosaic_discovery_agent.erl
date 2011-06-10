@@ -18,7 +18,7 @@ start (Configuration) ->
 	start (noname, Configuration).
 
 start (QualifiedName, Configuration) ->
-	mosaic_tools:start (gen_server, mosaic_discovery_agent, QualifiedName, Configuration).
+	mosaic_process_tools:start (gen_server, mosaic_discovery_agent, QualifiedName, Configuration).
 
 
 start_link () ->
@@ -28,7 +28,7 @@ start_link (Configuration) ->
 	start_link (noname, Configuration).
 
 start_link (QualifiedName, Configuration) ->
-	mosaic_tools:start_link (gen_server, mosaic_discovery_agent, QualifiedName, Configuration).
+	mosaic_process_tools:start_link (gen_server, mosaic_discovery_agent, QualifiedName, Configuration).
 
 
 start_supervised () ->
@@ -126,12 +126,12 @@ handle_call ({mosaic_discovery_agent, broadcast, Message, Count, Delay}, _Sender
 	end;
 	
 handle_call (Request, Sender, State) ->
-	ok = mosaic_tools:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
+	ok = mosaic_transcript:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
 	{reply, {error, {invalid_request, Request}}, State}.
 
 
 handle_cast (Request, State) ->
-	ok = mosaic_tools:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
+	ok = mosaic_transcript:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
 	{noreply, State}.
 
 
@@ -158,7 +158,7 @@ handle_info (
 					{noreply, OldState#state{broadcasts = NewBroadcasts}}
 			end;
 		error ->
-			ok = mosaic_tools:trace_error ("received invalid broadcast request: invalid reference; ignoring!", [{reference, Reference}]),
+			ok = mosaic_transcript:trace_error ("received invalid broadcast request: invalid reference; ignoring!", [{reference, Reference}]),
 			{noreply, OldState}
 	end;
 	
@@ -174,12 +174,12 @@ handle_info (
 			ok = mosaic_discovery_events:broadcasted (Events, Message),
 			{noreply, State};
 		{error, Reason} ->
-			ok = mosaic_tools:trace_error ("received invalid broadcast packet: invalid payload; ignoring!", [{source, {SourceIp, SourcePort}}, {payload, Payload}, {reason, Reason}]),
+			ok = mosaic_transcript:trace_error ("received invalid broadcast packet: invalid payload; ignoring!", [{source, {SourceIp, SourcePort}}, {payload, Payload}, {reason, Reason}]),
 			{noreply, State}
 	end;
 	
 handle_info (Message, State) ->
-	ok = mosaic_tools:trace_error ("received invalid message; ignoring!", [{message, Message}]),
+	ok = mosaic_transcript:trace_error ("received invalid message; ignoring!", [{message, Message}]),
 	{noreply, State}.
 
 
@@ -233,11 +233,11 @@ configure (defaults) ->
 		nocookie ->
 			crypto:rand_bytes (16);
 		Cookie ->
-			crypto:md5 (erlang:atom_to_list (Cookie))
+			crypto:md5 (erlang:atom_to_binary (Cookie, utf8))
 	end,
 	SocketIp = {224, 0, 0, 1},
 	SocketPort = 5555,
-	{ok, Events} = mosaic_tools:resolve_registered ({local, mosaic_discovery_events}),
+	{ok, Events} = mosaic_process_tools:resolve_registered ({local, mosaic_discovery_events}),
 	Configuration = #configuration{
 			identity = Identity,
 			shared_secret = SharedSecret,

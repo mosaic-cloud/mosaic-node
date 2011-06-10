@@ -45,6 +45,7 @@ def _backend_abacus (_identifier) :
 			_operator = _request["operator"]
 			_operands = _request["operands"]
 			if _operator == "+" :
+				_trace_information ("called `%s` with `%s`...", _operator, _operands)
 				(_first_operand, _second_operand) = _operands
 				_outcome = float (_first_operand) + float (_second_operand)
 			else :
@@ -249,7 +250,7 @@ def _frontend_test_execute_3 () :
 	_output_close ()
 	_input_close ()
 
-def _frontend_test_exchange () :
+def _frontend_test_exchange_1 () :
 	for i in xrange (0, 10) :
 		_output (({
 				"__type__" : "exchange",
@@ -341,7 +342,7 @@ _frontend_scenarios = {
 		"test-execute-1" : _frontend_test_execute_1,
 		"test-execute-2" : _frontend_test_execute_2,
 		"test-execute-3" : _frontend_test_execute_3,
-		"test-exchange" : _frontend_test_exchange,
+		"test-exchange-1" : _frontend_test_exchange_1,
 		"test-nodejs" : _frontend_test_nodejs,
 		"test-rabbitmq" : _frontend_test_rabbitmq,
 }
@@ -372,12 +373,12 @@ def _frontend (_scenario) :
 	_trace_debugging ("starting harness...")
 	if True :
 		_process = subprocess.Popen (
-				["[mosaic_component_harness]"],
-				executable = "./.outputs/gcc/applications-elf/mosaic_component_harness.elf",
+				["[mosaic_harness]"],
+				executable = "./.outputs/gcc/applications-elf/mosaic_harness.elf",
 				stdin = subprocess.PIPE, stdout = subprocess.PIPE)
 	else :
 		_process = subprocess.Popen (
-				["[mosaic_component_harness_strace]", "-e", "trace=file,desc,process", "--", "./.outputs/gcc/applications-elf/mosaic_component_harness.elf"],
+				["[mosaic_harness_strace]", "-e", "trace=file,desc,process", "--", "./.outputs/gcc/applications-elf/mosaic_harness.elf"],
 				executable = "/usr/bin/strace",
 				stdin = subprocess.PIPE, stdout = subprocess.PIPE)
 	

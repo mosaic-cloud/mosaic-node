@@ -22,7 +22,7 @@ start (Source, SourceToken, Target, TargetToken, Monitor, MonitorToken) ->
 start (QualifiedName, Source, SourceToken, Target, TargetToken, Monitor, MonitorToken)
 		when is_pid (Source), is_pid (Target), is_pid (Monitor), (Source =/= Target), (Source =/= Monitor), (Target =/= Monitor),
 				(SourceToken =/= TargetToken), (SourceToken =/= MonitorToken), (TargetToken =/= MonitorToken) ->
-	mosaic_tools:start (gen_fsm, mosaic_process_migrator, QualifiedName, {Source, SourceToken, Target, TargetToken, Monitor, MonitorToken}).
+	mosaic_process_tools:start (gen_fsm, mosaic_process_migrator, QualifiedName, {Source, SourceToken, Target, TargetToken, Monitor, MonitorToken}).
 
 
 start_link (Source, SourceToken, Target, TargetToken, Monitor, MonitorToken) ->
@@ -31,7 +31,7 @@ start_link (Source, SourceToken, Target, TargetToken, Monitor, MonitorToken) ->
 start_link (QualifiedName, Source, SourceToken, Target, TargetToken, Monitor, MonitorToken)
 		when is_pid (Source), is_pid (Target), is_pid (Monitor), (Source =/= Target), (Source =/= Monitor), (Target =/= Monitor),
 				(SourceToken =/= TargetToken), (SourceToken =/= MonitorToken), (TargetToken =/= MonitorToken) ->
-	mosaic_tools:start_link (gen_fsm, mosaic_process_migrator, QualifiedName, {Source, SourceToken, Target, TargetToken, Monitor, MonitorToken}).
+	mosaic_process_tools:start_link (gen_fsm, mosaic_process_migrator, QualifiedName, {Source, SourceToken, Target, TargetToken, Monitor, MonitorToken}).
 
 
 migrate (Migrator, Configuration)
@@ -45,7 +45,7 @@ migrate (Migrator, Configuration)
 init ({QualifiedName, {Source, SourceToken, Target, TargetToken, Monitor, MonitorToken}})
 		when is_pid (Source), is_pid (Target), is_pid (Monitor), (Source =/= Target), (Source =/= Monitor), (Target =/= Monitor),
 				(SourceToken =/= TargetToken), (SourceToken =/= MonitorToken), (TargetToken =/= MonitorToken) ->
-	case mosaic_tools:ensure_registered (QualifiedName) of
+	case mosaic_process_tools:ensure_registered (QualifiedName) of
 		ok ->
 			false = erlang:process_flag (trap_exit, true),
 			StateData = #state{
@@ -80,13 +80,13 @@ handle_sync_event ({mosaic_process_migrator, migrate, Configuration}, _Sender, m
 	{reply, ok, source_begin_waiting, StateData};
 	
 handle_sync_event (Event, Sender, _StateName, StateData) ->
-	ok = mosaic_tools:trace_error ("received invalid event; aborting!", [{event, Event}, {sender, Sender}]),
+	ok = mosaic_transcript:trace_error ("received invalid event; aborting!", [{event, Event}, {sender, Sender}]),
 	Error = {error, {invalid_event, Event}},
 	{stop, Error, Error, StateData}.
 
 
 handle_event (Event, _StateName, StateData) ->
-	ok = mosaic_tools:trace_error ("received invalid event; aborting!", [{event, Event}]),
+	ok = mosaic_transcript:trace_error ("received invalid event; aborting!", [{event, Event}]),
 	{stop, {error, {invalid_event, Event}}, StateData}.
 
 
@@ -233,7 +233,7 @@ handle_info (Message, StateName, StateData = #state{source_token = SourceToken, 
 			ok = send_event (Message),
 			{next_state, StateName, StateData};
 		stop ->
-			ok = mosaic_tools:trace_error ("received invalid message; aborting!", [{message, Message}]),
+			ok = mosaic_transcript:trace_error ("received invalid message; aborting!", [{message, Message}]),
 			{stop, {error, {invalid_message, Message}}, StateData}
 	end.
 

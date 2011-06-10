@@ -19,7 +19,7 @@ start (Configuration) ->
 	start (noname, Configuration).
 
 start (QualifiedName, Configuration) ->
-	mosaic_tools:start (gen_server, mosaic_object_store, QualifiedName, Configuration).
+	mosaic_process_tools:start (gen_server, mosaic_object_store, QualifiedName, Configuration).
 
 
 start_link () ->
@@ -29,7 +29,7 @@ start_link (Configuration) ->
 	start_link (noname, Configuration).
 
 start_link (QualifiedName, Configuration) ->
-	mosaic_tools:start_link (gen_server, mosaic_object_store, QualifiedName, Configuration).
+	mosaic_process_tools:start_link (gen_server, mosaic_object_store, QualifiedName, Configuration).
 
 
 start_supervised (QualifiedName) ->
@@ -92,7 +92,7 @@ migrate (SourceStore, TargetStore, Key)
 
 init ({QualifiedName, defaults}) ->
 	false = erlang:process_flag (trap_exit, true),
-	case mosaic_tools:ensure_registered (QualifiedName) of
+	case mosaic_process_tools:ensure_registered (QualifiedName) of
 		ok ->
 			Table = ets:new (noname, [ordered_set, protected]),
 			{ok, #state{qualified_name = QualifiedName, table = Table}};
@@ -222,15 +222,15 @@ handle_call ({mosaic_object_store, migrate_as_source, Key}, _Sender, State = #st
 	end;
 	
 handle_call (Request, Sender, State) ->
-	ok = mosaic_tools:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
+	ok = mosaic_transcript:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
 	{reply, {error, {invalid_request, Request}}, State}.
 
 
 handle_cast (Request, State) ->
-	ok = mosaic_tools:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
+	ok = mosaic_transcript:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
 	{noreply, State}.
 
 
 handle_info (Message, State) ->
-	ok = mosaic_tools:trace_error ("received invalid message; ignoring!", [{message, Message}]),
+	ok = mosaic_transcript:trace_error ("received invalid message; ignoring!", [{message, Message}]),
 	{noreply, State}.

@@ -1,0 +1,7 @@
+
+(vbs:require-erlang)
+
+(vbs:define-erlang-application 'mosaic_tools
+	erl: "\\./sources/.*\\.erl"
+	hrl: "\\./sources/.*\\.hrl"
+	additional-ebin: "\\./sources/.*\\.app")

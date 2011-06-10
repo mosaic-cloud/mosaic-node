@@ -1,0 +1,14 @@
+
+(vbs:require-erlang)
+
+(vbs:define-erlang-application 'mosaic_harness
+	erl: "\\./sources/.*\\.erl"
+	hrl: "\\./sources/.*\\.hrl"
+	additional-ebin: "\\./sources/.*\\.app")
+
+(vbs:require-gcc)
+
+(vbs:define-gcc-application 'mosaic_harness
+	c: "\\./sources/mosaic_harness.c"
+	cflags: '("-g")
+	ldflags: '("-ljansson"))

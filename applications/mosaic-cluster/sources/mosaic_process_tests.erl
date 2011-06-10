@@ -1,6 +1,7 @@
 
 -module (mosaic_process_tests).
 
+
 -export ([test/0]).
 -export ([
 		test_start_stop/1,
@@ -17,6 +18,9 @@
 		call_process/2, call_process/3,
 		cast_process/2, cast_process/3]).
 -export ([configure/6]).
+
+
+-import (mosaic_enforcements, [enforce_ok_1/1]).
 
 
 -test ({test_start_stop, [[{stop_method, stop}, {stop_signal, normal}]]}).
@@ -198,7 +202,7 @@ start_link_process (Module, Disposition) ->
 	start_link_process (Module, Disposition, defaults).
 
 start_link_process (Module, Disposition, Configuration) ->
-	Identifier = crypto:rand_bytes (160 div 8),
+	{ok, Identifier} = mosaic_component_coders:generate_component (),
 	start_link_process (Module, Disposition, Identifier, Configuration).
 
 start_link_process (Module, Disposition, Identifier, Configuration) ->
@@ -246,8 +250,8 @@ test () ->
 
 configure (dummy, create, Identifier, term, defaults, defaults) ->
 	Configuration = {
-			{spawn_executable, <<"./.outputs/gcc/applications-elf/mosaic_dummy_process.elf">>},
-			[{arg0, <<"[mosaic_dummy_process#", (mosaic_webmachine:format_string_identifier (Identifier)) / binary, "]">>}]},
+			{spawn_executable, <<"./.outputs/gcc/applications-elf/mosaic_port_process_dummy.elf">>},
+			[{arg0, <<"[mosaic_process#dummy#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
 	{ok, mosaic_port_process, Configuration};
 	
 configure (dummy, {migrate, source}, _Identifier, term, defaults, defaults) ->

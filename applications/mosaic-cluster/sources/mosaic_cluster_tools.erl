@@ -13,7 +13,7 @@
 
 
 key () ->
-	key (crypto:rand_bytes (160 div 8)).
+	mosaic_generic_coders:generate_data (160 div 8).
 
 key (Token) ->
 	{ok, chash:key_of (term_to_binary (Token))}.
@@ -25,7 +25,8 @@ key (Token, Index)
 
 keys (Count)
 		when is_integer (Count), (Count > 0) ->
-	keys (crypto:rand_bytes (160 div 8), Count).
+	{ok, Token} = mosaic_generic_coders:generate_data (160 div 8),
+	keys (Token, Count).
 
 keys (Token, Count)
 		when is_integer (Count), (Count > 0) ->

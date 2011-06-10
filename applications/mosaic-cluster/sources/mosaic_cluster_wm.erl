@@ -5,6 +5,9 @@
 -export ([init/1, allowed_methods/2, content_types_provided/2, malformed_request/2, handle_as_html/2, handle_as_json/2, ping/2]).
 
 
+-import (mosaic_enforcements, [enforce_ok_1/1]).
+
+
 -dispatch ({[], {console}}).
 -dispatch ({["console"], {console}}).
 
@@ -67,7 +70,7 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 		{ring} ->
 			mosaic_webmachine:enforce_request ('GET', [], Request);
 		{ring, Operation} when ((Operation =:= include) orelse (Operation =:= exclude)) ->
-			case mosaic_webmachine:enforce_request ('GET', [{"node", fun mosaic_webmachine:parse_existing_atom/1}], Request) of
+			case mosaic_webmachine:enforce_request ('GET', [{"node", fun mosaic_generic_coders:decode_atom/1}], Request) of
 				{ok, false, [Node]} ->
 					{ok, false, State#state{arguments = dict:from_list ([{node, Node}])}};
 				Error = {error, _Reason} ->
@@ -94,9 +97,9 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			Peers = erlang:nodes (),
 			Nodes = [Self | Peers],
 			{ok, json_struct, [
-					{self, mosaic_webmachine:format_atom (Self)},
-					{peers, lists:map (fun mosaic_webmachine:format_atom/1, Peers)},
-					{nodes, lists:map (fun mosaic_webmachine:format_atom/1, Nodes)}]};
+					{self, enforce_ok_1 (mosaic_generic_coders:encode_atom (Self))},
+					{peers, [enforce_ok_1 (mosaic_generic_coders:encode_atom (Peer)) || Peer <- Peers]},
+					{nodes, [enforce_ok_1 (mosaic_generic_coders:encode_atom (Node)) || Node <- Nodes]}]};
 		{nodes, self, activate} ->
 			case mosaic_cluster_tools:node_activate () of
 				ok ->
@@ -115,13 +118,12 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			{ok, Nodes} = mosaic_cluster_tools:ring_nodes (),
 			{ok, Partitions} = mosaic_cluster_tools:ring_partitions (),
 			{ok, json_struct, [
-					{nodes, lists:map (fun mosaic_webmachine:format_atom/1, Nodes)},
-					{partitions, lists:map (
-							fun ({Key, Node}) ->
+					{nodes, [enforce_ok_1 (mosaic_generic_coders:encode_atom (Node)) || Node <- Nodes]},
+					{partitions, [
 								{struct, [
-										{key, mosaic_webmachine:format_integer_identifier (Key)},
-										{node, mosaic_webmachine:format_atom (Node)}]}
-							end, Partitions)}]};
+										{key, enforce_ok_1 (mosaic_generic_coders:encode_hex_data (<<Partition : 160>>))},
+										{node, enforce_ok_1 (mosaic_generic_coders:encode_atom (Node))}]}
+							|| {Partition, Node} <- Partitions]}]};
 		{ring, include} ->
 			Node = dict:fetch (node, Arguments),
 			case mosaic_cluster_tools:ring_include (Node) of

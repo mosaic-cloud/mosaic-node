@@ -19,7 +19,7 @@ start (Configuration) ->
 	start (noname, Configuration).
 
 start (QualifiedName, Configuration) ->
-	mosaic_tools:start (gen_server, mosaic_process_controller, QualifiedName, Configuration).
+	mosaic_process_tools:start (gen_server, mosaic_process_controller, QualifiedName, Configuration).
 
 
 start_link () ->
@@ -29,7 +29,7 @@ start_link (Configuration) ->
 	start_link (noname, Configuration).
 
 start_link (QualifiedName, Configuration) ->
-	mosaic_tools:start_link (gen_server, mosaic_process_controller, QualifiedName, Configuration).
+	mosaic_process_tools:start_link (gen_server, mosaic_process_controller, QualifiedName, Configuration).
 
 
 start_supervised (QualifiedName) ->
@@ -88,7 +88,7 @@ migrate (SourceController, TargetController, Identifier, SourceConfiguration, Ta
 
 init ({QualifiedName, defaults}) ->
 	false = erlang:process_flag (trap_exit, true),
-	case mosaic_tools:ensure_registered (QualifiedName) of
+	case mosaic_process_tools:ensure_registered (QualifiedName) of
 		ok ->
 			State = #state{
 					qualified_name = QualifiedName,
@@ -313,12 +313,12 @@ handle_call (
 	{reply, {ok, Count}, State};
 	
 handle_call (Request, Sender, State) ->
-	ok = mosaic_tools:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
+	ok = mosaic_transcript:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
 	{reply, {error, {invalid_request, Request}}, State}.
 
 
 handle_cast (Request, State) ->
-	ok = mosaic_tools:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
+	ok = mosaic_transcript:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
 	{noreply, State}.
 
 
@@ -372,11 +372,11 @@ handle_info (
 					NewState = OldState#state{link_pending = NewLinkPending},
 					{noreply, NewState};
 				true ->
-					ok = mosaic_tools:trace_error ("received unexpected link exit; ignoring!", [{link, Link}, {reason, Reason}]),
+					ok = mosaic_transcript:trace_error ("received unexpected link exit; ignoring!", [{link, Link}, {reason, Reason}]),
 					{noreply, OldState}
 			end
 	end;
 	
 handle_info (Message, State) ->
-	ok = mosaic_tools:trace_error ("received invalid message; ignoring!", [{message, Message}]),
+	ok = mosaic_transcript:trace_error ("received invalid message; ignoring!", [{message, Message}]),
 	{noreply, State}.

@@ -5,8 +5,6 @@ test "${#}" -eq 0
 
 cd -- "$( dirname -- "$( readlink -e -- "${0}" )" )"
 
-set -x
-
 rm -Rf ./.generated
 mkdir ./.generated
 

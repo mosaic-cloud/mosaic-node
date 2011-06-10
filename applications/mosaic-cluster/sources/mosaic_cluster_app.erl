@@ -73,10 +73,10 @@ start_discovery () ->
 					ok = mosaic_cluster_tools:ring_include (Node),
 					ok;
 				{mosaic_discovery_events, broadcasted, Message} ->
-					ok = mosaic_tools:trace_error ("received invalid broadcast message; ignoring!", [{message, Message}]),
+					ok = mosaic_transcript:trace_error ("received invalid broadcast message; ignoring!", [{message, Message}]),
 					ok;
 				_ ->
-					ok = mosaic_tools:trace_error ("received invalid event; ignoring!", [{event, Event}]),
+					ok = mosaic_transcript:trace_error ("received invalid event; ignoring!", [{event, Event}]),
 					ok
 			end,
 			{ok, void}

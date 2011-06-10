@@ -16,7 +16,7 @@ init ({QualifiedName, {CallbackModule, Disposition, Identifier, Configuration}})
 			((Disposition =:= create)
 				orelse (is_record (Disposition, migrate, 2) andalso is_reference (element (2, Disposition)))) ->
 	false = erlang:process_flag (trap_exit, true),
-	case mosaic_tools:ensure_registered (QualifiedName) of
+	case mosaic_process_tools:ensure_registered (QualifiedName) of
 		ok ->
 			case Disposition of
 				create ->
@@ -140,7 +140,7 @@ handle_call ({mosaic_process, rollback_migration, Token}, _Sender, OldState) ->
 	end;
 	
 handle_call (Request, Sender, State) ->
-	ok = mosaic_tools:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
+	ok = mosaic_transcript:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
 	{reply, {error, {invalid_request, Request}}, State}.
 
 
@@ -154,7 +154,7 @@ handle_cast ({mosaic_process, cast, Request, RequestData}, OldState = #state{cal
 	end;
 	
 handle_cast (Request, State) ->
-	ok = mosaic_tools:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
+	ok = mosaic_transcript:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
 	{noreply, State}.
 
 

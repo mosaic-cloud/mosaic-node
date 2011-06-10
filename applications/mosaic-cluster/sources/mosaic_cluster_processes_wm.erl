@@ -5,6 +5,9 @@
 -export ([init/1, allowed_methods/2, content_types_provided/2, malformed_request/2, handle_as_json/2, ping/2]).
 
 
+-import (mosaic_enforcements, [enforce_ok_1/1]).
+
+
 -dispatch ({["processes", "nodes"], {nodes}}).
 -dispatch ({["processes", "nodes", "self", "activate"], {nodes, self, activate}}).
 -dispatch ({["processes", "nodes", "self", "deactivate"], {nodes, self, deactivate}}).
@@ -43,9 +46,9 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 		{processes, create} ->
 			case mosaic_webmachine:enforce_request ('GET',
 					[
-						{"type", fun mosaic_webmachine:parse_existing_atom/1},
-						{"arguments", fun mosaic_webmachine:parse_json/1},
-						{"count", fun mosaic_webmachine:parse_integer/1}],
+						{"type", fun mosaic_generic_coders:decode_atom/1},
+						{"arguments", fun mosaic_json_coders:decode_json/1},
+						{"count", fun mosaic_generic_coders:decode_integer/1}],
 					Request) of
 				{ok, false, [Type, Arguments, Count]} ->
 					if
@@ -58,7 +61,7 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 					Error
 			end;
 		{processes, stop} ->
-			case mosaic_webmachine:enforce_request ('GET', [{"key", fun mosaic_webmachine:parse_string_identifier/1}], Request) of
+			case mosaic_webmachine:enforce_request ('GET', [{"key", fun mosaic_component_coders:decode_component/1}], Request) of
 				{ok, false, [Key]} ->
 					{ok, false, State#state{arguments = dict:from_list ([{key, Key}])}};
 				Error = {error, _Reason} ->
@@ -67,8 +70,8 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 		{processes, Action} when ((Action =:= call) orelse (Action =:= cast)) ->
 			case mosaic_webmachine:enforce_request ('GET',
 					[
-						{"key", fun mosaic_webmachine:parse_string_identifier/1},
-						{"arguments", fun mosaic_webmachine:parse_json/1}],
+						{"key", fun mosaic_component_coders:decode_component/1},
+						{"arguments", fun mosaic_json_coders:decode_json/1}],
 					Request) of
 				{ok, false, [Key, Arguments]} ->
 					{ok, false, State#state{arguments = dict:from_list ([{key, Key}, {arguments, Arguments}])}};
@@ -76,7 +79,7 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 					Error
 			end;
 		{ping} ->
-			case mosaic_webmachine:enforce_request ('GET', [{"count", fun mosaic_webmachine:parse_integer/1}], Request) of
+			case mosaic_webmachine:enforce_request ('GET', [{"count", fun mosaic_generic_coders:decode_integer/1}], Request) of
 				{ok, false, [Count]} ->
 					if
 						Count =:= 0 ->
@@ -99,8 +102,8 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			case mosaic_cluster_processes:service_nodes () of
 				{ok, Nodes} ->
 					{ok, json_struct, [
-							{self, mosaic_webmachine:format_atom (erlang:node ())},
-							{nodes, lists:map (fun mosaic_webmachine:format_atom/1, Nodes)}]};
+							{self, mosaic_generic_coders:encode_atom (erlang:node ())},
+							{nodes, [enforce_ok_1 (mosaic_generic_coders:encode_atom (Node)) || Node <- Nodes]}]};
 				Error = {error, _Reason} ->
 					Error
 			end;
@@ -122,11 +125,11 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			case mosaic_cluster_processes:list () of
 				{ok, Keys, []} ->
 					{ok, json_struct, [
-							{keys, lists:map (fun mosaic_webmachine:format_string_identifier/1, Keys)}]};
+							{keys, [enforce_ok_1 (mosaic_component_coders:encode_component (Key)) || Key <- Keys]}]};
 				{ok, Keys, Reasons} ->
 					{ok, json_struct, [
-							{keys, lists:map (fun mosaic_webmachine:format_string_identifier/1, Keys)},
-							{error, lists:map (fun mosaic_webmachine:format_term/1, Reasons)}]};
+							{keys, [enforce_ok_1 (mosaic_component_coders:encode_component (Key)) || Key <- Keys]},
+							{error, [enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reason)) || Reason <- Reasons]}]};
 				Error = {error, _Reason} ->
 					Error
 			end;
@@ -136,14 +139,12 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			Count = dict:fetch (count, Arguments),
 			case mosaic_cluster_processes:define_and_create (ProcessType, json, ProcessArgumentsContent, Count) of
 				{ok, Processes, []} ->
-					Keys = lists:map (fun ({Key, _Process}) -> Key end, Processes),
 					{ok, json_struct, [
-							{keys, lists:map (fun mosaic_webmachine:format_string_identifier/1, Keys)}]};
+							{keys, [enforce_ok_1 (mosaic_component_coders:encode_component (Key)) || {Key, _Process} <- Processes]}]};
 				{ok, Processes, Reasons} ->
-					Keys = lists:map (fun ({Key, _Process}) -> Key end, Processes),
 					{ok, json_struct, [
-							{keys, lists:map (fun mosaic_webmachine:format_string_identifier/1, Keys)},
-							{errors, lists:map (fun mosaic_webmachine:format_term/1, Reasons)}]};
+							{keys, [enforce_ok_1 (mosaic_component_coders:encode_component (Key)) || {Key, _Process} <- Processes]},
+							{error, [enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reason)) || Reason <- Reasons]}]};
 				Error = {error, _Reason} ->
 					Error
 			end;
@@ -181,21 +182,19 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			case mosaic_cluster_processes:service_ping (Count) of
 				{ok, Pongs, Pangs} ->
 					{ok, json_struct, [
-							{pongs, lists:map (
-									fun ({pong, Key, _Vnode, mosaic_cluster_processes, {Partition, Node}}) ->
-										{struct, [
-												{key, mosaic_webmachine:format_string_identifier (Key)},
-												{partition, mosaic_webmachine:format_integer_identifier (Partition)},
-												{node, mosaic_webmachine:format_atom (Node)}]}
-									end, Pongs)},
-							{pangs, lists:map (
-									fun ({pang, Key, {Partition, Node}, Reason}) ->
-										{struct, [
-												{key, mosaic_webmachine:format_string_identifier (Key)},
-												{partition, mosaic_webmachine:format_integer_identifier (Partition)},
-												{node, mosaic_webmachine:format_atom (Node)},
-												{reason, mosaic_webmachine:format_term (Reason)}]}
-									end, Pangs)}]};
+							{pongs, [
+								{struct, [
+										{key, enforce_ok_1 (mosaic_component_coders:encode_component (Key))},
+										{partition, enforce_ok_1 (mosaic_component_coders:encode_component (<<Partition : 160>>))},
+										{node, enforce_ok_1 (mosaic_generic_coders:encode_atom (Node))}]}
+								|| {pong, Key, _Vnode, mosaic_cluster_processes, {Partition, Node}} <- Pongs]},
+							{pangs, [
+								{struct, [
+										{key, enforce_ok_1 (mosaic_component_coders:encode_component (Key))},
+										{partition, enforce_ok_1 (mosaic_component_coders:encode_component (<<Partition : 160>>))},
+										{node, enforce_ok_1 (mosaic_generic_coders:encode_atom (Node))},
+										{reason, enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reason))}]}
+								|| {pang, Key, {Partition, Node}, Reason} <- Pangs]}]};
 				Error = {error, _Reason} ->
 					Error
 			end
