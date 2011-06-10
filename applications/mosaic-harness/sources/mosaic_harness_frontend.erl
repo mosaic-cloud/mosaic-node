@@ -53,7 +53,7 @@ push_packet (Harness, Packet)
 -include ("mosaic_harness.hrl").
 
 
--record (state, {qualified_name, controller, controller_token, port, port_exit_status}).
+-record (state, {qualified_name, controller, controller_token, port, port_exit_reason, port_exit_status}).
 
 
 init ({QualifiedName, Configuration}) ->
@@ -75,18 +75,24 @@ init ({QualifiedName, Configuration}) ->
 		State = #state{
 					qualified_name = QualifiedName,
 					controller = Controller, controller_token = ControllerToken,
-					port = Port, port_exit_status = none},
+					port = Port, port_exit_reason = none, port_exit_status = none},
 		{ok, State}
 	catch throw : {error, Reason} -> {stop, Reason} end.
 
 
-terminate (_Reason, _State = #state{port = none, port_exit_status = none}) ->
+terminate (_Reason, _State = #state{port = none}) ->
 	ok;
 	
-terminate (_Reason, _State = #state{port = Port, port_exit_status = PortExitStatus})
-		when is_port (Port), ((PortExitStatus =:= none) orelse (is_integer (PortExitStatus) andalso (PortExitStatus >= 0))) ->
+terminate (_Reason, _State = #state{port = Port})
+		when is_port (Port) ->
 	ok = try true = erlang:port_close (Port), ok catch error : badarg -> ok end,
-	ok = timer:sleep (100),
+	ok = case mosaic_process_tools:wait (Port, 5000) of
+		{ok, _} ->
+			ok;
+		{error, _} ->
+			true = erlang:exit (Port, kill),
+			ok
+	end,
 	ok.
 
 
@@ -96,8 +102,8 @@ code_change (_OldVsn, State, _Arguments) ->
 
 handle_call (
 			{mosaic_harness_frontend, stop, Signal}, _Sender,
-			State = #state{port = Port, port_exit_status = none})
-		when is_atom (Signal), is_port (Port) ->
+			State = #state{port = Port})
+		when is_port (Port) ->
 	try
 		ok = case Signal of
 			normal -> ok;
@@ -110,7 +116,7 @@ handle_call (
 	
 handle_call (
 			{mosaic_harness_frontend, execute, Specification}, _Sender,
-			State = #state{port = Port, port_exit_status = none})
+			State = #state{port = Port})
 		when is_port (Port) ->
 	try
 		ok = enforce_ok (mosaic_harness_coders:validate_execute_specification (Specification)),
@@ -121,7 +127,7 @@ handle_call (
 	
 handle_call (
 			{mosaic_harness_frontend, signal, Specification}, _Sender,
-			State = #state{port = Port, port_exit_status = none})
+			State = #state{port = Port})
 		when is_port (Port) ->
 	try
 		ok = enforce_ok (mosaic_harness_coders:validate_signal_specification (Specification)),
@@ -132,7 +138,7 @@ handle_call (
 	
 handle_call (
 			{mosaic_harness_frontend, push_packet, Packet}, _Sender,
-			State = #state{port = Port, port_exit_status = none})
+			State = #state{port = Port})
 		when is_port (Port) ->
 	try
 		ok = enforce_ok (push_packet_internal (Port, enforce_ok_1 (mosaic_harness_coders:encode_packet_fully (Packet)))),
@@ -172,15 +178,28 @@ handle_cast (
 	catch Error = {error, _Reason} -> {stop, Error, State} end;
 	
 handle_cast (
+			{mosaic_harness_frontend_internals, port_exit_reason, PortExitReason},
+			OldState = #state{port_exit_reason = none}) ->
+	NewState = OldState#state{port = none, port_exit_reason = PortExitReason},
+	handle_cast ({mosaic_harness_frontend_internals, maybe_stop}, NewState);
+	
+handle_cast (
 			{mosaic_harness_frontend_internals, port_exit_status, PortExitStatus},
-			OldState = #state{port = Port, port_exit_status = none})
-		when is_integer (PortExitStatus), (PortExitStatus >= 0), is_port (Port) ->
+			OldState = #state{port_exit_status = none})
+		when is_integer (PortExitStatus), (PortExitStatus >= 0) ->
 	NewState = OldState#state{port_exit_status = PortExitStatus},
+	handle_cast ({mosaic_harness_frontend_internals, maybe_stop}, NewState);
+	
+handle_cast (
+			{mosaic_harness_frontend_internals, maybe_stop},
+			State = #state{port_exit_reason = PortExitReason, port_exit_status = PortExitStatus}) ->
 	if
-		(PortExitStatus =:= 0) ->
-			{stop, normal, NewState};
-		(PortExitStatus > 0) ->
-			{stop, {error, failed_port}, NewState}
+		(PortExitReason =:= normal), (PortExitStatus =:= 0) ->
+			{stop, normal, State};
+		(PortExitReason =:= none); (PortExitStatus =:= none) ->
+			{noreply, State};
+		(PortExitReason =/= normal); (PortExitStatus > 0) ->
+			{stop, {error, {failed_port, PortExitReason, PortExitStatus}}, State}
 	end;
 	
 handle_cast (Request, State) ->

@@ -81,13 +81,12 @@ terminate (_Reason, _State = #state{harness = none}) ->
 	
 terminate (_Reason, _State = #state{harness = Harness})
 		when is_pid (Harness) ->
-	ok = try
-		_ = mosaic_harness_frontend:stop (Harness, normal),
-		_ = mosaic_process_tools:wait (Harness, 5000),
-		true = erlang:exit (Harness, kill),
-		ok
-	catch
-		exit : {noproc, _} ->
+	ok = try _ = mosaic_harness_frontend:stop (Harness, normal), ok catch exit : {noproc, _} -> ok end,
+	case mosaic_process_tools:wait (Harness, 5000) of
+		{ok, _} ->
+			ok;
+		{error, _} ->
+			true = erlang:exit (Harness, kill),
 			ok
 	end,
 	ok.
@@ -416,8 +415,6 @@ begin_migration (target, Configuration, CompletionFun, OldState = #state{status 
 commit_migration (OldState = #state{status = migrating_as_source, harness = Harness}) ->
 	case mosaic_harness_frontend:stop (Harness, normal) of
 		ok ->
-			_ = mosaic_process_tools:wait (Harness, 5000),
-			true = erlang:exit (Harness, kill),
 			{continue, OldState#state{status = migrating_as_source_succeeded}};
 		{error, Reason} ->
 			{terminate, Reason, OldState#state{status = migrating_as_source_failed}}
