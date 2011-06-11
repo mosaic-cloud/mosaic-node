@@ -164,16 +164,26 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			case Action of
 				call ->
 					case mosaic_process_router:call (Key, Operation, Inputs, <<>>, undefined) of
-						{ok, {struct, OutputAttributes}, _Data} ->
-							{ok, json_struct, OutputAttributes};
-						{error, {struct, ErrorAttributes}, _Data} ->
-							{ok, json_struct, ErrorAttributes};
+						{ok, Outputs, _Data} ->
+							case mosaic_json_coders:coerce_json (Outputs) of
+								{ok, CoercedOutputs} ->
+									{ok, json_struct, [{ok, true}, {outputs, CoercedOutputs}]};
+								{error, _Reason} ->
+									{ok, EncodedOutputs} = mosaic_generic_coders:encode_term (json, Outputs),
+									{ok, json_struct, [{ok, true}, {outputs, EncodedOutputs}]}
+							end;
 						{error, Reason, _Data} ->
-							{error, Reason};
+							case mosaic_json_coders:coerce_json (Reason) of
+								{ok, CoercedReason} ->
+									{ok, json_struct, [{ok, false}, {error, CoercedReason}]};
+								{error, _Reason} ->
+									{ok, EncodedReason} = mosaic_generic_coders:encode_term (json, Reason),
+									{ok, json_struct, [{ok, true}, {error, EncodedReason}]}
+							end;
 						Error = {error, _Reason} ->
 							Error;
 						CallReply ->
-							{error, {invalid_Reply, CallReply}}
+							{error, {invalid_reply, CallReply}}
 					end;
 				cast ->
 					case mosaic_process_router:cast (Key, Operation, Inputs, <<>>) of

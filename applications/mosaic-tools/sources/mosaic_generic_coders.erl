@@ -8,7 +8,7 @@
 		encode_float/1, decode_float/1,
 		encode_hex_data/1, decode_hex_data/1,
 		encode_string/1, decode_string/1,
-		encode_text_term/1,
+		encode_term/2,
 		encode_reason/2]).
 -export ([generate_data/1, generate_hex_data/1]).
 -export ([validate_term/2]).
@@ -104,7 +104,7 @@ decode_hex_data (String)
 	try
 		StringLength = erlang:length (String),
 		ok = if
-			((StringLength rem 2) =:= 0) ->
+			(StringLength > 0), ((StringLength rem 2) =:= 0) ->
 				ok;
 			true ->
 				throw ({error, {invalid_length, StringLength}})
@@ -123,7 +123,7 @@ decode_hex_data (String)
 		end
 	catch
 		throw : {error, Reason} -> {error, {invalid_hex_data, String, Reason}};
-		error : Reason -> {invalid_hex_data, String, Reason}
+		error : Reason -> {error, {invalid_hex_data, String, Reason}}
 	end.
 
 
@@ -179,6 +179,13 @@ encode_text_term_ok_1 (Binary)
 	
 encode_text_term_ok_1 (Object) ->
 	["binary_to_term(", encode_text_term_ok_1 (erlang:term_to_binary (Object)), ")"].
+
+
+encode_term (json, Term) ->
+	encode_term (text, Term);
+	
+encode_term (text, Term) ->
+	encode_text_term (Term).
 
 
 encode_reason (json, Reason) ->

@@ -13,7 +13,7 @@
 -export ([configure/6]).
 
 
--import (mosaic_process_tests, [start_link_process/4, stop_and_wait_process/1, wait_process/1, call_process/3, cast_process/3]).
+-import (mosaic_process_tests, [start_link_process/4, stop_and_wait_process/1, wait_process/1, call_process/4, cast_process/4]).
 -import (mosaic_process_migrator_tests, [start_link_process_migrator/6, wait_process_migrator/1]).
 -import (mosaic_enforcements, [enforce_ok_1/1]).
 
@@ -23,8 +23,8 @@
 -test ({test_cast, [{defaults}]}).
 -test ({test_migrate, [{defaults}]}).
 -test ({test_abacus, [{python}]}).
--test ({test_abacus, [{java}]}).
--test ({test_abacus, [{node}]}).
+%-test ({test_abacus, [{java}]}).
+%-test ({test_abacus, [{node}]}).
 %-test ({test_rabbitmq, [{defaults}]}).
 
 
@@ -40,9 +40,11 @@ test_call ({defaults}) ->
 	{ok, Identifier} = mosaic_component_coders:generate_component (),
 	{ok, Configuration} = configure (python_parrot, create, Identifier),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
-	Request = {struct, [{<<"key-1">>, 1}, {<<"key-a">>, <<"a">>}]},
-	RequestData = <<"data">>,
-	{ok, Request, RequestData} = call_process (Process, Request, RequestData),
+	{ok, InputName1} = mosaic_generic_coders:generate_hex_data (8),
+	{ok, InputValue1} = mosaic_generic_coders:generate_hex_data (8),
+	Inputs = {struct, [{InputName1, InputValue1}]},
+	{ok, Data} = mosaic_generic_coders:generate_data (8),
+	{ok, Inputs, Data} = call_process (Process, <<"call-return">>, Inputs, Data),
 	ok = stop_and_wait_process (Process),
 	ok.
 
@@ -51,10 +53,12 @@ test_cast ({defaults}) ->
 	{ok, Identifier} = mosaic_component_coders:generate_component (),
 	{ok, Configuration} = configure (python_parrot, create, Identifier),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
-	Request = {struct, [{<<"key-1">>, 1}, {<<"key-a">>, <<"a">>}]},
-	RequestData = <<"data">>,
-	ok = cast_process (Process, Request, RequestData),
-	ok = receive {'$gen_cast', {mosaic_process_router, cast, Identifier, Request, RequestData}} -> ok end,
+	{ok, InputName1} = mosaic_generic_coders:generate_hex_data (8),
+	{ok, InputValue1} = mosaic_generic_coders:generate_hex_data (8),
+	Inputs = {struct, [{InputName1, InputValue1}]},
+	{ok, Data} = mosaic_generic_coders:generate_data (8),
+	ok = cast_process (Process, <<"cast-mirror">>, Inputs, Data),
+	ok = receive {'$gen_cast', {mosaic_process_router, cast, <<0 : 160>>, <<"cast-mirror">>, Inputs, Data}} -> ok end,
 	ok = stop_and_wait_process (Process),
 	ok.
 
@@ -90,12 +94,7 @@ test_abacus ({Flavour}) ->
 	{ok, Identifier} = mosaic_component_coders:generate_component (),
 	{ok, Configuration} = configure (Type, create, Identifier),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
-	Request = {struct, [{<<"operator">>, <<"+">>}, {<<"operands">>, [1, 2]}]},
-	{ok, {struct, ReplyAttributes}, <<>>} = call_process (Process, Request, <<>>),
-	{ok, Outcome} = case lists:sort (ReplyAttributes) of
-		[{<<"ok">>, true}, {<<"outcome">>, Outcome_}] when is_number (Outcome_) ->
-			{ok, Outcome_}
-	end,
+	{ok, Outcome, <<>>} = call_process (Process, <<"+">>, [1, 2], <<>>),
 	ok = if Outcome == 3 -> ok end,
 	ok = stop_and_wait_process (Process),
 	ok.
@@ -153,7 +152,7 @@ configure (Type, create, Identifier, term, defaults, ExtraOptions)
 					<<"./applications/mosaic-harness/sources/mosaic_harness_tester.py">>,
 					<<"backend">>, Scenario, enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]}]}
 			| ExtraOptions],
-	case mosaic_component_process:parse_configuration (create, term, Options) of
+	case mosaic_component_process_coders:parse_configuration (create, term, Options) of
 		{ok, Configuration} ->
 			{ok, mosaic_component_process, Configuration};
 		Error = {error, _Reason} ->
@@ -178,7 +177,7 @@ configure (Type = java_abacus, create, Identifier, term, defaults, ExtraOptions)
 					<<"eu.mosaic_cloud.components.examples.abacus.AbacusComponentCallbacks">>,
 					<<"file:../mosaic-java-components/components-examples/target/components-examples-0.2-SNAPSHOT.jar">>]}]}
 			| ExtraOptions],
-	case mosaic_component_process:parse_configuration (create, term, Options) of
+	case mosaic_component_process_coders:parse_configuration (create, term, Options) of
 		{ok, Configuration} ->
 			{ok, mosaic_component_process, Configuration};
 		Error = {error, _Reason} ->
@@ -202,7 +201,7 @@ configure (Type = node_abacus, create, Identifier, term, defaults, ExtraOptions)
 					<<"./mosaic_component_abacus.js">>]},
 				{working_directory, <<"./applications/mosaic-component/sources">>}]}
 			| ExtraOptions],
-	case mosaic_component_process:parse_configuration (create, term, Options) of
+	case mosaic_component_process_coders:parse_configuration (create, term, Options) of
 		{ok, Configuration} ->
 			{ok, mosaic_component_process, Configuration};
 		Error = {error, _Reason} ->
@@ -219,7 +218,7 @@ configure (Type = rabbitmq, create, Identifier, term, defaults, ExtraOptions)
 				{arguments, [enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]},
 				{working_directory, <<"../mosaic-components-rabbitmq">>}]}
 			| ExtraOptions],
-	case mosaic_component_process:parse_configuration (create, term, Options) of
+	case mosaic_component_process_coders:parse_configuration (create, term, Options) of
 		{ok, Configuration} ->
 			{ok, mosaic_component_process, Configuration};
 		Error = {error, _Reason} ->
@@ -234,7 +233,7 @@ configure (Type, {migrate, target}, Identifier, term, defaults, ExtraOptions) ->
 			{harness, [
 				{argument0, <<"[mosaic_component#", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]}
 			| ExtraOptions],
-	case mosaic_component_process:parse_configuration (migrate, term, Options) of
+	case mosaic_component_process_coders:parse_configuration (migrate, term, Options) of
 		{ok, Configuration} ->
 			{ok, mosaic_component_process, Configuration};
 		Error = {error, _Reason} ->

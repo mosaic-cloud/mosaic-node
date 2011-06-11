@@ -2,11 +2,14 @@
 -module (mosaic_harness_coders).
 
 
--export ([validate_configuration/1, validate_execute_specification/1, validate_signal_specification/1]).
--export ([decode_configuration/2, decode_execute_specification/2, decode_signal_specification/2]).
--export ([encode_packet/1, decode_packet/1]).
--export ([encode_packet_binary/1, decode_packet_binary/1]).
--export ([encode_packet_fully/1, decode_packet_fully/1]).
+-export ([
+		validate_configuration/1, decode_configuration/2,
+		validate_execute_specification/1, decode_execute_specification/2,
+		validate_signal_specification/1, decode_signal_specification/2]).
+-export ([
+		encode_packet/1, decode_packet/1,
+		encode_packet_binary/1, decode_packet_binary/1,
+		encode_packet_fully/1, decode_packet_fully/1]).
 
 
 -import (mosaic_enforcements, [enforce_ok_1/1]).
@@ -24,29 +27,6 @@ validate_configuration (Configuration) ->
 								argument0 = {is_binary, invalid_argument0},
 								arguments = {is_list, {is_binary, invalid_argument}, invalid_arguments}},
 							invalid_configuration}).
-
-
-validate_execute_specification (Specification) ->
-	mosaic_generic_coders:validate_term (Specification,
-				{is_record, #execute_specification{
-								executable = {is_binary, invalid_executable},
-								argument0 = {'orelse', [{matches, defaults}, is_binary], invalid_argument0},
-								arguments = {'orelse', [{matches, defaults},
-												{is_list, {is_binary, invalid_argument}, '_'}],
-												invalid_arguments},
-								environment = {'orelse', [{matches, defaults},
-												{is_list,
-													{is_tuple, {{is_binary, invalid_name}, {is_atom, invalid_value}}, invalid_environment},
-													'_'}],
-											invalid_environment},
-								working_directory = {'orelse', [{matches, defaults}, is_binary], invalid_working_directory}},
-							invalid_specification}).
-
-
-validate_signal_specification (Specification) ->
-	mosaic_generic_coders:validate_term (Specification,
-				{is_record, #signal_specification{signal = {is_binary, invalid_signal}}, invalid_specification}).
-
 
 decode_configuration (term, OriginalOptions)
 		when is_list (OriginalOptions) ->
@@ -122,6 +102,22 @@ decode_configuration (term, OriginalOptions)
 decode_configuration (term, Configuration) ->
 	{error, {invalid_configuration, Configuration}}.
 
+
+validate_execute_specification (Specification) ->
+	mosaic_generic_coders:validate_term (Specification,
+				{is_record, #execute_specification{
+								executable = {is_binary, invalid_executable},
+								argument0 = {'orelse', [{matches, defaults}, is_binary], invalid_argument0},
+								arguments = {'orelse', [{matches, defaults},
+												{is_list, {is_binary, invalid_argument}, '_'}],
+												invalid_arguments},
+								environment = {'orelse', [{matches, defaults},
+												{is_list,
+													{is_tuple, {{is_binary, invalid_name}, {is_atom, invalid_value}}, invalid_environment},
+													'_'}],
+											invalid_environment},
+								working_directory = {'orelse', [{matches, defaults}, is_binary], invalid_working_directory}},
+							invalid_specification}).
 
 decode_execute_specification (term, OriginalOptions)
 		when is_list (OriginalOptions) ->
@@ -209,99 +205,16 @@ decode_execute_specification (term, Specification) ->
 	{error, {invalid_specification, Specification}}.
 
 
+validate_signal_specification (Specification) ->
+	mosaic_generic_coders:validate_term (Specification,
+				{is_record, #signal_specification{signal = {is_binary, invalid_signal}}, invalid_specification}).
+
 decode_signal_specification (term, Signal)
 		when is_atom (Signal) ->
 	{ok, #signal_specification{signal = erlang:atom_to_binary (Signal, utf8)}};
 	
 decode_signal_specification (term, Specification) ->
 	{error, {invalid_specification, Specification}}.
-
-
-encode_packet_fully (Packet = {exchange, _MetaData, _Data}) ->
-	try enforce_ok_1 (encode_packet (Packet)) of
-		NewPacket ->
-			encode_packet_fully (NewPacket)
-	catch throw : Error = {error, _Reason} -> Error end;
-	
-encode_packet_fully (Packet = {resources, _MetaData, _Data}) ->
-	try enforce_ok_1 (encode_packet (Packet)) of
-		NewPacket ->
-			encode_packet_fully (NewPacket)
-	catch throw : Error = {error, _Reason} -> Error end;
-	
-encode_packet_fully (Packet = {generic, _Type, _MetaData, _Data}) ->
-	try enforce_ok_1 (encode_packet (Packet)) of
-		NewPacket ->
-			encode_packet_fully (NewPacket)
-	catch throw : Error = {error, _Reason} -> Error end;
-	
-encode_packet_fully (Packet = #execute_specification{}) ->
-	try enforce_ok_1 (encode_packet (Packet)) of
-		NewPacket ->
-			encode_packet_fully (NewPacket)
-	catch throw : Error = {error, _Reason} -> Error end;
-	
-encode_packet_fully (Packet = #signal_specification{}) ->
-	try enforce_ok_1 (encode_packet (Packet)) of
-		NewPacket ->
-			encode_packet_fully (NewPacket)
-	catch throw : Error = {error, _Reason} -> Error end;
-	
-encode_packet_fully (Packet = #terminate_specification{}) ->
-	try enforce_ok_1 (encode_packet (Packet)) of
-		NewPacket ->
-			encode_packet_fully (NewPacket)
-	catch throw : Error = {error, _Reason} -> Error end;
-	
-encode_packet_fully (Packet = {json, _MetaData, _Data}) ->
-	try enforce_ok_1 (encode_packet_binary (Packet)) of
-		NewPacket ->
-			encode_packet_fully (NewPacket)
-	catch throw : Error = {error, _Reason} -> Error end;
-	
-encode_packet_fully (PacketPayload)
-		when is_binary (PacketPayload) ->
-	{ok, PacketPayload};
-	
-encode_packet_fully (Packet)
-		when is_tuple (Packet), (tuple_size (Packet) >= 1) ->
-	{error, {invalid_packet, Packet}}.
-
-
-decode_packet_fully (Packet = {exit, _ExitStatus}) ->
-	{ok, Packet};
-	
-decode_packet_fully (Packet = {exchange, _MetaData, _Data}) ->
-	{ok, Packet};
-	
-decode_packet_fully (Packet = {resources, _MetaData, _Data}) ->
-	{ok, Packet};
-	
-decode_packet_fully (Packet = {generic, _MetaData, _Data}) ->
-	{ok, Packet};
-	
-decode_packet_fully (Packet = {exit, _MetaData, _Data}) ->
-	try enforce_ok_1 (decode_packet (Packet)) of
-		NewPacket ->
-			decode_packet_fully (NewPacket)
-	catch throw : Error = {error, _Reason} -> Error end;
-	
-decode_packet_fully (Packet = {json, _MetaData, _Data}) ->
-	try enforce_ok_1 (decode_packet (Packet)) of
-		NewPacket ->
-			decode_packet_fully (NewPacket)
-	catch throw : Error = {error, _Reason} -> Error end;
-	
-decode_packet_fully (PacketPayload)
-		when is_binary (PacketPayload) ->
-	try enforce_ok_1 (decode_packet_binary (PacketPayload)) of
-		NewPacket ->
-			decode_packet_fully (NewPacket)
-	catch throw : Error = {error, _Reason} -> Error end;
-	
-decode_packet_fully (Packet)
-		when is_tuple (Packet), (tuple_size (Packet) >= 1) ->
-	{error, {invalid_packet, Packet}}.
 
 
 encode_packet ({exchange, MetaData, Data})
@@ -390,3 +303,80 @@ decode_packet_binary (Payload)
 				throw ({error, invalid_framing})
 		end
 	catch throw : {error, Reason} -> {error, {invalid_packet, Payload, Reason}} end.
+
+
+encode_packet_fully (PacketPayload)
+		when is_binary (PacketPayload) ->
+	{ok, PacketPayload};
+	
+encode_packet_fully (Packet = {exchange, _MetaData, _Data}) ->
+	try enforce_ok_1 (encode_packet (Packet)) of
+		NewPacket -> encode_packet_fully (NewPacket)
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+encode_packet_fully (Packet = {resources, _MetaData, _Data}) ->
+	try enforce_ok_1 (encode_packet (Packet)) of
+		NewPacket -> encode_packet_fully (NewPacket)
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+encode_packet_fully (Packet = {generic, _Type, _MetaData, _Data}) ->
+	try enforce_ok_1 (encode_packet (Packet)) of
+		NewPacket -> encode_packet_fully (NewPacket)
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+encode_packet_fully (Packet = #execute_specification{}) ->
+	try enforce_ok_1 (encode_packet (Packet)) of
+		NewPacket -> encode_packet_fully (NewPacket)
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+encode_packet_fully (Packet = #signal_specification{}) ->
+	try enforce_ok_1 (encode_packet (Packet)) of
+		NewPacket -> encode_packet_fully (NewPacket)
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+encode_packet_fully (Packet = #terminate_specification{}) ->
+	try enforce_ok_1 (encode_packet (Packet)) of
+		NewPacket -> encode_packet_fully (NewPacket)
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+encode_packet_fully (Packet = {json, _MetaData, _Data}) ->
+	try enforce_ok_1 (encode_packet_binary (Packet)) of
+		NewPacket -> encode_packet_fully (NewPacket)
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+encode_packet_fully (Packet)
+		when is_tuple (Packet), (tuple_size (Packet) >= 1) ->
+	{error, {invalid_packet, Packet}}.
+
+
+decode_packet_fully (Packet = {exchange, _MetaData, _Data}) ->
+	{ok, Packet};
+	
+decode_packet_fully (Packet = {resources, _MetaData, _Data}) ->
+	{ok, Packet};
+	
+decode_packet_fully (Packet = {generic, _MetaData, _Data}) ->
+	{ok, Packet};
+	
+decode_packet_fully (Packet = {exit, _ExitStatus}) ->
+	{ok, Packet};
+	
+decode_packet_fully (Packet = {exit, _MetaData, _Data}) ->
+	try enforce_ok_1 (decode_packet (Packet)) of
+		NewPacket -> decode_packet_fully (NewPacket)
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+decode_packet_fully (Packet = {json, _MetaData, _Data}) ->
+	try enforce_ok_1 (decode_packet (Packet)) of
+		NewPacket -> decode_packet_fully (NewPacket)
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+decode_packet_fully (PacketPayload)
+		when is_binary (PacketPayload) ->
+	try enforce_ok_1 (decode_packet_binary (PacketPayload)) of
+		NewPacket -> decode_packet_fully (NewPacket)
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+decode_packet_fully (Packet)
+		when is_tuple (Packet), (tuple_size (Packet) >= 1) ->
+	{error, {invalid_packet, Packet}}.

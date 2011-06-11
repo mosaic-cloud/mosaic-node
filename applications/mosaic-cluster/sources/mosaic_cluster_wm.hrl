@@ -144,13 +144,13 @@
 				if (_inputs == undefined)
 					_inputs = null;
 				_inputs = JSON.stringify (_inputs);
-				return (_get (\"/processes/call\", {key : _key, operation : _operation, inputs : _inputs}));
+				return (_get (\"/processes/call\", {key : _key, operation : _operation, inputs : _inputs}) .outputs);
 			});
 			_mosaic.processes.cast = _wrapped (function (_key, _operation, _inputs) {
 				if (_inputs == undefined)
 					_inputs = null;
 				_inputs = JSON.stringify (_inputs);
-				return (_get (\"/processes/cast\", {key : _key, operation : _operation, inputs : _inputs}));
+				return (_get (\"/processes/cast\", {key : _key, operation : _operation, inputs : _inputs}) .ok);
 			});
 			
 			$(\"#sandbox\")[0].contentWindow.mosaic = _mosaic;

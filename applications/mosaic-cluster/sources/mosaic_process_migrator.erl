@@ -45,9 +45,9 @@ migrate (Migrator, Configuration)
 init ({QualifiedName, {Source, SourceToken, Target, TargetToken, Monitor, MonitorToken}})
 		when is_pid (Source), is_pid (Target), is_pid (Monitor), (Source =/= Target), (Source =/= Monitor), (Target =/= Monitor),
 				(SourceToken =/= TargetToken), (SourceToken =/= MonitorToken), (TargetToken =/= MonitorToken) ->
+	false = erlang:process_flag (trap_exit, true),
 	case mosaic_process_tools:ensure_registered (QualifiedName) of
 		ok ->
-			false = erlang:process_flag (trap_exit, true),
 			StateData = #state{
 					source = Source, source_token = SourceToken,
 					target = Target, target_token = TargetToken,

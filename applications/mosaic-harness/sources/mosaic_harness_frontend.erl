@@ -85,13 +85,16 @@ terminate (_Reason, _State = #state{port = none}) ->
 	
 terminate (_Reason, _State = #state{port = Port})
 		when is_port (Port) ->
-	ok = try true = erlang:port_close (Port), ok catch error : badarg -> ok end,
-	ok = case mosaic_process_tools:wait (Port, 5000) of
-		{ok, _} ->
-			ok;
-		{error, _} ->
-			true = erlang:exit (Port, kill),
+	ok = try
+		true = erlang:port_close (Port),
+		ok
+	catch error : badarg -> ok end,
+	ok = receive
+		{'EXIT', Port, _PortExitReason} ->
 			ok
+	after 5000 ->
+		true = erlang:exit (Port, kill),
+		ok
 	end,
 	ok.
 
