@@ -47,13 +47,13 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 			case mosaic_webmachine:enforce_request ('GET',
 					[
 						{"type", fun mosaic_generic_coders:decode_atom/1},
-						{"arguments", fun mosaic_json_coders:decode_json/1},
+						{"configuration", fun mosaic_json_coders:decode_json/1},
 						{"count", fun mosaic_generic_coders:decode_integer/1}],
 					Request) of
-				{ok, false, [Type, Arguments, Count]} ->
+				{ok, false, [Type, Configuration, Count]} ->
 					if
 						(Count > 0), (Count =< 128) ->
-							{ok, false, State#state{arguments = dict:from_list ([{type, Type}, {arguments, Arguments}, {count, Count}])}};
+							{ok, false, State#state{arguments = dict:from_list ([{type, Type}, {configuration, Configuration}, {count, Count}])}};
 						true ->
 							{error, {invalid_argument, "count", {out_of_range, 1, 128}}}
 					end;
@@ -71,10 +71,11 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 			case mosaic_webmachine:enforce_request ('GET',
 					[
 						{"key", fun mosaic_component_coders:decode_component/1},
-						{"arguments", fun mosaic_json_coders:decode_json/1}],
+						{"operation", fun mosaic_generic_coders:decode_string/1},
+						{"inputs", fun mosaic_json_coders:decode_json/1}],
 					Request) of
-				{ok, false, [Key, Arguments]} ->
-					{ok, false, State#state{arguments = dict:from_list ([{key, Key}, {arguments, Arguments}])}};
+				{ok, false, [Key, Operation, Inputs]} ->
+					{ok, false, State#state{arguments = dict:from_list ([{key, Key}, {operation, Operation}, {inputs, Inputs}])}};
 				Error = {error, _Reason} ->
 					Error
 			end;
@@ -135,9 +136,9 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			end;
 		{processes, create} ->
 			ProcessType = dict:fetch (type, Arguments),
-			ProcessArgumentsContent = dict:fetch (arguments, Arguments),
+			ProcessConfigurationContent = dict:fetch (configuration, Arguments),
 			Count = dict:fetch (count, Arguments),
-			case mosaic_cluster_processes:define_and_create (ProcessType, json, ProcessArgumentsContent, Count) of
+			case mosaic_cluster_processes:define_and_create (ProcessType, json, ProcessConfigurationContent, Count) of
 				{ok, Processes, []} ->
 					{ok, json_struct, [
 							{keys, [enforce_ok_1 (mosaic_component_coders:encode_component (Key)) || {Key, _Process} <- Processes]}]};
@@ -158,23 +159,30 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			end;
 		{processes, Action} when ((Action =:= call) orelse (Action =:= cast)) ->
 			Key = dict:fetch (key, Arguments),
-			CallArguments = dict:fetch (arguments, Arguments),
+			Operation = dict:fetch (operation, Arguments),
+			Inputs = dict:fetch (inputs, Arguments),
 			case Action of
 				call ->
-					case mosaic_process_router:call (Key, CallArguments, <<>>, undefined) of
-						{ok, {struct, ReplyAttributes}, _ReplyData} ->
-							{ok, json_struct, ReplyAttributes};
-						{ok, Reply, _ReplyData} ->
-							{error, {invalid_reply, Reply}};
+					case mosaic_process_router:call (Key, Operation, Inputs, <<>>, undefined) of
+						{ok, {struct, OutputAttributes}, _Data} ->
+							{ok, json_struct, OutputAttributes};
+						{error, {struct, ErrorAttributes}, _Data} ->
+							{ok, json_struct, ErrorAttributes};
+						{error, Reason, _Data} ->
+							{error, Reason};
 						Error = {error, _Reason} ->
-							Error
+							Error;
+						CallReply ->
+							{error, {invalid_Reply, CallReply}}
 					end;
 				cast ->
-					case mosaic_process_router:cast (Key, CallArguments, <<>>) of
+					case mosaic_process_router:cast (Key, Operation, Inputs, <<>>) of
 						ok ->
 							ok;
 						Error = {error, _Reason} ->
-							Error
+							Error;
+						CastReply ->
+							{error, {invalid_reply, CastReply}}
 					end
 			end;
 		{ping} ->

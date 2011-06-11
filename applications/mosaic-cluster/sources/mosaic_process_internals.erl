@@ -145,8 +145,7 @@ handle_call ({mosaic_process, rollback_migration, Token}, _Sender, OldState)
 			{stop, Reason, Error, NewState}
 	end;
 	
-handle_call (Request, Sender, State) ->
-	ok = mosaic_transcript:trace_error ("received invalid call request; terminating!", [{request, Request}, {sender, Sender}]),
+handle_call (Request, _Sender, State) ->
 	Error = {error, {invalid_request, Request}},
 	{stop, Error, Error, State}.
 
@@ -161,7 +160,6 @@ handle_cast ({mosaic_process, cast, Operation, Inputs, Data}, OldState = #state{
 	end;
 	
 handle_cast (Request, State) ->
-	ok = mosaic_transcript:trace_error ("received invalid cast request; terminating!", [{request, Request}]),
 	{stop, {error, {invalid_request, Request}}, State}.
 
 

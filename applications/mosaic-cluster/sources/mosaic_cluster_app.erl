@@ -30,7 +30,7 @@ stop (void) ->
 
 
 start_supervisor () ->
-	case mosaic_sup:start_link () of
+	case mosaic_cluster_sup:start_link () of
 		Outcome = {ok, _Supervisor} ->
 			Outcome;
 		Error = {error, _Reason} ->
@@ -39,20 +39,20 @@ start_supervisor () ->
 
 
 start_daemons () ->
-	ok = case mosaic_cluster_processes_configurator:start_supervised () of
-		{ok, _Configurator} ->
+	ok = case mosaic_cluster_component_resources:start_supervised () of
+		{ok, _Resources} ->
 			ok;
 		Error1 = {error, _Reason1} ->
 			throw (Error1)
 	end,
-	ok = case mosaic_cluster_processes_router:start_supervised () of
-		{ok, _Router} ->
+	ok = case mosaic_cluster_processes_configurator:start_supervised () of
+		{ok, _Configurator} ->
 			ok;
 		Error2 = {error, _Reason2} ->
 			throw (Error2)
 	end,
-	ok = case mosaic_cluster_resources:start_supervised () of
-		{ok, _Resources} ->
+	ok = case mosaic_cluster_processes_router:start_supervised () of
+		{ok, _Router} ->
 			ok;
 		Error3 = {error, _Reason3} ->
 			throw (Error3)

@@ -7,14 +7,14 @@
 -export ([validate_configuration/2, parse_configuration/3]).
 -export ([
 		init/3, terminate/2, handle_stop/2,
-		handle_call/4, handle_cast/3, handle_info/2,
+		handle_call/5, handle_cast/4, handle_info/2,
 		begin_migration/4, commit_migration/1, rollback_migration/1]).
 
 
 -import (mosaic_enforcements, [enforce_ok_1/1]).
 
 
--record (state, {identifier, status, harness, harness_token, execute, router, inbound_pending_calls, outbound_pending_calls}).
+-record (state, {identifier, status, harness, harness_token, execute, resources, router, inbound_pending_calls, outbound_pending_calls}).
 -record (configuration, {harness, execute, router}).
 -record (inbound_pending_call, {correlation, sender}).
 -record (outbound_pending_call, {reference, correlation}).
@@ -103,12 +103,12 @@ handle_stop (Signal, State) ->
 	{reply, {error, {invalid_signal, Signal}}, State}.
 
 
-handle_call (Request, RequestData, Sender, State) ->
-	handle_info ({mosaic_component_process_internals, inbound_call, Request, RequestData, Sender}, State).
+handle_call (Operation, Inputs, Data, Sender, State) ->
+	handle_info ({mosaic_component_process_internals, inbound_call, Operation, Inputs, Data, Sender}, State).
 
 
-handle_cast (Request, RequestData, State) ->
-	handle_info ({mosaic_component_process_internals, inbound_cast, Request, RequestData}, State).
+handle_cast (Operation, Inputs, Data, State) ->
+	handle_info ({mosaic_component_process_internals, inbound_cast, Operation, Inputs, Data}, State).
 
 
 handle_info (
@@ -374,8 +374,7 @@ handle_info (
 	end;
 	
 handle_info (Message, State) ->
-	ok = mosaic_transcript:trace_error ("received invalid message; ignoring!", [{message, Message}]),
-	{noreply, State}.
+	{stop, {error, {invalid_message, Message}}, State}.
 
 
 begin_migration (source, Configuration, CompletionFun, OldState = #state{status = executing, execute = ExecuteSpecification}) ->

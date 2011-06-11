@@ -93,7 +93,7 @@ service_keys (Service, Type)
 
 service_activate (Service, VnodeModule)
 		when is_atom (Service), is_atom (VnodeModule) ->
-	case mosaic_sup:start_child_vnode_master (VnodeModule) of
+	case mosaic_cluster_sup:start_child_vnode_master (VnodeModule) of
 		{ok, Master} when is_pid (Master) ->
 			ok = riak_core:register_vnode_module (VnodeModule),
 			ok = riak_core_node_watcher:service_up (Service, Master),

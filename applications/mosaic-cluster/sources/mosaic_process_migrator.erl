@@ -79,15 +79,13 @@ handle_sync_event ({mosaic_process_migrator, migrate, Configuration}, _Sender, m
 	ok = send_event ({mosaic_process_migrator_internals, source_begin, Configuration}),
 	{reply, ok, source_begin_waiting, StateData};
 	
-handle_sync_event (Event, Sender, _StateName, StateData) ->
-	ok = mosaic_transcript:trace_error ("received invalid event; aborting!", [{event, Event}, {sender, Sender}]),
-	Error = {error, {invalid_event, Event}},
+handle_sync_event (Request, _Sender, _StateName, StateData) ->
+	Error = {error, {invalid_request, Request}},
 	{stop, Error, Error, StateData}.
 
 
-handle_event (Event, _StateName, StateData) ->
-	ok = mosaic_transcript:trace_error ("received invalid event; aborting!", [{event, Event}]),
-	{stop, {error, {invalid_event, Event}}, StateData}.
+handle_event (Request, _StateName, StateData) ->
+	{stop, {error, {invalid_request, Request}}, StateData}.
 
 
 source_begin_waiting ({mosaic_process_migrator_internals, source_begin, Configuration}, StateData = #state{source = Source, source_token = SourceToken}) ->
@@ -233,7 +231,6 @@ handle_info (Message, StateName, StateData = #state{source_token = SourceToken, 
 			ok = send_event (Message),
 			{next_state, StateName, StateData};
 		stop ->
-			ok = mosaic_transcript:trace_error ("received invalid message; aborting!", [{message, Message}]),
 			{stop, {error, {invalid_message, Message}}, StateData}
 	end.
 

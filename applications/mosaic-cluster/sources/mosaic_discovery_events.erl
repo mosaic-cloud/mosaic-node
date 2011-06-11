@@ -30,7 +30,7 @@ start_link (QualifiedName, void) ->
 
 
 start_supervised () ->
-	mosaic_sup:start_child_daemon (mosaic_discovery_events, {local, mosaic_discovery_events}, [void], permanent).
+	mosaic_cluster_sup:start_child_daemon (mosaic_discovery_events, {local, mosaic_discovery_events}, [void], permanent).
 
 
 stop () ->
@@ -54,8 +54,8 @@ register_handler (Events, Module, Arguments)
 			ok;
 		{'EXIT', Reason} ->
 			{error, Reason};
-		Outcome ->
-			{error, {invalid_outcome, Outcome}}
+		Reply ->
+			{error, {invalid_reply, Reply}}
 	end.
 
 

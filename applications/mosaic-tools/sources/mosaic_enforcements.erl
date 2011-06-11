@@ -16,8 +16,8 @@ enforce (Outcome)
 enforce (Error = {error, _Reason}) ->
 	throw (Error);
 	
-enforce (Outcome) ->
-	throw ({error, {invalid_outcome, Outcome}}).
+enforce (Return) ->
+	throw ({error, {invalid_return, Return}}).
 
 
 enforce (Outcome, [{Outcome, Replacement} | _]) ->
@@ -36,8 +36,8 @@ enforce_ok (ok) ->
 enforce_ok (Error = {error, _Reason}) ->
 	throw (Error);
 	
-enforce_ok (Outcome) ->
-	throw ({error, {invalid_outcome, Outcome}}).
+enforce_ok (Return) ->
+	throw ({error, {invalid_return, Return}}).
 
 
 enforce_ok_1 ({ok, Value}) ->
@@ -46,8 +46,8 @@ enforce_ok_1 ({ok, Value}) ->
 enforce_ok_1 (Error = {error, _Reason}) ->
 	throw (Error);
 	
-enforce_ok_1 (Outcome) ->
-	throw ({error, {invalid_outcome, Outcome}}).
+enforce_ok_1 (Return) ->
+	throw ({error, {invalid_return, Return}}).
 
 
 enforce_ok_2 ({ok, Value1, Value2}) ->
@@ -56,5 +56,5 @@ enforce_ok_2 ({ok, Value1, Value2}) ->
 enforce_ok_2 (Error = {error, _Reason}) ->
 	throw (Error);
 	
-enforce_ok_2 (Outcome) ->
-	throw ({error, {invalid_outcome, Outcome}}).
+enforce_ok_2 (Return) ->
+	throw ({error, {invalid_return, Return}}).

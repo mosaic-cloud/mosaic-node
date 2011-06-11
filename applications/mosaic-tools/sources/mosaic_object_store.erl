@@ -36,7 +36,7 @@ start_supervised (QualifiedName) ->
 	start_supervised (QualifiedName, defaults).
 
 start_supervised (QualifiedName, Configuration) ->
-	mosaic_sup:start_child_object_store (QualifiedName, Configuration).
+	mosaic_cluster_sup:start_child_object_store (QualifiedName, Configuration).
 
 
 stop (Store) ->
@@ -159,8 +159,8 @@ handle_call ({mosaic_object_store, update, Key, Mutator}, _Sender, State = #stat
 			{reply, ok, State};
 		Error = {error, _Reason} ->
 			{reply, Error, State};
-		Outcome ->
-			{reply, {error, {invalid_outcome, Outcome}}, State}
+		Return ->
+			{reply, {error, {invalid_return, Return}}, State}
 	catch
 		throw : Reason ->
 			{reply, {error, {unexpected_error, Reason}}, State};
@@ -220,15 +220,16 @@ handle_call ({mosaic_object_store, migrate_as_source, Key}, _Sender, State = #st
 	end;
 	
 handle_call (Request, Sender, State) ->
-	ok = mosaic_transcript:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
-	{reply, {error, {invalid_request, Request}}, State}.
+	ok = mosaic_transcript:trace_error ("received invalid call request; terminating!", [{request, Request}, {sender, Sender}]),
+	Error = {error, {invalid_request, Request}},
+	{stop, Error, Error, State}.
 
 
 handle_cast (Request, State) ->
-	ok = mosaic_transcript:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
-	{noreply, State}.
+	ok = mosaic_transcript:trace_error ("received invalid cast request; terminating!", [{request, Request}]),
+	{stop, {error, {invalid_request, Request}}, State}.
 
 
 handle_info (Message, State) ->
-	ok = mosaic_transcript:trace_error ("received invalid message; ignoring!", [{message, Message}]),
-	{noreply, State}.
+	ok = mosaic_transcript:trace_error ("received invalid message; terminating!", [{message, Message}]),
+	{stop, {error, {invalid_message, Message}}, State}.

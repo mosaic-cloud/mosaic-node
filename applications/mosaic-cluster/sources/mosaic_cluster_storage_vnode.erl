@@ -109,8 +109,9 @@ handle_command ({mosaic_cluster, list}, _Sender, State = #state{object_store = O
 			end, []),
 	{reply, {ok, Keys}, State};
 	
-handle_command (Command, _Sender, State = #state{}) ->
-	{reply, {error, {invalid_command, Command}}, State}.
+handle_command (Request, Sender, State = #state{}) ->
+	ok = mosaic_transcript:trace_error ("received invalid command request; ignoring!", [{request, Request}, {sender, Sender}]),
+	{reply, {error, {invalid_request, Request}}, State}.
 
 
 handoff_starting (_Node, State = #state{}) ->

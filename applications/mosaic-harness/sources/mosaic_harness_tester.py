@@ -148,7 +148,7 @@ def _frontend_node_abacus () :
 			"argument0" : None,
 			"arguments" : ["./mosaic_component_abacus.js"],
 			"environment" : None,
-			"working-directory" : "./applications/mosaic-cluster/sources",
+			"working-directory" : "./applications/mosaic-component/sources",
 	}, ""))
 	_sleep (0.1)
 	__frontend_abacus ()
@@ -267,7 +267,7 @@ def _frontend_test_nodejs () :
 			"argument0" : None,
 			"arguments" : ["./mosaic_component_abacus.js"],
 			"environment" : None,
-			"working-directory" : "./applications/mosaic-cluster/sources",
+			"working-directory" : "./applications/mosaic-component/sources",
 	}, ""))
 	_sleep (0.1)
 	for i in xrange (0, 10) :

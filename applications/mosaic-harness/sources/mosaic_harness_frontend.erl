@@ -150,47 +150,51 @@ handle_call (Request, _Sender, State) ->
 	{stop, Error, Error, State}.
 
 
-handle_cast (
+handle_cast (Request, State) ->
+	{stop, {error, {invalid_request, Request}}, State}.
+
+
+handle_info (
 			{mosaic_harness_frontend_internals, inbound_packet, Packet = {exchange, _MetaData, _Data}},
 			State = #state{controller = Controller, controller_token = ControllerToken}) ->
 	Controller ! {mosaic_harness_frontend, ControllerToken, push_packet, Packet},
 	{noreply, State};
 	
-handle_cast (
+handle_info (
 			{mosaic_harness_frontend_internals, inbound_packet, Packet = {resources, _Specification}},
 			State = #state{controller = Controller, controller_token = ControllerToken}) ->
 	Controller ! {mosaic_harness_frontend, ControllerToken, push_packet, Packet},
 	{noreply, State};
 	
-handle_cast (
+handle_info (
 			{mosaic_harness_frontend_internals, inbound_packet, {exit, ExitStatus}},
 			State = #state{controller = Controller, controller_token = ControllerToken}) ->
 	Controller ! {mosaic_harness_frontend, ControllerToken, exit, ExitStatus},
 	{noreply, State};
 	
-handle_cast (
+handle_info (
 			{mosaic_harness_frontend_internals, inbound_packet, PacketPayload},
 			State)
 		when is_binary (PacketPayload) ->
 	try enforce_ok_1 (mosaic_harness_coders:decode_packet_fully (PacketPayload)) of
 		Packet ->
-			handle_cast ({mosaic_harness_frontend_internals, inbound_packet, Packet}, State)
+			handle_info ({mosaic_harness_frontend_internals, inbound_packet, Packet}, State)
 	catch Error = {error, _Reason} -> {stop, Error, State} end;
 	
-handle_cast (
+handle_info (
 			{mosaic_harness_frontend_internals, port_exit_reason, PortExitReason},
 			OldState = #state{port_exit_reason = none}) ->
 	NewState = OldState#state{port = none, port_exit_reason = PortExitReason},
-	handle_cast ({mosaic_harness_frontend_internals, maybe_stop}, NewState);
+	handle_info ({mosaic_harness_frontend_internals, maybe_stop}, NewState);
 	
-handle_cast (
+handle_info (
 			{mosaic_harness_frontend_internals, port_exit_status, PortExitStatus},
 			OldState = #state{port_exit_status = none})
 		when is_integer (PortExitStatus), (PortExitStatus >= 0) ->
 	NewState = OldState#state{port_exit_status = PortExitStatus},
-	handle_cast ({mosaic_harness_frontend_internals, maybe_stop}, NewState);
+	handle_info ({mosaic_harness_frontend_internals, maybe_stop}, NewState);
 	
-handle_cast (
+handle_info (
 			{mosaic_harness_frontend_internals, maybe_stop},
 			State = #state{port_exit_reason = PortExitReason, port_exit_status = PortExitStatus}) ->
 	if
@@ -201,25 +205,20 @@ handle_cast (
 		(PortExitReason =/= normal); (PortExitStatus > 0) ->
 			{stop, {error, {failed_port, PortExitReason, PortExitStatus}}, State}
 	end;
-	
-handle_cast (Request, State) ->
-	{stop, {error, {invalid_request, Request}}, State}.
-
-
 handle_info ({Port, Callback}, State = #state{port = Port, port_exit_status = none})
 		when is_port (Port) ->
 	case Callback of
 		{data, PacketPayload} when is_binary (PacketPayload) ->
-			handle_cast ({mosaic_harness_frontend_internals, inbound_packet, PacketPayload}, State);
+			handle_info ({mosaic_harness_frontend_internals, inbound_packet, PacketPayload}, State);
 		{exit_status, ExitStatus} when is_integer (ExitStatus), (ExitStatus >= 0) ->
-			handle_cast ({mosaic_harness_frontend_internals, port_exit_status, ExitStatus}, State);
+			handle_info ({mosaic_harness_frontend_internals, port_exit_status, ExitStatus}, State);
 		_ ->
 			{stop, {invalid_port_callback, Callback}, State}
 	end;
 	
 handle_info ({'EXIT', Port, ExitReason}, State = #state{port = Port})
 		when is_port (Port) ->
-	handle_cast ({mosaic_harness_frontend_internals, port_exit_reason, ExitReason}, State);
+	handle_info ({mosaic_harness_frontend_internals, port_exit_reason, ExitReason}, State);
 	
 handle_info (Message, State) ->
 	{stop, {invalid_message, Message}, State}.

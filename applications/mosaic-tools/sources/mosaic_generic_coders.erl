@@ -7,6 +7,7 @@
 		encode_integer/1, decode_integer/1,
 		encode_float/1, decode_float/1,
 		encode_hex_data/1, decode_hex_data/1,
+		encode_string/1, decode_string/1,
 		encode_text_term/1,
 		encode_reason/2]).
 -export ([generate_data/1, generate_hex_data/1]).
@@ -57,6 +58,27 @@ decode_float (String)
 	try
 		{ok, erlang:list_to_float (String)}
 	catch error : badarg -> {error, {invalid_float, String}} end.
+
+
+encode_string (Binary)
+		when is_binary (Binary) ->
+	{ok, Binary};
+	
+encode_string (String)
+		when is_list (String) ->
+	try
+		{ok, erlang:iolist_to_binary (String)}
+	catch error : badarg -> {error, {invalid_string, String}} end.
+
+decode_string (Binary)
+		when is_binary (Binary) ->
+	{ok, Binary};
+	
+decode_string (String)
+		when is_list (String) ->
+	try
+		{ok, erlang:iolist_to_binary (String)}
+	catch error : badarg -> {error, {invalid_string, String}} end.
 
 
 encode_hex_data (Binary)

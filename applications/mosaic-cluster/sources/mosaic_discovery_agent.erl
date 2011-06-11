@@ -35,7 +35,7 @@ start_supervised () ->
 	start_supervised (defaults).
 
 start_supervised (Configuration) ->
-	mosaic_sup:start_child_daemon (mosaic_discovery_agent, {local, mosaic_discovery_agent}, [Configuration], permanent).
+	mosaic_cluster_sup:start_child_daemon (mosaic_discovery_agent, {local, mosaic_discovery_agent}, [Configuration], permanent).
 
 
 stop () ->
@@ -125,14 +125,13 @@ handle_call ({mosaic_discovery_agent, broadcast, Message, Count, Delay}, _Sender
 			Error
 	end;
 	
-handle_call (Request, Sender, State) ->
-	ok = mosaic_transcript:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
-	{reply, {error, {invalid_request, Request}}, State}.
+handle_call (Request, _Sender, State) ->
+	Error = {error, {invalid_request, Request}},
+	{stop, Error, Error, State}.
 
 
 handle_cast (Request, State) ->
-	ok = mosaic_transcript:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
-	{noreply, State}.
+	{stop, {error, {invalid_request, Request}}, State}.
 
 
 handle_info (
@@ -179,8 +178,7 @@ handle_info (
 	end;
 	
 handle_info (Message, State) ->
-	ok = mosaic_transcript:trace_error ("received invalid message; ignoring!", [{message, Message}]),
-	{noreply, State}.
+	{stop, {error, {invalid_message, Message}}, State}.
 
 
 encode_payload (Identity, SharedSecret, Message)

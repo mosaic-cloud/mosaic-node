@@ -105,7 +105,7 @@ test_rabbitmq ({defaults}) ->
 	{ok, Identifier} = mosaic_component_coders:generate_component (),
 	{ok, Configuration} = configure (rabbitmq, create, Identifier),
 	{ok, Router} = mosaic_cluster_processes_router:start_link ({local, mosaic_process_router}, defaults),
-	{ok, Resources} = mosaic_cluster_resources:start_link ({local, mosaic_component_resources}, defaults),
+	{ok, Resources} = mosaic_cluster_component_resources:start_link ({local, mosaic_component_resources}, defaults),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
 	ok = timer:sleep (6 * 1000),
 	ok = stop_and_wait_process (Process),
@@ -200,7 +200,7 @@ configure (Type = node_abacus, create, Identifier, term, defaults, ExtraOptions)
 				{executable, Node},
 				{arguments, [
 					<<"./mosaic_component_abacus.js">>]},
-				{working_directory, <<"./applications/mosaic-cluster/sources">>}]}
+				{working_directory, <<"./applications/mosaic-component/sources">>}]}
 			| ExtraOptions],
 	case mosaic_component_process:parse_configuration (create, term, Options) of
 		{ok, Configuration} ->

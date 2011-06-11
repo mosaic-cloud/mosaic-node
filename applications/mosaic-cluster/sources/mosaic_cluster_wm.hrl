@@ -125,13 +125,13 @@
 				var _outcome = _get (\"/processes/ping\", {count : _count});
 				return ({pongs : _outcome.pongs, pangs : _outcome.pangs});
 			});
-			_mosaic.processes.create = _wrapped (function (_type, _arguments, _count) {
-				if (_arguments == undefined)
-					_arguments = null;
+			_mosaic.processes.create = _wrapped (function (_type, _configuration, _count) {
+				if (_configuration == undefined)
+					_configuration = null;
 				if (_count == undefined)
 					_count = 1;
-				_arguments = JSON.stringify (_arguments);
-				var _outcome = _get (\"/processes/create\", {type : _type, arguments : _arguments, count : _count});
+				_configuration = JSON.stringify (_configuration);
+				var _outcome = _get (\"/processes/create\", {type : _type, configuration : _configuration, count : _count});
 				if (_count == 1)
 					return (_outcome.keys[0]);
 				else
@@ -140,17 +140,17 @@
 			_mosaic.processes.stop = _wrapped (function (_key) {
 				return (_get (\"/processes/stop\", {key : _key}) .ok);
 			});
-			_mosaic.processes.call = _wrapped (function (_key, _arguments) {
-				if (_arguments == undefined)
-					_arguments = null;
-				_arguments = JSON.stringify (_arguments);
-				return (_get (\"/processes/call\", {key : _key, arguments : _arguments}));
+			_mosaic.processes.call = _wrapped (function (_key, _operation, _inputs) {
+				if (_inputs == undefined)
+					_inputs = null;
+				_inputs = JSON.stringify (_inputs);
+				return (_get (\"/processes/call\", {key : _key, operation : _operation, inputs : _inputs}));
 			});
-			_mosaic.processes.cast = _wrapped (function (_key, _arguments) {
-				if (_arguments == undefined)
-					_arguments = null;
-				_arguments = JSON.stringify (_arguments);
-				return (_get (\"/processes/cast\", {key : _key, arguments : _arguments}));
+			_mosaic.processes.cast = _wrapped (function (_key, _operation, _inputs) {
+				if (_inputs == undefined)
+					_inputs = null;
+				_inputs = JSON.stringify (_inputs);
+				return (_get (\"/processes/cast\", {key : _key, operation : _operation, inputs : _inputs}));
 			});
 			
 			$(\"#sandbox\")[0].contentWindow.mosaic = _mosaic;

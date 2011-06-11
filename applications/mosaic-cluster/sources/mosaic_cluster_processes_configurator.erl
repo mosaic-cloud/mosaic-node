@@ -12,7 +12,7 @@ start_supervised () ->
 	start_supervised (defaults).
 
 start_supervised (Configuration) ->
-	mosaic_sup:start_child_daemon (mosaic_cluster_processes_configurator, {local, mosaic_process_configurator}, [Configuration], permanent).
+	mosaic_cluster_sup:start_child_daemon (mosaic_cluster_processes_configurator, {local, mosaic_process_configurator}, [Configuration], permanent).
 
 start_link (QualifiedName, Configuration) ->
 	mosaic_process_tools:start_link (gen_server, mosaic_cluster_processes_configurator, QualifiedName, Configuration).
@@ -50,8 +50,8 @@ handle_call ({mosaic_process_configurator, configure, Type, Disposition, Identif
 					{reply, Outcome, State};
 				Error = {error, _Reason} ->
 					{reply, Error, State};
-				Outcome ->
-					{reply, {error, {configurator_failed, {invalid_outcome, Outcome}}}, State}
+				Return ->
+					{reply, {error, {configurator_failed, {invalid_return, Return}}}, State}
 			catch
 				throw : CatchedTerm ->
 					{reply, {error, {configurator_failed, {throw, CatchedTerm, erlang:get_stacktrace ()}}}, State};
@@ -110,16 +110,14 @@ handle_call ({mosaic_process_configurator, unregister, Type, ConfigurationEncodi
 			{reply, Error, State}
 	end;
 	
-handle_call (Request, Sender, State = #state{}) ->
-	ok = mosaic_transcript:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
-	{reply, {error, {invalid_request, Request}}, State}.
+handle_call (Request, _Sender, State = #state{}) ->
+	Error = {error, {invalid_request, Request}},
+	{stop, Error, Error, State}.
 
 
 handle_cast (Request, State = #state{}) ->
-	ok = mosaic_transcript:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
-	{noreply, State}.
+	{stop, {error, {invalid_request, Request}}, State}.
 
 
 handle_info (Message, State = #state{}) ->
-	ok = mosaic_transcript:trace_error ("received invalid message; ignoring!", [{message, Message}]),
-	{noreply, State}.
+	{stop, {error, {invalid_message, Message}}, State}.

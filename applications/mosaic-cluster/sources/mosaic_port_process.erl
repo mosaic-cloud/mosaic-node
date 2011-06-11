@@ -6,7 +6,7 @@
 
 -export ([
 		init/3, terminate/2, handle_stop/2,
-		handle_call/4, handle_cast/3, handle_info/2,
+		handle_call/5, handle_cast/4, handle_info/2,
 		begin_migration/4, commit_migration/1, rollback_migration/1]).
 
 
@@ -56,43 +56,39 @@ handle_stop (normal, State = #state{status = running}) ->
 	{stop, normal, ok, State};
 	
 handle_stop (Signal, State = #state{status = running}) ->
-	ok = mosaic_transcript:trace_error ("received invalid stop request; ignoring!", [{signal, Signal}]),
-	{reply, {error, {invalid_signal, Signal}}, State};
+	Error = {error, {invalid_signal, Signal}},
+	{stop, Error, Error, State};
 	
-handle_stop (Signal, State = #state{status = Status})
+handle_stop (_Signal, State = #state{status = Status})
 		when ((Status =:= pre_migrating_as_target) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
-	ok = mosaic_transcript:trace_error ("received unexpected stop request; ignoring!", [{signal, Signal}, {status, Status}]),
-	{reply, {error, {invalid_status, Status}}, State}.
+	Error = {error, {invalid_status, Status}},
+	{stop, Error, Error, State}.
 
 
-handle_call (Request, _RequestData, Sender, State = #state{status = running}) ->
-	ok = mosaic_transcript:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
-	{reply, {error, {invalid_request, Request}}, State};
+handle_call (Operation, Inputs, _Data, _Sender, State = #state{status = running}) ->
+	Error = {error, {invalid_request, Operation, Inputs}},
+	{stop, Error, Error, State};
 	
-handle_call (Request, _RequestData, Sender, State = #state{status = Status})
+handle_call (_Operation, _Inputs, _Data, _Sender, State = #state{status = Status})
 		when ((Status =:= pre_migrating_as_target) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
-	ok = mosaic_transcript:trace_error ("received unexpected call request; ignoring!", [{request, Request}, {sender, Sender}, {status, Status}]),
-	{reply, {error, {invalid_status, Status}}, State}.
+	Error = {error, {invalid_status, Status}},
+	{stop, Error, Error, State}.
 
 
-handle_cast (Request, _RequestData, State = #state{status = running}) ->
-	ok = mosaic_transcript:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
-	{noreply, State};
+handle_cast (Operation, Inputs, _Data, State = #state{status = running}) ->
+	{stop, {error, {invalid_request, Operation, Inputs}}, State};
 	
-handle_cast (Request, _RequestData, State = #state{status = Status})
+handle_cast (_Operation, _Inputs, _Data, State = #state{status = Status})
 		when ((Status =:= pre_migrating_as_target) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
-	ok = mosaic_transcript:trace_error ("received unexpected cast request; ignoring!", [{request, Request}, {status, Status}]),
-	{noreply, State}.
+	{stop, {error, {invalid_status, Status}}, State}.
 
 
 handle_info (Message, State = #state{status = running}) ->
-	ok = mosaic_transcript:trace_error ("received invalid message; ignoring!", [{message, Message}]),
-	{noreply, State};
+	{stop, {error, {invalid_message, Message}}, State};
 	
-handle_info (Message, State = #state{status = Status})
+handle_info (_Message, State = #state{status = Status})
 		when ((Status =:= pre_migrating_as_target) orelse (Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
-	ok = mosaic_transcript:trace_error ("received unexpected message; ignoring!", [{message, Message}, {status, Status}]),
-	{noreply, State}.
+	{stop, {error, {invalid_status, Status}}, State}.
 
 
 begin_migration (source, MigrateConfiguration, CompletionFunction, OldState = #state{status = running, configuration = CreateConfiguration}) ->

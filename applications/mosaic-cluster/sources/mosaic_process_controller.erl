@@ -36,7 +36,7 @@ start_supervised (QualifiedName) ->
 	start_supervised (QualifiedName, defaults).
 
 start_supervised (QualifiedName, Configuration) ->
-	mosaic_sup:start_child_process_controller (QualifiedName, Configuration).
+	mosaic_cluster_sup:start_child_process_controller (QualifiedName, Configuration).
 
 
 stop (Controller) ->
@@ -253,7 +253,7 @@ handle_call (
 					{reply, {error, source_already_migrating}, State}
 			end;
 		error ->
-			{reply, {error, source_does_not_exist}, State}
+			{reply, {error, does_not_exist}, State}
 	end;
 	
 handle_call (
@@ -281,7 +281,7 @@ handle_call (
 					{reply, {error, source_already_migrating}, OldState}
 			end;
 		true ->
-			{reply, {error, source_does_not_exist}, OldState}
+			{reply, {error, does_not_exist}, OldState}
 	end;
 	
 handle_call (
@@ -292,7 +292,7 @@ handle_call (
 		{ok, #process_state{process = Process}} ->
 			{reply, {ok, Process}, State};
 		error ->
-			{reply, {error, process_does_not_exist}, State}
+			{reply, {error, does_not_exist}, State}
 	end;
 	
 handle_call (
@@ -312,14 +312,13 @@ handle_call (
 	Count = orddict:size (Processes),
 	{reply, {ok, Count}, State};
 	
-handle_call (Request, Sender, State) ->
-	ok = mosaic_transcript:trace_error ("received invalid call request; ignoring!", [{request, Request}, {sender, Sender}]),
-	{reply, {error, {invalid_request, Request}}, State}.
+handle_call (Request, _Sender, State) ->
+	Error = {error, {invalid_request, Request}},
+	{stop, Error, Error, State}.
 
 
 handle_cast (Request, State) ->
-	ok = mosaic_transcript:trace_error ("received invalid cast request; ignoring!", [{request, Request}]),
-	{noreply, State}.
+	{stop, {error, {invalid_request, Request}}, State}.
 
 
 handle_info (
@@ -378,5 +377,4 @@ handle_info (
 	end;
 	
 handle_info (Message, State) ->
-	ok = mosaic_transcript:trace_error ("received invalid message; ignoring!", [{message, Message}]),
-	{noreply, State}.
+	{stop, {error, {invalid_message, Message}}, State}.
