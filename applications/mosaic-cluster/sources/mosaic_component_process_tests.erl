@@ -23,8 +23,8 @@
 -test ({test_cast, [{defaults}]}).
 -test ({test_migrate, [{defaults}]}).
 -test ({test_abacus, [{python}]}).
+-test ({test_abacus, [{node}]}).
 %-test ({test_abacus, [{java}]}).
-%-test ({test_abacus, [{node}]}).
 %-test ({test_rabbitmq, [{defaults}]}).
 
 
@@ -86,10 +86,10 @@ test_abacus ({Flavour}) ->
 	{ok, Type} = case Flavour of
 		python ->
 			{ok, python_abacus};
-		java ->
-			{ok, java_abacus};
 		node ->
-			{ok, node_abacus}
+			{ok, node_abacus};
+		java ->
+			{ok, java_abacus}
 	end,
 	{ok, Identifier} = mosaic_component_coders:generate_component (),
 	{ok, Configuration} = configure (Type, create, Identifier),
@@ -159,6 +159,30 @@ configure (Type, create, Identifier, term, defaults, ExtraOptions)
 			Error
 	end;
 	
+configure (Type = node_abacus, create, Identifier, term, defaults, ExtraOptions)
+		when is_list (ExtraOptions) ->
+	{ok, Node} = case os:find_executable ("node") of
+		Node_ when is_list (Node_) ->
+			{ok, erlang:list_to_binary (Node_)};
+		false ->
+			{error, {unresolved_executable, <<"node">>}}
+	end,
+	Options = [
+			{harness, [
+				{argument0, <<"[mosaic_component#", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
+			{execute, [
+				{executable, Node},
+				{arguments, [
+					<<"./mosaic_component_abacus.js">>]},
+				{working_directory, <<"./applications/mosaic-component/sources">>}]}
+			| ExtraOptions],
+	case mosaic_component_process_coders:parse_configuration (create, term, Options) of
+		{ok, Configuration} ->
+			{ok, mosaic_component_process, Configuration};
+		Error = {error, _Reason} ->
+			Error
+	end;
+	
 configure (Type = java_abacus, create, Identifier, term, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	{ok, Java} = case os:find_executable ("java") of
@@ -176,30 +200,6 @@ configure (Type = java_abacus, create, Identifier, term, defaults, ExtraOptions)
 					<<"-jar">>, <<"../mosaic-java-components/components-container/target/components-container-0.2-SNAPSHOT-jar-with-dependencies.jar">>,
 					<<"eu.mosaic_cloud.components.examples.abacus.AbacusComponentCallbacks">>,
 					<<"file:../mosaic-java-components/components-examples/target/components-examples-0.2-SNAPSHOT.jar">>]}]}
-			| ExtraOptions],
-	case mosaic_component_process_coders:parse_configuration (create, term, Options) of
-		{ok, Configuration} ->
-			{ok, mosaic_component_process, Configuration};
-		Error = {error, _Reason} ->
-			Error
-	end;
-	
-configure (Type = node_abacus, create, Identifier, term, defaults, ExtraOptions)
-		when is_list (ExtraOptions) ->
-	{ok, Node} = case os:find_executable ("node") of
-		Node_ when is_list (Node_) ->
-			{ok, erlang:list_to_binary (Node_)};
-		false ->
-			{error, {unresolved_executable, <<"node">>}}
-	end,
-	Options = [
-			{harness, [
-				{argument0, <<"[mosaic_component#", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
-			{execute, [
-				{executable, Node},
-				{arguments, [
-					<<"./mosaic_component_abacus.js">>]},
-				{working_directory, <<"./applications/mosaic-component/sources">>}]}
 			| ExtraOptions],
 	case mosaic_component_process_coders:parse_configuration (create, term, Options) of
 		{ok, Configuration} ->

@@ -16,42 +16,65 @@ var Component = function (_harness) {
 
 sys.inherits (Component, events.EventEmitter);
 
-Component.prototype.call = function (_component, _correlation, _metaData, _data) {
-	if ((typeof (_component) == "string") && (typeof (_correlation) == "string") && (typeof (_metaData) == "object") && (_data instanceof Buffer)) {
+Component.prototype.call = function (_component, _operation, _correlation, _inputs, _data) {
+	if (typeof (_data) === "string")
+		_data = new Buffer (_data);
+	if ((typeof (_component) === "string") && (typeof (_operation) === "string") && (typeof (_correlation) === "string") && (_data instanceof Buffer)) {
 		var _exchangeMetaData = {
 			"action" : "call",
 			"component" : _component,
+			"operation" : _operation,
 			"correlation" : _correlation,
-			"meta-data" : _metaData
+			"inputs" : _inputs
 		};
 		this.exchange (_exchangeMetaData, _data);
-	}
+	} else
+		this.emit ("error", new Error ("invalid arguments"));
 };
 
-Component.prototype.cast = function (_component, _metaData, _data) {
-	if ((typeof (_component) == "string") && (typeof (_metaData) == "object") && (_data instanceof Buffer)) {
+Component.prototype.cast = function (_component, _operation, _inputs, _data) {
+	if (typeof (_data) === "string")
+		_data = new Buffer (_data);
+	if ((typeof (_component) === "string") && (typeof (_operation) === "string") && (_data instanceof Buffer)) {
 		var _exchangeMetaData = {
 			"action" : "cast",
 			"component" : _component,
-			"meta-data" : _metaData
+			"operation" : _operation,
+			"inputs" : _inputs
 		};
 		this.exchange (_exchangeMetaData, _data);
-	}
+	} else
+		this.emit ("error", new Error ("invalid arguments"));
 };
 
-Component.prototype.return = function (_correlation, _metaData, _data) {
-	if ((typeof (_correlation) == "string") && (typeof (_metaData) == "object") && (_data instanceof Buffer)) {
-		var _exchangeMetaData = {
-			"action" : "return",
-			"correlation" : _correlation,
-			"meta-data" : _metaData
-		};
+Component.prototype.call_return = function (_correlation, _ok, _outputs_or_error, _data) {
+	if (typeof (_data) === "string")
+		_data = new Buffer (_data);
+	if ((typeof (_correlation) === "string") && (_data instanceof Buffer)) {
+		var _exchangeMetaData = undefined;
+		if (_ok === true)
+			_exchangeMetaData = {
+				"action" : "call-return",
+				"correlation" : _correlation,
+				"ok" : true,
+				"outputs" : _outputs_or_error
+			};
+		else if (_ok === false)
+			_exchangeMetaData = {
+				"action" : "call-return",
+				"correlation" : _correlation,
+				"ok" : false,
+				"error" : _outputs_or_error
+			};
+		else
+			this.emit ("error", new Error ("invalid arguments"));
 		this.exchange (_exchangeMetaData, _data);
-	}
+	} else
+		this.emit ("error", new Error ("invalid arguments"));
 };
 
 Component.prototype.exchange = function (_metaData, _data) {
-	if (typeof (_metaData) == "object") {
+	if (typeof (_metaData) === "object") {
 		_metaData["__type__"] = "exchange";
 		this._harness.output (_metaData, _data);
 	} else
@@ -59,31 +82,43 @@ Component.prototype.exchange = function (_metaData, _data) {
 };
 
 Component.prototype._onInput = function (_metaData, _data) {
-	if (typeof (_metaData) == "object") {
+	if (typeof (_metaData) === "object") {
 		var _type = _metaData["__type__"];
-		if (_type == "exchange") {
+		if (_type === "exchange") {
 			delete _metaData["__type__"];
 			var _action = _metaData["action"];
-			if (_action == "call") {
+			if (_action === "call") {
+				var _operation = _metaData["operation"];
 				var _correlation = _metaData["correlation"];
-				var _callMetaData = _metaData["meta-data"];
-				if ((typeof (_correlation) == "string") && (typeof (_callMetaData) == "object"))
-					this.emit ("call", _correlation, _callMetaData, _data);
+				var _inputs = _metaData["inputs"];
+				if ((typeof (_operation) === "string") && (typeof (_correlation) === "string") && (_inputs !== undefined))
+					this.emit ("call", _operation, _correlation, _inputs, _data);
 				else
 					this.emit ("error", new Error ("invalid call meta-data `" + _metaData + "`"));
-			} else if (_action == "cast") {
-				var _castMetaData = _metaData["meta-data"];
-				if (typeof (_castMetaData) == "object")
-					this.emit ("cast", _castMetaData, _data);
+			} else if (_action === "cast") {
+				var _operation = _metaData["operation"];
+				var _inputs = _metaData["inputs"];
+				if ((typeof (_operation) === "string") && (_inputs !== undefined))
+					this.emit ("cast", _operation, _inputs, _data);
 				else
 					this.emit ("error", new Error ("invalid cast meta-data `" + _metaData + "`"));
-			} else if (_action == "return") {
+			} else if (_action === "call-return") {
 				var _correlation = _metaData["correlation"];
-				var _returnMetaData = _metaData["meta-data"];
-				if ((typeof (_correlation) == "string") && (typeof (_returnMetaData) == "object"))
-					this.emit ("return", _correlation, _returnMetaData, _data);
-				else
-					this.emit ("error", new Error ("invalid return meta-data `" + _metaData + "`"));
+				var _ok = _metaData["ok"];
+				if (_ok === true) {
+					var _outputs = _metaData["outputs"];
+					if ((typeof (_correlation) === "string") && (_outputs !== undefined))
+						this.emit ("call-return", _correlation, true, _outputs, _data);
+					else
+						this.emit ("error", new Error ("invalid call return meta-data `" + _metaData + "`"));
+				} else if (_ok === false) {
+					var _error = _metaData["error"];
+					if ((typeof (_correlation) === "string") && (_error !== undefined))
+						this.emit ("call-return", _correlation, false, _error, _data);
+					else
+						this.emit ("error", new Error ("invalid call return meta-data `" + _metaData + "`"));
+				} else
+					this.emit ("error", new Error ("invalid call return meta-data `" + _metaData + "`"));
 			} else
 				this.emit ("exchange", _metaData, _data);
 		} else
@@ -182,7 +217,7 @@ PacketInputer.prototype.close = function () {
 };
 
 PacketInputer.prototype._onStreamData = function (_data) {
-	if (this._buffer == null) {
+	if (this._buffer === null) {
 		this._buffer = new Buffer (Math.ceil (_data.length / this._bufferInitialSize) * this._bufferInitialSize);
 		this._bufferOffset = 0;
 	}
@@ -193,9 +228,9 @@ PacketInputer.prototype._onStreamData = function (_data) {
 	}
 	_data.copy (this._buffer, this._bufferOffset);
 	this._bufferOffset += _data.length;
-	if ((this._pendingSize == null) && (this._bufferOffset >= 4))
+	if ((this._pendingSize === null) && (this._bufferOffset >= 4))
 		this._pendingSize = (this._buffer[0] << 24) | (this._buffer[1] << 16) | (this._buffer[2] << 8) | (this._buffer[3] << 0);
-	if ((this._pendingSize != null) && (this._bufferOffset >= (this._pendingSize + 4))) {
+	if ((this._pendingSize !== null) && (this._bufferOffset >= (this._pendingSize + 4))) {
 		var _packet = new Buffer (this._pendingSize);
 		this._buffer.copy (_packet, 0, 4, this._pendingSize + 4);
 		this._buffer.copy (this._buffer, 0, this._pendingSize + 4, this._bufferOffset);
@@ -207,9 +242,9 @@ PacketInputer.prototype._onStreamData = function (_data) {
 
 PacketInputer.prototype._onPacket = function (_buffer) {
 	for (var _split = 0; _split < _buffer.length; _split++)
-		if (_buffer[_split] == 0)
+		if (_buffer[_split] === 0)
 			break;
-	if (_split == _buffer.length)
+	if (_split === _buffer.length)
 		throw (new Error ());
 	var _metaData = JSON.parse (_buffer.slice (0, _split));
 	var _data = _buffer.slice (_split + 1);
@@ -273,9 +308,9 @@ PacketOutputer.prototype._onStreamError = function (_error) {
 // ---------------------------------------
 
 function _boundedMethod (_this, _function) {
-	if (_this == undefined)
+	if (_this === undefined)
 		throw (new Error ());
-	if (_function == undefined)
+	if (_function === undefined)
 		throw (new Error ());
 	return (function () {
 		return (_function.apply (_this, arguments));

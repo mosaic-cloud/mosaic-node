@@ -29,14 +29,14 @@ test () ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
 						{define_and_create_processes, python_abacus, term, defaults, 4}]};
-			{ok, create_java_abacus_4} ->
-				{ok, defaults, [
-						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, java_abacus, term, defaults, 4}]};
 			{ok, create_node_abacus_4} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
 						{define_and_create_processes, node_abacus, term, defaults, 4}]};
+			{ok, create_java_abacus_4} ->
+				{ok, defaults, [
+						{boot}, {activate}, {ping, default}, {initialize},
+						{define_and_create_processes, java_abacus, term, defaults, 4}]};
 			{ok, create_rabbitmq} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
@@ -105,10 +105,10 @@ execute ({initialize}) ->
 	ok = mosaic_process_configurator:register (dummy, json, {mosaic_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register (python_abacus, term, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register (python_abacus, json, {mosaic_component_process_tests, configure, defaults}),
-	ok = mosaic_process_configurator:register (java_abacus, term, {mosaic_component_process_tests, configure, defaults}),
-	ok = mosaic_process_configurator:register (java_abacus, json, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register (node_abacus, term, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register (node_abacus, json, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register (java_abacus, term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register (java_abacus, json, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register (rabbitmq, term, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register (rabbitmq, json, {mosaic_component_process_tests, configure, defaults}),
 	ok;

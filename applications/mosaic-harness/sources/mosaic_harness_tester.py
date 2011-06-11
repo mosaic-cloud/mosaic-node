@@ -143,6 +143,17 @@ def _frontend_python_abacus () :
 	}, ""))
 	__frontend_abacus ()
 
+def _frontend_node_abacus () :
+	_output (({
+			"__type__" : "execute",
+			"executable" : "/usr/bin/node",
+			"argument0" : None,
+			"arguments" : ["./mosaic_component_abacus.js"],
+			"environment" : None,
+			"working-directory" : "./applications/mosaic-component/sources",
+	}, ""))
+	__frontend_abacus ()
+
 def _frontend_java_abacus () :
 	_output (({
 			"__type__" : "execute",
@@ -155,17 +166,6 @@ def _frontend_java_abacus () :
 				"file:../mosaic-java-components/components-examples/target/components-examples-0.2-SNAPSHOT.jar"],
 			"environment" : None,
 			"working-directory" : None,
-	}, ""))
-	__frontend_abacus ()
-
-def _frontend_node_abacus () :
-	_output (({
-			"__type__" : "execute",
-			"executable" : "/usr/bin/node",
-			"argument0" : None,
-			"arguments" : ["./mosaic_component_abacus.js"],
-			"environment" : None,
-			"working-directory" : "./applications/mosaic-component/sources",
 	}, ""))
 	__frontend_abacus ()
 
@@ -360,15 +360,15 @@ def _frontend_test_rabbitmq () :
 	_input_close ()
 
 _frontend_scenarios = {
-		"python-parrot" : _frontend_python_parrot,
-		"python-abacus" : _frontend_python_abacus,
-		"java-abacus" : _frontend_java_abacus,
-		"node-abacus" : _frontend_node_abacus,
 		"test-execute-1" : _frontend_test_execute_1,
 		"test-execute-2" : _frontend_test_execute_2,
 		"test-execute-3" : _frontend_test_execute_3,
 		"test-exchange-1" : _frontend_test_exchange_1,
 		"test-exchange-2" : _frontend_test_exchange_2,
+		"python-parrot" : _frontend_python_parrot,
+		"python-abacus" : _frontend_python_abacus,
+		"node-abacus" : _frontend_node_abacus,
+		"java-abacus" : _frontend_java_abacus,
 		"test-rabbitmq" : _frontend_test_rabbitmq,
 }
 
