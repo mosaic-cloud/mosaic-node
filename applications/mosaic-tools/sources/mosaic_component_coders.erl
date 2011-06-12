@@ -51,7 +51,7 @@ encode_group (Group)
 	encode_component (Group).
 
 decode_group (EncodedGroup)
-		when is_binary (EncodedGroup) ->
+		when is_binary (EncodedGroup); is_list (EncodedGroup) ->
 	decode_component (EncodedGroup).
 
 generate_group () ->
@@ -99,7 +99,7 @@ encode_resource_specifications (json, Specifications)
 encode_resource_specifications (json, Specifications) ->
 	{error, {invalid_specifications, Specifications}}.
 
-encode_resource_specification (json, Specification = {Identifier, Type})
+encode_resource_specification (json, {Identifier, Type})
 		when is_binary (Identifier), is_binary (Type) ->
 	{ok, {Identifier, Type}};
 	
@@ -118,7 +118,7 @@ decode_resource_specifications (json, {struct, Specifications})
 decode_resource_specifications (json, Specifications) ->
 	{error, {invalid_specifications, Specifications}}.
 
-decode_resource_specification (json, Specification = {Identifier, Type})
+decode_resource_specification (json, {Identifier, Type})
 		when is_binary (Identifier), is_binary (Type) ->
 	{ok, {Identifier, Type, defaults}};
 	
