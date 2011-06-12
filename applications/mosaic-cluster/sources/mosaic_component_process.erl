@@ -38,7 +38,8 @@ init (prepare, Identifier, {Status, HarnessOptions, ExecuteSpecification, Resour
 	true = erlang:process_flag (trap_exit, true),
 	try
 		HarnessToken = erlang:make_ref (),
-		HarnessConfiguration = enforce_ok_1 (mosaic_harness_coders:decode_configuration (term, [{controller, erlang:self ()}, {controller_token, HarnessToken} | HarnessOptions])),
+		HarnessConfiguration = enforce_ok_1 (mosaic_harness_coders:decode_frontend_configuration (
+					term, [{controller, erlang:self ()}, {controller_token, HarnessToken} | HarnessOptions])),
 		Harness = enforce_ok_1 (mosaic_harness_frontend:start_link (HarnessConfiguration)),
 		ok = if
 			(ExecuteSpecification =/= migrate) ->
@@ -133,12 +134,16 @@ handle_info (
 		(ExitCode =:= 0) ->
 			{stop, normal, State};
 		(ExitCode > 0) ->
-			{stop, {error, {failed, ExitCode}}, State}
+			{stop, {error, {process_failed, ExitCode}}, State}
 	end;
 	
 handle_info ({Reference, Outcome}, State)
 		when is_reference (Reference) ->
 	handle_outbound_call_return (Reference, Outcome, State);
+	
+handle_info ({'EXIT', Harness, HarnessExitReason}, OldState = #state{harness = Harness})
+		when is_pid (Harness) ->
+	{stop, {error, {harness_failed, HarnessExitReason}}, OldState#state{harness = none}};
 	
 handle_info (Message, State) ->
 	{stop, {error, {invalid_message, Message}}, State}.
@@ -248,8 +253,8 @@ handle_register (Group, Correlation, State = #state{router = Router}) ->
 	handle_info ({mosaic_component_process_internals, push_packet, Packet}, State).
 
 
-handle_acquire (Specification, Correlation, State = #state{resources = Resources}) ->
-	Outcome = mosaic_component_resources:acquire (Resources, Specification),
+handle_acquire (Specification, Correlation, State = #state{identifier = Identifier, resources = Resources}) ->
+	Outcome = mosaic_component_resources:acquire (Resources, Identifier, erlang:self (), Specification),
 	Packet = {acquire_return, Correlation, Outcome},
 	handle_info ({mosaic_component_process_internals, push_packet, Packet}, State).
 
@@ -273,7 +278,7 @@ begin_migration (target, Configuration, CompletionFun, OldState = #state{status 
 			_ ->
 				throw ({invalid_configuration, Configuration})
 		end,
-		ok = case mosaic_harness_coders:validate_execute_specification (ExecuteSpecification) of
+		ok = case mosaic_harness_coders:validate_frontend_execute_specification (ExecuteSpecification) of
 			ok ->
 				ok;
 			Error1 = {error, _Reason1} ->

@@ -39,6 +39,7 @@ _erl_args=(
 	-env ERL_CRASH_DUMP /dev/null
 	-env ERL_LIBS "${_erl_libs}"
 	-env ERL_EPMD_PORT "${_erl_epmd_port}"
+	-env LANG C
 )
 
 _epmd_port="${_erl_epmd_port}"

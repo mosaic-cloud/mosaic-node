@@ -81,12 +81,11 @@ generate_correlation () ->
 
 
 validate_resource_specifications (Specifications) ->
-	mosaic_generic_coders:validate_term (Specifications, {is_list, fun validate_resource_specification/1, invalid_specifications}).
+	mosaic_generic_coders:validate_term (Specifications, {is_list, {validator, fun validate_resource_specification/1}, invalid_specifications}).
 
 validate_resource_specification (Specification) ->
 	mosaic_generic_coders:validate_term (Specification,
-				{is_tuple, {{is_atom, invalid_identifier}, {is_atom, invalid_type}, {matches, defaults}}, invalid_specification}).
-
+				{is_tuple, {{is_binary, invalid_identifier}, {is_binary, invalid_type}, {matches, defaults}}, invalid_specification}).
 
 encode_resource_specifications (json, Specifications)
 		when is_list (Specifications), (Specifications =/= []) ->
@@ -101,16 +100,11 @@ encode_resource_specifications (json, Specifications) ->
 	{error, {invalid_specifications, Specifications}}.
 
 encode_resource_specification (json, Specification = {Identifier, Type})
-		when is_atom (Identifier), is_atom (Type) ->
-	try
-		{ok, {
-					enforce_ok_1 (mosaic_generic_coders:encode_atom (Identifier)),
-					enforce_ok_1 (mosaic_generic_coders:encode_atom (Type))}}
-	catch throw : {error, Reason} -> {error, {invalid_specification, Specification, Reason}} end;
+		when is_binary (Identifier), is_binary (Type) ->
+	{ok, {Identifier, Type}};
 	
 encode_resource_specification (json, Specification) ->
 	{error, {invalid_specification, Specification}}.
-
 
 decode_resource_specifications (json, {struct, Specifications})
 		when is_list (Specifications), (Specifications =/= []) ->
@@ -126,28 +120,22 @@ decode_resource_specifications (json, Specifications) ->
 
 decode_resource_specification (json, Specification = {Identifier, Type})
 		when is_binary (Identifier), is_binary (Type) ->
-	try
-		{ok, {
-					enforce_ok_1 (mosaic_generic_coders:decode_atom (Identifier)),
-					enforce_ok_1 (mosaic_generic_coders:decode_atom (Type)),
-					defaults}}
-	catch throw : {error, Reason} -> {error, {invalid_specification, Specification, Reason}} end;
+	{ok, {Identifier, Type, defaults}};
 	
 decode_resource_specification (json, Specification) ->
 	{error, {invalid_specification, Specification}}.
 
 
 validate_resource_descriptors (Descriptors) ->
-	mosaic_generic_coders:validate_term (Descriptors, {is_list, fun validate_resource_descriptor/1, invalid_descriptors}).
+	mosaic_generic_coders:validate_term (Descriptors, {is_list, {validator, fun validate_resource_descriptor/1}, invalid_descriptors}).
 
 validate_resource_descriptor (Descriptor) ->
 	mosaic_generic_coders:validate_term (Descriptor,
-				{is_tuple, {{is_atom, invalid_identifier}, {is_list, fun validate_resource_descriptor_attribute/1, invalid_attributes}}, invalid_descriptor}).
+				{is_tuple, {{is_binary, invalid_identifier}, {is_list, {validator, fun validate_resource_descriptor_attribute/1}, invalid_attributes}}, invalid_descriptor}).
 
 validate_resource_descriptor_attribute (Attribute) ->
 	mosaic_generic_coders:validate_term (Attribute,
-				{is_tuple, {{is_atom, invalid_name}, {'orelse', [is_binary, is_integer, is_float, is_boolean], invalid_value}}, invalid_attribute}).
-
+				{is_tuple, {{is_binary, invalid_name}, {'orelse', [is_binary, is_integer, is_float, is_boolean], invalid_value}}, invalid_attribute}).
 
 encode_resource_descriptors (json, Descriptors)
 		when is_list (Descriptors), (Descriptors =/= []) ->
@@ -162,13 +150,13 @@ encode_resource_descriptors (json, Descriptors) ->
 	{error, {invalid_descriptors, Descriptors}}.
 
 encode_resource_descriptor (json, Descriptor = {Identifier, Attributes})
-		when is_atom (Identifier), is_list (Attributes), (Attributes =/= []) ->
+		when is_binary (Identifier), is_list (Attributes), (Attributes =/= []) ->
 	try
 		{ok, {
-					enforce_ok_1 (mosaic_generic_coders:encode_atom (Identifier)),
+					Identifier,
 					lists:map (
 								fun (Attribute) ->
-									encode_resource_descriptor_attribute (json, Attribute)
+									enforce_ok_1 (encode_resource_descriptor_attribute (json, Attribute))
 								end, Attributes)}}
 	catch throw : {error, Reason} -> {error, {invalid_descriptor, Descriptor, Reason}} end;
 	
@@ -176,23 +164,19 @@ encode_resource_descriptor (json, Descriptor) ->
 	{error, {invalid_descriptor, Descriptor}}.
 
 encode_resource_descriptor_attribute (json, Attribute = {Name, Value})
-		when is_atom (Name) ->
+		when is_binary (Name) ->
 	try
-		EncodedName = enforce_ok_1 (mosaic_generic_coders:encode_atom (Name)),
 		EncodedValue = if
 			is_binary (Value); is_integer (Value); is_float (Value); is_boolean (Value); (Value =:= null) ->
 				Value;
-			is_atom (Value) ->
-				enforce_ok_1 (mosaic_generic_coders:encode_atom (Value));
 			true ->
 				throw ({error, invalid_value})
 		end,
-		{ok, {EncodedName, EncodedValue}}
+		{ok, {Name, EncodedValue}}
 	catch throw : {error, Reason} -> {error, {invalid_attribute, Attribute, Reason}} end;
 	
 encode_resource_descriptor_attribute (json, Attribute) ->
 	{error, {invalid_attribute, Attribute}}.
-
 
 decode_resource_descriptors (json, {struct, Descriptors})
 		when is_list (Descriptors), (Descriptors =/= []) ->
@@ -210,7 +194,7 @@ decode_resource_descriptor (json, Descriptor = {Identifier, {struct, Attributes}
 		when is_binary (Identifier), is_list (Attributes) ->
 	try
 		{ok, {
-					enforce_ok_1 (mosaic_generic_coders:decode_atom (Identifier)),
+					Identifier,
 					lists:map (
 							fun (Attribute) ->
 								enforce_ok_1 (decode_resource_descriptor_attribute (json, Attribute))
@@ -220,10 +204,9 @@ decode_resource_descriptor (json, Descriptor = {Identifier, {struct, Attributes}
 decode_resource_descriptor (json, Descriptor) ->
 	{error, {invalid_descriptor, Descriptor}}.
 
-decode_resource_descriptor_attribute (json, Attribute = {EncodedName, EncodedValue})
-		when is_binary (EncodedName) ->
+decode_resource_descriptor_attribute (json, Attribute = {Name, EncodedValue})
+		when is_binary (Name) ->
 	try
-		Name = enforce_ok_1 (mosaic_generic_coders:decode_atom (EncodedName)),
 		Value = if
 			is_binary (EncodedValue); is_integer (EncodedValue); is_float (EncodedValue); is_boolean (EncodedValue); (EncodedValue =:= null) ->
 				EncodedValue;
@@ -328,8 +311,8 @@ encode_packet ({register_return, Correlation, {error, Reason}})
 					{<<"ok">>, false}, {<<"error">>, EncodedReason}], <<>>}}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-encode_packet ({acquire, Correlation, Specifications})
-		when is_binary (Correlation), is_list (Specifications), (Specifications =/= []) ->
+encode_packet ({acquire, Specifications, Correlation})
+		when is_list (Specifications), is_binary (Correlation), (Specifications =/= []) ->
 	try
 		EncodedSpecifications = enforce_ok_1 (encode_resource_specifications (json, Specifications)),
 		EncodedCorrelation = enforce_ok_1 (encode_correlation (Correlation)),
@@ -353,10 +336,13 @@ encode_packet ({acquire_return, Correlation, {error, Reason}})
 	try
 		EncodedCorrelation = enforce_ok_1 (encode_correlation (Correlation)),
 		EncodedReason = enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reason)),
-		{ok, resources, [
+		{ok, {resources, [
 					{<<"action">>, <<"acquire-return">>}, {<<"correlation">>, EncodedCorrelation},
-					{<<"ok">>, false}, {<<"error">>, EncodedReason}]}
-	catch throw : Error = {error, _Reason} -> Error end.
+					{<<"ok">>, false}, {<<"error">>, EncodedReason}], <<>>}}
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+encode_packet (Packet) ->
+	{error, {invalid_packet, Packet}}.
 
 
 decode_packet (Packet = {exchange, MetaData, Data})
@@ -378,7 +364,7 @@ decode_packet (Packet = {exchange, MetaData, Data})
 					when is_binary (EncodedCorrelation) ->
 				Correlation = enforce_ok_1 (decode_correlation (EncodedCorrelation)),
 				{ok, {call_return, Correlation, {ok, Outputs, Data}}};
-			[{<<"action">>, <<"call-return">>}, {<<"correlation">>, EncodedCorrelation}, {<<"ok">>, false}, {<<"error">>, Reason}]
+			[{<<"action">>, <<"call-return">>}, {<<"correlation">>, EncodedCorrelation}, {<<"error">>, Reason}, {<<"ok">>, false}]
 					when is_binary (EncodedCorrelation) ->
 				Correlation = enforce_ok_1 (decode_correlation (EncodedCorrelation)),
 				{ok, {call_return, Correlation, {error, Reason, Data}}};
@@ -392,7 +378,7 @@ decode_packet (Packet = {exchange, MetaData, Data})
 			[{<<"action">>, <<"register">>}, {<<"correlation">>, EncodedCorrelation}, {<<"group">>, EncodedGroup}]
 					when is_binary (EncodedGroup), is_binary (EncodedCorrelation), (Data =:= <<>>) ->
 				Group = enforce_ok_1 (decode_group (EncodedGroup)),
-				Correlation = enforce_ok_1 (decode_group (EncodedCorrelation)),
+				Correlation = enforce_ok_1 (decode_correlation (EncodedCorrelation)),
 				{ok, {register, Group, Correlation}};
 			[{<<"action">>, <<"register-return">>}, {<<"correlation">>, EncodedCorrelation}, {<<"ok">>, true}]
 					when is_binary (EncodedCorrelation), (Data =:= <<>>) ->
@@ -413,9 +399,9 @@ decode_packet (Packet = {resources, MetaData, Data})
 		case MetaData of
 			[{<<"action">>, <<"acquire">>}, {<<"correlation">>, EncodedCorrelation}, {<<"specifications">>, EncodedSpecifications}]
 					when is_binary (EncodedCorrelation), (Data =:= <<>>) ->
-				Correlation = enforce_ok_1 (decode_correlation (EncodedCorrelation)),
 				Specifications = enforce_ok_1 (decode_resource_specifications (json, EncodedSpecifications)),
-				{ok, {acquire, Correlation, Specifications}};
+				Correlation = enforce_ok_1 (decode_correlation (EncodedCorrelation)),
+				{ok, {acquire, Specifications, Correlation}};
 			[{<<"action">>, <<"acquire-return">>}, {<<"correlation">>, EncodedCorrelation}, {<<"descriptors">>, EncodedDescriptors},
 						{<<"ok">>, true}]
 					when is_binary (EncodedCorrelation), (Data =:= <<>>) ->
@@ -429,7 +415,10 @@ decode_packet (Packet = {resources, MetaData, Data})
 			_ ->
 				throw ({error, {invalid_packet, Packet}})
 		end
-	catch throw : Error = {error, _Reason} -> Error end.
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+decode_packet (Packet) ->
+	{error, {invalid_packet, Packet}}.
 
 
 encode_packet_fully (Packet = {exchange, _MetaData, _Data}) ->

@@ -18,14 +18,14 @@
 -import (mosaic_enforcements, [enforce_ok_1/1]).
 
 
--test ({test_start_stop, [{defaults}]}).
--test ({test_call, [{defaults}]}).
--test ({test_cast, [{defaults}]}).
--test ({test_migrate, [{defaults}]}).
--test ({test_abacus, [{python}]}).
--test ({test_abacus, [{node}]}).
+%-test ({test_start_stop, [{defaults}]}).
+%-test ({test_call, [{defaults}]}).
+%-test ({test_cast, [{defaults}]}).
+%-test ({test_migrate, [{defaults}]}).
+%-test ({test_abacus, [{python}]}).
+%-test ({test_abacus, [{node}]}).
 %-test ({test_abacus, [{java}]}).
-%-test ({test_rabbitmq, [{defaults}]}).
+-test ({test_rabbitmq, [{defaults}]}).
 
 
 test_start_stop ({defaults}) ->

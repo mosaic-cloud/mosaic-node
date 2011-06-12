@@ -4,10 +4,10 @@
 -behaviour (application).
 
 
--export ([start/2, stop/1, boot/0, boot/2]).
+-export ([start/2, stop/1, boot/0, shutdown/0]).
 
 
--import (mosaic_enforcements, [enforce/1, enforce/2]).
+-import (mosaic_enforcements, [enforce_ok/1]).
 
 
 start (normal, defaults) ->
@@ -25,24 +25,29 @@ stop (void) ->
 
 
 boot () ->
-	boot (mosaic_component, start).
+	try
+		ok = enforce_ok (application:load (crypto)),
+		ok = enforce_ok (application:load (mosaic_tools)),
+		ok = enforce_ok (application:load (mosaic_harness)),
+		ok = enforce_ok (application:load (mosaic_component)),
+		ok = enforce_ok (mosaic_component_backend:configure ()),
+		ok = enforce_ok (application:start (crypto)),
+		ok = enforce_ok (application:start (mosaic_tools)),
+		ok = enforce_ok (application:start (mosaic_harness)),
+		ok = enforce_ok (application:start (mosaic_component)),
+		ok
+	catch
+		throw : {error, Reason} ->
+			ok = error_logger:error_report (["failed booting mosaic component; terminating!", {reason, Reason}, {stacktrace, erlang:get_stacktrace ()}]),
+			shutdown ();
+		_ : Reason ->
+			ok = error_logger:error_report (["failed booting mosaic component; terminating!", {reason, Reason}, {stacktrace, erlang:get_stacktrace ()}]),
+			shutdown ()
+	end.
 
 
-boot (mosaic_component, load) ->
-	try
-		ok = enforce (application:load (mosaic_component),
-				[{{error, {already_loaded, mosaic_component}}, ok}])
-	catch throw : Error = {error, _} -> Error end;
-	
-boot (mosaic_component, start) ->
-	try
-		ok = enforce (boot (mosaic_component, load)),
-		{ok, Handler} = enforce (application:get_env (mosaic_component, handler),
-				[{undefined, {error, {invalid_environment, missing_handler}}}]),
-		if
-			is_atom (Handler) -> ok;
-			true -> throw ({error, {invalid_environment, {invalid_handler, Handler}}})
-		end,
-		ok = enforce (Handler:configure ()),
-		ok = enforce (boot (mosaic_component, start))
-	catch throw : Error = {error, _} -> Error end.
+shutdown () ->
+	ok = init:stop (),
+	ok = timer:sleep (5000),
+	ok = erlang:halt (),
+	ok.

@@ -21,7 +21,7 @@ validate_configuration (
 		end,
 		ok = if
 			(Disposition =:= create) ->
-				ok = case mosaic_harness_coders:validate_execute_specification (ExecuteSpecification) of
+				ok = case mosaic_harness_coders:validate_frontend_execute_specification (ExecuteSpecification) of
 					ok ->
 						ok;
 					Error1 = {error, _Reason1} ->
@@ -81,7 +81,7 @@ parse_configuration (Disposition, term, OriginalOptions)
 					undefined when (Disposition =:= migrate) ->
 						{ok, migrate};
 					ExecuteSpecification__ when (Disposition =:= create) ->
-						case mosaic_harness_coders:decode_execute_specification (term, ExecuteSpecification__) of
+						case mosaic_harness_coders:decode_frontend_execute_specification (term, ExecuteSpecification__) of
 							{ok, ExecuteSpecification_} ->
 								{ok, ExecuteSpecification_};
 							{error, Reason1} ->
@@ -91,22 +91,22 @@ parse_configuration (Disposition, term, OriginalOptions)
 						throw ({error, {unexpected_execute, ExecuteSpecification__}})
 				end,
 				{ok, Resources} = case proplists:get_value (resources, FinalOptions) of
-					Resources_ when (is_pid (Resources_) orelse is_atom (Resources_)) ->
-						{ok, Resources_};
-					defaults ->
-						{ok, mosaic_component_process_resources};
 					undefined ->
 						throw ({error, missing_resources});
+					defaults ->
+						{ok, mosaic_component_resources};
+					Resources_ when (is_pid (Resources_) orelse is_atom (Resources_)) ->
+						{ok, Resources_};
 					Resources_ ->
 						throw ({error, {invalid_resources, Resources_}})
 				end,
 				{ok, Router} = case proplists:get_value (router, FinalOptions) of
-					Router_ when (is_pid (Router_) orelse is_atom (Router_)) ->
-						{ok, Router_};
-					defaults ->
-						{ok, mosaic_process_router};
 					undefined ->
 						throw ({error, missing_router});
+					defaults ->
+						{ok, mosaic_process_router};
+					Router_ when (is_pid (Router_) orelse is_atom (Router_)) ->
+						{ok, Router_};
 					Router_ ->
 						throw ({error, {invalid_router, Router_}})
 				end,

@@ -4,5 +4,4 @@
 (vbs:define-erlang-application 'mosaic_component
 	dependencies: '(mosaic_tools mosaic_harness)
 	erl: "\\./sources/.*\\.erl"
-	additional-ebin: "\\./sources/.*\\.app"
-	additional-priv: "\\./sources/.*\\.config")
+	additional-ebin: "\\./sources/.*\\.app")

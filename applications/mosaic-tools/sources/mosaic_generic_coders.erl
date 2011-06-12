@@ -10,8 +10,17 @@
 		encode_string/1, decode_string/1,
 		encode_term/2,
 		encode_reason/2]).
--export ([generate_data/1, generate_hex_data/1]).
--export ([validate_term/2]).
+-export ([
+		generate_data/1, generate_hex_data/1]).
+-export ([
+		validate_term/2]).
+-export ([
+		proplist_get/4, proplist_pop/4,
+		application_env_get/4,
+		os_env_get/3]).
+
+
+-import (mosaic_enforcements, [enforce_ok/1, enforce_ok_1/1]).
 
 
 encode_atom (Atom)
@@ -392,6 +401,17 @@ validate_term_ok (Term, {is_tuple, Size, Reason})
 		true -> throw ({error, {Reason, Term, invalid_tuple}})
 	end;
 	
+validate_term_ok (Term, {is_tuple, TupleSchema, Reason})
+		when is_tuple (TupleSchema) ->
+	if
+		is_tuple (Term), (tuple_size (TupleSchema) =:= tuple_size (Term)) ->
+			try
+				ok = lists:foreach (fun ({Element, ElementSchema}) -> ok = validate_term_ok (Element, ElementSchema) end,
+							lists:zip (erlang:tuple_to_list (Term), erlang:tuple_to_list (TupleSchema)))
+			catch throw : {error, ElementReason} -> throw ({error, {Reason, Term, ElementReason}}) end;
+		true -> throw ({error, {Reason, Term, invalid_tuple}})
+	end;
+	
 validate_term_ok (Term, {is_record, Tag, Size, Reason})
 		when is_atom (Tag), is_integer (Size) ->
 	if
@@ -446,7 +466,14 @@ validate_term_ok (Term, {is_process, Reason}) ->
 		true -> throw ({error, {Reason, Term, invalid_process}})
 	end;
 	
-validate_term_ok (Term, {Validator, Reason})
+validate_term_ok (Term, {validator, Validator})
+		when is_function (Validator, 1) ->
+	case Validator (Term) of
+		ok -> ok;
+		{error, ValidatorReason} -> throw ({error, {ValidatorReason, Term}})
+	end;
+	
+validate_term_ok (Term, {validator, Validator, Reason})
 		when is_function (Validator, 1) ->
 	case Validator (Term) of
 		ok -> ok;
@@ -481,4 +508,80 @@ validate_term_ok (Term, {matches, Expected, Reason}) ->
 	if
 		(Term =:= Expected) -> ok;
 		true -> throw ({error, {Reason, Term, mismatched_value}})
+	end.
+
+
+proplist_get (Key, Proplist, Enforce, Default)
+		when is_list (Proplist) ->
+	try
+		case proplists:get_value (Key, Proplist, undefined) of
+			undefined ->
+				apply_default_get (Default);
+			EncodedTerm ->
+				apply_enforce_get (EncodedTerm, Enforce)
+		end
+	catch throw : Error = {error, _Reason} -> Error end.
+
+
+proplist_pop (Key, Proplist, Enforce, Default)
+		when is_list (Proplist) ->
+	try
+		Term = enforce_ok_1 (proplist_get (Key, Proplist, Enforce, Default)),
+		RestProplist = proplists:delete (Key, Proplist),
+		{ok, Term, RestProplist}
+	catch throw : Error = {error, _Reason} -> Error end.
+
+
+application_env_get (Key, Application, Enforce, Default)
+		when is_atom (Key), is_atom (Application) ->
+	try
+		case application:get_env (Application, Key) of
+			{ok, EncodedTerm} ->
+				apply_enforce_get (EncodedTerm, Enforce);
+			undefined ->
+				apply_default_get (Default)
+		end
+	catch throw : Error = {error, _Reason} -> Error end.
+
+
+os_env_get (Key, Enforce, Default)
+		when is_atom (Key) ->
+	os_env_get (erlang:atom_to_list (Key), Enforce, Default);
+	
+os_env_get (Key, Enforce, Default)
+		when is_list (Key) ->
+	try
+		case os:getenv (Key) of
+			false ->
+				apply_default_get (Default);
+			EncodedTerm ->
+				apply_enforce_get (EncodedTerm, Enforce)
+		end
+	catch throw : Error = {error, _Reason} -> Error end.
+
+
+apply_default_get ({DefaultAction, DefaultValue}) ->
+	case DefaultAction of
+		default ->
+			{ok, DefaultValue};
+		error ->
+			throw ({error, DefaultValue})
+	end.
+
+apply_enforce_get (EncodedTerm, none) ->
+	{ok, EncodedTerm};
+	
+apply_enforce_get (EncodedTerm, {EnforceAction, EnforceValue}) ->
+	case EnforceAction of
+		decode when is_function (EnforceValue, 1) ->
+			Term = enforce_ok_1 (EnforceValue (EncodedTerm)),
+			{ok, Term};
+		validate when is_tuple (EnforceValue) ->
+			Term = EncodedTerm,
+			ok = enforce_ok (validate_term (Term, EnforceValue)),
+			{ok, Term};
+		validate when is_function (EnforceValue, 1) ->
+			Term = EncodedTerm,
+			ok = enforce_ok (EnforceValue (Term)),
+			{ok, Term}
 	end.

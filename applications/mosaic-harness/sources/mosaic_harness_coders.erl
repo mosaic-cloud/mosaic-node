@@ -3,9 +3,11 @@
 
 
 -export ([
-		validate_configuration/1, decode_configuration/2,
-		validate_execute_specification/1, decode_execute_specification/2,
-		validate_signal_specification/1, decode_signal_specification/2]).
+		validate_frontend_configuration/1, decode_frontend_configuration/2,
+		validate_frontend_execute_specification/1, decode_frontend_execute_specification/2,
+		validate_frontend_signal_specification/1, decode_frontend_signal_specification/2]).
+-export ([
+		validate_backend_configuration/1, decode_backend_configuration/2]).
 -export ([
 		encode_packet/1, decode_packet/1,
 		encode_packet_binary/1, decode_packet_binary/1,
@@ -18,9 +20,9 @@
 -include ("mosaic_harness.hrl").
 
 
-validate_configuration (Configuration) ->
+validate_frontend_configuration (Configuration) ->
 	mosaic_generic_coders:validate_term (Configuration,
-				{is_record, #configuration{
+				{is_record, #frontend_configuration{
 								controller = {is_pid, invalid_controller},
 								controller_token = {is_reference, invalid_controller_token},
 								executable = {is_binary, invalid_executable},
@@ -28,7 +30,7 @@ validate_configuration (Configuration) ->
 								arguments = {is_list, {is_binary, invalid_argument}, invalid_arguments}},
 							invalid_configuration}).
 
-decode_configuration (term, OriginalOptions)
+decode_frontend_configuration (term, OriginalOptions)
 		when is_list (OriginalOptions) ->
 	DefaultOptions = [{executable, defaults}, {argument0, defaults}, {arguments, defaults}],
 	FinalOptions = OriginalOptions ++ DefaultOptions,
@@ -87,7 +89,7 @@ decode_configuration (term, OriginalOptions)
 					Arguments_ ->
 						throw ({error, {invalid_arguments, Arguments_}})
 				end,
-				Configuration = #configuration{
+				Configuration = #frontend_configuration{
 						controller = Controller, controller_token = ControllerToken,
 						executable = Executable, argument0 = Argument0, arguments = Arguments},
 				{ok, Configuration}
@@ -99,13 +101,13 @@ decode_configuration (term, OriginalOptions)
 			{error, {invalid_configuration, OriginalOptions}}
 	end;
 	
-decode_configuration (term, Configuration) ->
+decode_frontend_configuration (term, Configuration) ->
 	{error, {invalid_configuration, Configuration}}.
 
 
-validate_execute_specification (Specification) ->
+validate_frontend_execute_specification (Specification) ->
 	mosaic_generic_coders:validate_term (Specification,
-				{is_record, #execute_specification{
+				{is_record, #frontend_execute_specification{
 								executable = {is_binary, invalid_executable},
 								argument0 = {'orelse', [{matches, defaults}, is_binary], invalid_argument0},
 								arguments = {'orelse', [{matches, defaults},
@@ -119,7 +121,7 @@ validate_execute_specification (Specification) ->
 								working_directory = {'orelse', [{matches, defaults}, is_binary], invalid_working_directory}},
 							invalid_specification}).
 
-decode_execute_specification (term, OriginalOptions)
+decode_frontend_execute_specification (term, OriginalOptions)
 		when is_list (OriginalOptions) ->
 	DefaultOptions = [{argument0, defaults}, {arguments, defaults}, {environment, defaults}, {working_directory, defaults}],
 	FinalOptions = OriginalOptions ++ DefaultOptions,
@@ -189,7 +191,7 @@ decode_execute_specification (term, OriginalOptions)
 					WorkingDirectory_ ->
 						throw ({error, {invalid_working_directory, WorkingDirectory_}})
 				end,
-				Specification = #execute_specification{
+				Specification = #frontend_execute_specification{
 						executable = Executable, argument0 = Argument0, arguments = Arguments,
 						environment = Environment, working_directory = WorkingDirectory},
 				{ok, Specification}
@@ -201,20 +203,84 @@ decode_execute_specification (term, OriginalOptions)
 			{error, {invalid_specification, OriginalOptions}}
 	end;
 	
-decode_execute_specification (term, Specification) ->
+decode_frontend_execute_specification (term, Specification) ->
 	{error, {invalid_specification, Specification}}.
 
 
-validate_signal_specification (Specification) ->
+validate_frontend_signal_specification (Specification) ->
 	mosaic_generic_coders:validate_term (Specification,
-				{is_record, #signal_specification{signal = {is_binary, invalid_signal}}, invalid_specification}).
+				{is_record, #frontend_signal_specification{signal = {is_binary, invalid_signal}}, invalid_specification}).
 
-decode_signal_specification (term, Signal)
+decode_frontend_signal_specification (term, Signal)
 		when is_atom (Signal) ->
-	{ok, #signal_specification{signal = erlang:atom_to_binary (Signal, utf8)}};
+	{ok, #frontend_signal_specification{signal = erlang:atom_to_binary (Signal, utf8)}};
 	
-decode_signal_specification (term, Specification) ->
+decode_frontend_signal_specification (term, Specification) ->
 	{error, {invalid_specification, Specification}}.
+
+
+validate_backend_configuration (Configuration) ->
+	mosaic_generic_coders:validate_term (Configuration,
+				{is_record, #backend_configuration{
+								controller = {is_pid, invalid_controller},
+								controller_token = {is_reference, invalid_controller_token},
+								input_descriptor = {is_integer, invalid_input_descriptor},
+								output_descriptor = {is_integer, invalid_output_descriptor}},
+							invalid_configuration}).
+
+decode_backend_configuration (term, OriginalOptions)
+		when is_list (OriginalOptions) ->
+	DefaultOptions = [],
+	FinalOptions = OriginalOptions ++ DefaultOptions,
+	case lists:sort (proplists:get_keys (FinalOptions)) of
+		[controller, controller_token, input_descriptor, output_descriptor] ->
+			try
+				{ok, Controller} = case proplists:get_value (controller, FinalOptions) of
+					Controller_ when is_pid (Controller_) ->
+						{ok, Controller_};
+					undefined ->
+						throw ({error, missing_controller});
+					Controller_ ->
+						throw ({error, {invalid_controller, Controller_}})
+				end,
+				{ok, ControllerToken} = case proplists:get_value (controller_token, FinalOptions) of
+					ControllerToken_ when is_reference (ControllerToken_) ->
+						{ok, ControllerToken_};
+					undefined ->
+						throw ({error, missing_controller_token});
+					ControllerToken_ ->
+						throw ({error, {invalid_controller_token, ControllerToken_}})
+				end,
+				{ok, InputDescriptor} = case proplists:get_value (input_descriptor, FinalOptions) of
+					InputDescriptor_ when is_integer (InputDescriptor_), (InputDescriptor_ >= 0) ->
+						{ok, InputDescriptor_};
+					undefined ->
+						throw ({error, missing_input_descriptor});
+					InputDescriptor_ ->
+						throw ({error, {invalid_input_descriptor, InputDescriptor_}})
+				end,
+				{ok, OutputDescriptor} = case proplists:get_value (output_descriptor, FinalOptions) of
+					OutputDescriptor_ when is_integer (OutputDescriptor_), (OutputDescriptor_ >= 0) ->
+						{ok, OutputDescriptor_};
+					undefined ->
+						throw ({error, missing_output_descriptor});
+					OutputDescriptor_ ->
+						throw ({error, {invalid_output_descriptor, OutputDescriptor_}})
+				end,
+				Configuration = #backend_configuration{
+						controller = Controller, controller_token = ControllerToken,
+						input_descriptor = InputDescriptor, output_descriptor = OutputDescriptor},
+				{ok, Configuration}
+			catch
+				throw : {error, Reason} -> {error, {invalid_configuration, OriginalOptions, Reason}};
+				error : Reason -> {error, {invalid_configuration, OriginalOptions, Reason}}
+			end;
+		_ ->
+			{error, {invalid_configuration, OriginalOptions}}
+	end;
+	
+decode_backend_configuration (term, Configuration) ->
+	{error, {invalid_configuration, Configuration}}.
 
 
 encode_packet ({exchange, MetaData, Data})
@@ -230,7 +296,7 @@ encode_packet ({generic, Type, MetaData, Data})
 	{ok, {json, [{<<"__type__">>, Type} | MetaData], Data}};
 	
 encode_packet (
-			#execute_specification{
+			#frontend_execute_specification{
 				executable = Executable, argument0 = Argument0, arguments = Arguments,
 				environment = Environment, working_directory = WorkingDirectory}) ->
 	{ok, {generic, <<"execute">>, [
@@ -240,11 +306,14 @@ encode_packet (
 				{<<"environment">>, if (Environment =:= defaults) -> null; true -> {struct, Environment} end},
 				{<<"working-directory">>, if (WorkingDirectory =:= defaults) -> null; true -> WorkingDirectory end}], <<>>}};
 	
-encode_packet (#signal_specification{signal = Signal}) ->
+encode_packet (#frontend_signal_specification{signal = Signal}) ->
 	{ok, {generic, <<"signal">>, [{<<"signal">>, Signal}], <<>>}};
 	
-encode_packet (#terminate_specification{}) ->
-	{ok, {generic, <<"terminate">>, [], <<>>}}.
+encode_packet (#frontend_terminate_specification{}) ->
+	{ok, {generic, <<"terminate">>, [], <<>>}};
+	
+encode_packet (Packet) ->
+	{error, {invalid_packet, Packet}}.
 
 
 decode_packet (Packet = {exit, MetaData, Data})
@@ -277,7 +346,10 @@ decode_packet (Packet = {json, MetaData, Data})
 			_ ->
 				throw ({error, {invalid_packet, Packet, {invalid_type, Type}}})
 		end
-	catch throw : Error = {error, _Reason} -> Error end.
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+decode_packet (Packet) ->
+	{error, {invalid_packet, Packet}}.
 
 
 encode_packet_binary (Packet = {json, MetaData, Data})
@@ -324,17 +396,17 @@ encode_packet_fully (Packet = {generic, _Type, _MetaData, _Data}) ->
 		NewPacket -> encode_packet_fully (NewPacket)
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-encode_packet_fully (Packet = #execute_specification{}) ->
+encode_packet_fully (Packet = #frontend_execute_specification{}) ->
 	try enforce_ok_1 (encode_packet (Packet)) of
 		NewPacket -> encode_packet_fully (NewPacket)
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-encode_packet_fully (Packet = #signal_specification{}) ->
+encode_packet_fully (Packet = #frontend_signal_specification{}) ->
 	try enforce_ok_1 (encode_packet (Packet)) of
 		NewPacket -> encode_packet_fully (NewPacket)
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-encode_packet_fully (Packet = #terminate_specification{}) ->
+encode_packet_fully (Packet = #frontend_terminate_specification{}) ->
 	try enforce_ok_1 (encode_packet (Packet)) of
 		NewPacket -> encode_packet_fully (NewPacket)
 	catch throw : Error = {error, _Reason} -> Error end;

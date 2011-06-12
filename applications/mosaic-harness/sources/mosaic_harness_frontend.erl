@@ -60,8 +60,8 @@ init ({QualifiedName, Configuration}) ->
 	false = erlang:process_flag (trap_exit, true),
 	try
 		ok = enforce_ok (mosaic_process_tools:ensure_registered (QualifiedName)),
-		ok = enforce_ok (mosaic_harness_coders:validate_configuration (Configuration)),
-		#configuration{
+		ok = enforce_ok (mosaic_harness_coders:validate_frontend_configuration (Configuration)),
+		#frontend_configuration{
 					controller = Controller, controller_token = ControllerToken,
 					executable = Executable, argument0 = Argument0, arguments = Arguments
 		} = Configuration,
@@ -112,7 +112,7 @@ handle_call (
 			normal -> ok;
 			_ -> throw ({error, {invalid_signal, Signal}})
 		end,
-		ok = enforce_ok (push_packet_internal (Port, enforce_ok_1 (mosaic_harness_coders:encode_packet_fully (#terminate_specification{})))),
+		ok = enforce_ok (push_packet_internal (Port, enforce_ok_1 (mosaic_harness_coders:encode_packet_fully (#frontend_terminate_specification{})))),
 		ok = timer:sleep (100),
 		{reply, ok, State}
 	catch throw : Error = {error, _Reason} -> {stop, Error, Error, State} end;
@@ -122,7 +122,7 @@ handle_call (
 			State = #state{port = Port})
 		when is_port (Port) ->
 	try
-		ok = enforce_ok (mosaic_harness_coders:validate_execute_specification (Specification)),
+		ok = enforce_ok (mosaic_harness_coders:validate_frontend_execute_specification (Specification)),
 		ok = enforce_ok (push_packet_internal (Port, enforce_ok_1 (mosaic_harness_coders:encode_packet_fully (Specification)))),
 		ok = timer:sleep (100),
 		{reply, ok, State}
@@ -133,7 +133,7 @@ handle_call (
 			State = #state{port = Port})
 		when is_port (Port) ->
 	try
-		ok = enforce_ok (mosaic_harness_coders:validate_signal_specification (Specification)),
+		ok = enforce_ok (mosaic_harness_coders:validate_frontend_signal_specification (Specification)),
 		ok = enforce_ok (push_packet_internal (Port, enforce_ok_1 (mosaic_harness_coders:encode_packet_fully (Specification)))),
 		ok = timer:sleep (100),
 		{reply, ok, State}
@@ -164,7 +164,7 @@ handle_info (
 	{noreply, State};
 	
 handle_info (
-			{mosaic_harness_frontend_internals, inbound_packet, Packet = {resources, _Specification}},
+			{mosaic_harness_frontend_internals, inbound_packet, Packet = {resources, _MetaData, _Data}},
 			State = #state{controller = Controller, controller_token = ControllerToken}) ->
 	Controller ! {mosaic_harness_frontend, ControllerToken, push_packet, Packet},
 	{noreply, State};
@@ -208,6 +208,7 @@ handle_info (
 		(PortExitReason =/= normal); (PortExitStatus > 0) ->
 			{stop, {error, {failed_port, PortExitReason, PortExitStatus}}, State}
 	end;
+	
 handle_info ({Port, Callback}, State = #state{port = Port, port_exit_status = none})
 		when is_port (Port) ->
 	case Callback of

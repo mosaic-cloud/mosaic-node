@@ -13,25 +13,36 @@ start (Type, Module, QualifiedName, Configuration)
 		when ((Type =:= gen_server) orelse (Type =:= gen_fsm) orelse (Type =:= gen_event)),
 				((QualifiedName =:= noname) orelse (is_record (QualifiedName, local, 2) andalso is_atom (element (2, QualifiedName)))),
 				is_atom (Module) ->
-	case QualifiedName of
-		{local, _LocalName} ->
-			case Type of
-				gen_server ->
-					gen_server:start (QualifiedName, Module, {QualifiedName, Configuration}, []);
-				gen_fsm ->
-					gen_fsm:start (QualifiedName, Module, {QualifiedName, Configuration}, []);
-				gen_event when (Module =:= none), (Configuration =:= void) ->
-					gen_event:start (QualifiedName)
-			end;
-		noname ->
-			case Type of
-				gen_server ->
-					gen_server:start (Module, {QualifiedName, Configuration}, []);
-				gen_fsm ->
-					gen_fsm:start (Module, {QualifiedName, Configuration}, []);
-				gen_event when (Module =:= none), (Configuration =:= void) ->
-					gen_event:start ()
-			end
+	try
+		case QualifiedName of
+			{local, _LocalName} ->
+				case Type of
+					gen_server ->
+						gen_server:start (QualifiedName, Module, {QualifiedName, Configuration}, []);
+					gen_fsm ->
+						gen_fsm:start (QualifiedName, Module, {QualifiedName, Configuration}, []);
+					gen_event when (Module =:= none), (Configuration =:= void) ->
+						gen_event:start (QualifiedName)
+				end;
+			noname ->
+				case Type of
+					gen_server ->
+						gen_server:start (Module, {QualifiedName, Configuration}, []);
+					gen_fsm ->
+						gen_fsm:start (Module, {QualifiedName, Configuration}, []);
+					gen_event when (Module =:= none), (Configuration =:= void) ->
+						gen_event:start ()
+				end
+		end
+	of
+		Outcome = {ok, _Process} ->
+			Outcome;
+		Error = {error, Reason} ->
+			ok = mosaic_transcript:trace_error ("failed starting process...", [{type, Type}, {module, Module}, {qualified_name, QualifiedName}, {configuration, Configuration}, {reason, Reason}]),
+			Error
+	catch _ : Reason ->
+		ok = mosaic_transcript:trace_error ("failed starting process...", [{type, Type}, {module, Module}, {qualified_name, QualifiedName}, {configuration, Configuration}, {reason, Reason}, {stacktrace, erlang:get_stacktrace ()}]),
+		{error, Reason}
 	end.
 
 
@@ -39,25 +50,36 @@ start_link (Type, Module, QualifiedName, Configuration)
 		when ((Type =:= gen_server) orelse (Type =:= gen_fsm) orelse (Type =:= gen_event)),
 				((QualifiedName =:= noname) orelse (is_record (QualifiedName, local, 2) andalso is_atom (element (2, QualifiedName)))),
 				is_atom (Module) ->
-	case QualifiedName of
-		{local, _LocalName} ->
-			case Type of
-				gen_server ->
-					gen_server:start_link (QualifiedName, Module, {QualifiedName, Configuration}, []);
-				gen_fsm ->
-					gen_fsm:start_link (QualifiedName, Module, {QualifiedName, Configuration}, []);
-				gen_event when (Module =:= none), (Configuration =:= void) ->
-					gen_event:start_link (QualifiedName)
-			end;
-		noname ->
-			case Type of
-				gen_server ->
-					gen_server:start_link (Module, {QualifiedName, Configuration}, []);
-				gen_fsm ->
-					gen_fsm:start_link (Module, {QualifiedName, Configuration}, []);
-				gen_event when (Module =:= none), (Configuration =:= void) ->
-					gen_event:start_link ()
-			end
+	try
+		case QualifiedName of
+			{local, _LocalName} ->
+				case Type of
+					gen_server ->
+						gen_server:start_link (QualifiedName, Module, {QualifiedName, Configuration}, []);
+					gen_fsm ->
+						gen_fsm:start_link (QualifiedName, Module, {QualifiedName, Configuration}, []);
+					gen_event when (Module =:= none), (Configuration =:= void) ->
+						gen_event:start_link (QualifiedName)
+				end;
+			noname ->
+				case Type of
+					gen_server ->
+						gen_server:start_link (Module, {QualifiedName, Configuration}, []);
+					gen_fsm ->
+						gen_fsm:start_link (Module, {QualifiedName, Configuration}, []);
+					gen_event when (Module =:= none), (Configuration =:= void) ->
+						gen_event:start_link ()
+				end
+		end
+	of
+		Outcome = {ok, _Process} ->
+			Outcome;
+		Error = {error, Reason} ->
+			ok = mosaic_transcript:trace_error ("failed starting process...", [{type, Type}, {module, Module}, {qualified_name, QualifiedName}, {configuration, Configuration}, {reason, Reason}]),
+			Error
+	catch _ : Reason ->
+		ok = mosaic_transcript:trace_error ("failed starting process...", [{type, Type}, {module, Module}, {qualified_name, QualifiedName}, {configuration, Configuration}, {reason, Reason}, {stacktrace, erlang:get_stacktrace ()}]),
+		{error, Reason}
 	end.
 
 

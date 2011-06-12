@@ -7,7 +7,7 @@
 	{registered, []},
 	{mod, {mosaic_component_app, defaults}},
 	{env, [
-		{controller, undefined},
-		{identifier, undefined},
-		{handler, undefined}]},
+		{callbacks, undefined},
+		{harness_input_descriptor, undefined},
+		{harness_output_descriptor, undefined}]}
 ]}.

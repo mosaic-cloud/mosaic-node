@@ -8,7 +8,7 @@
 -export ([init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2, handle_info/2]).
 
 
--import (mosaic_enforcements, [enforce_ok_1/1]).
+-import (mosaic_enforcements, [enforce_ok/1, enforce_ok_1/1]).
 
 
 start_supervised () ->
@@ -44,14 +44,13 @@ code_change (_OldVsn, State = #state{}, _Arguments) ->
 
 
 handle_call (
-			{mosaic_component_resources, acquire, OwnerIdentifier, OwnerProcess, Encoding, SpecificationContent}, _Sender,
+			{mosaic_component_resources, acquire, OwnerIdentifier, OwnerProcess, Specifications}, _Sender,
 			State = #state{table = Table})
 		when is_binary (OwnerIdentifier), (bit_size (OwnerIdentifier) =:= 160), (is_pid (OwnerProcess) orelse is_port (OwnerProcess)) ->
 	try
-		Specifications = enforce_ok_1 (mosaic_component_coders:decode_resource_specifications (Encoding, SpecificationContent)),
+		ok = enforce_ok (mosaic_component_coders:validate_resource_specifications (Specifications)),
 		Descriptors = enforce_ok_1 (execute_acquire (OwnerIdentifier, OwnerProcess, Specifications, Table)),
-		DescriptorContent = enforce_ok_1 (mosaic_component_coders:encode_resource_descriptors (Encoding, Descriptors)),
-		{reply, {ok, DescriptorContent}, State}
+		{reply, {ok, Descriptors}, State}
 	catch throw : Error = {error, _Reason} -> {reply, Error, State} end;
 	
 handle_call (Request, _Sender, State = #state{}) ->
@@ -81,12 +80,12 @@ execute_acquire (OwnerIdentifier, OwnerProcess, Specifications, Table) ->
 	{ok, Descriptors}.
 
 
-try_acquire (Owner, Specification = {Identifier, Type = 'socket:ipv4:tcp', defaults}) ->
+try_acquire (Owner, Specification = {Identifier, Type = <<"socket:ipv4:tcp">>, defaults}) ->
 	Ip = <<"127.0.0.1">>,
 	Port = crypto:rand_uniform (32769, 49150),
 	Key = {Type, Ip, Port},
 	Data = {Identifier, Type, Owner, {Ip, Port}},
-	Descriptor = {Identifier, [{ip, Ip}, {port, Port}]},
+	Descriptor = {Identifier, [{<<"ip">>, Ip}, {<<"port">>, Port}]},
 	{ok, {Key, Data, Descriptor, Specification}};
 	
 try_acquire (_Owner, Specification) ->
