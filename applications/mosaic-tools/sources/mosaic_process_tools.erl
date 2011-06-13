@@ -13,6 +13,7 @@ start (Type, Module, QualifiedName, Configuration)
 		when ((Type =:= gen_server) orelse (Type =:= gen_fsm) orelse (Type =:= gen_event)),
 				((QualifiedName =:= noname) orelse (is_record (QualifiedName, local, 2) andalso is_atom (element (2, QualifiedName)))),
 				is_atom (Module) ->
+	% ok = mosaic_transcript:trace_information ("starting (non-linked) process...", [{type, Type}, {module, Module}, {qualified_name, QualifiedName}, {configuration, Configuration}]),
 	try
 		case QualifiedName of
 			{local, _LocalName} ->
@@ -50,6 +51,7 @@ start_link (Type, Module, QualifiedName, Configuration)
 		when ((Type =:= gen_server) orelse (Type =:= gen_fsm) orelse (Type =:= gen_event)),
 				((QualifiedName =:= noname) orelse (is_record (QualifiedName, local, 2) andalso is_atom (element (2, QualifiedName)))),
 				is_atom (Module) ->
+	% ok = mosaic_transcript:trace_information ("starting linked process...", [{type, Type}, {module, Module}, {qualified_name, QualifiedName}, {configuration, Configuration}]),
 	try
 		case QualifiedName of
 			{local, _LocalName} ->

@@ -16,9 +16,11 @@
 -export ([
 		encode_packet/1, decode_packet/1,
 		encode_packet_fully/1, decode_packet_fully/1]).
+-export ([
+		decode_socket_ipv4_tcp_descriptors/2, decode_socket_ipv4_tcp_descriptor/1]).
 
 
--import (mosaic_enforcements, [enforce_ok_1/1]).
+-import (mosaic_enforcements, [enforce_ok_1/1, enforce_ok_2/1]).
 
 
 validate_component (Component) ->
@@ -556,3 +558,32 @@ decode_packet_fully (Packet = {resources, _MetaData, _Data}) ->
 	
 decode_packet_fully (Packet) ->
 	{error, {invalid_packet, Packet}}.
+
+
+decode_socket_ipv4_tcp_descriptors (Identifiers, Descriptors)
+		when is_list (Identifiers), is_list (Descriptors) ->
+	try
+		Values = lists:map (
+					fun (Identifier)
+							when is_binary (Identifier) ->
+						case lists:keyfind (Identifier, 1, Descriptors) of
+							{Identifier, Descriptor} ->
+								enforce_ok_2 (decode_socket_ipv4_tcp_descriptor (Descriptor));
+							false ->
+								throw ({error, {missing_socket_descriptor, Identifier}})
+						end
+					end,
+					Identifiers),
+		{ok, Values}
+	catch throw : Error = {error, _Reason} -> Error end.
+
+
+decode_socket_ipv4_tcp_descriptor (Descriptor)
+		when is_list (Descriptor) ->
+	try
+		Ip = enforce_ok_1 (mosaic_generic_coders:proplist_get (<<"ip">>, Descriptor,
+				{validate, {is_binary, invalid_socket_ip}}, {error, invalid_socket_descriptor})),
+		Port = enforce_ok_1 (mosaic_generic_coders:proplist_get (<<"port">>, Descriptor,
+				{validate, {is_integer, invalid_socket_port}}, {error, invalid_socket_descriptor})),
+		{ok, Ip, Port}
+	catch throw : Error = {error, _Reason} -> Error end.

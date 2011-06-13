@@ -70,7 +70,13 @@ start_discovery () ->
 	JoinFunction = fun (Event, void) ->
 			ok = case Event of
 				{mosaic_discovery_events, broadcasted, {mosaic_cluster, node, Node}} when is_atom (Node) ->
-					ok = mosaic_cluster_tools:ring_include (Node),
+					ok = case mosaic_cluster_tools:ring_include (Node) of
+						ok ->
+							ok;
+						{error, Reason} ->
+							ok = mosaic_transcript:trace_error ("failed joining node; ignoring!", [{node, Node}, {reason, Reason}]),
+							ok
+					end,
 					ok;
 				{mosaic_discovery_events, broadcasted, Message} ->
 					ok = mosaic_transcript:trace_error ("received invalid broadcast message; ignoring!", [{message, Message}]),
@@ -109,43 +115,4 @@ start_discovery () ->
 
 
 boot () ->
-	boot (mosaic_cluster).
-
-boot ([]) ->
-	ok;
-	
-boot ([App | RemainingApps])
-		when is_atom (App), is_list (RemainingApps) ->
-	case boot (App) of
-		ok ->
-			boot (RemainingApps);
-		Error = {error, _Reason} ->
-			Error
-	end;
-	
-boot (App)
-		when is_atom (App) ->
-	ok = case application:load (App) of
-		ok ->
-			ok;
-		{error, {already_loaded, App}} ->
-			ok
-	end,
-	case application:get_key (App, applications) of
-		{ok, DepApps} ->
-			case boot (DepApps) of
-				ok ->
-					case application:start (App) of
-						ok ->
-							ok;
-						{error, {already_started, App}} ->
-							ok;
-						Error = {error, _Reason} ->
-							Error
-					end;
-				Error = {error, _Reason} ->
-					Error
-			end;
-		undefined ->
-			{error, {undefined_dependencies, App}}
-	end.
+	mosaic_application_tools:boot (mosaic_cluster).

@@ -17,7 +17,7 @@ _erl_argv=(
 	"${_erl}"
 		"${_erl_args[@]}"
 		-noshell -noinput
-		-sname "mosaic-cluster-tests" -setcookie "${_erl_cookie}"
+		-sname "mosaic-cluster-tests@localhost" -setcookie "${_erl_cookie}"
 		-boot start_clean
 		-config "${_outputs}/erlang/applications/mosaic_cluster/priv/mosaic_cluster.config"
 		-mosaic_cluster webmachine_listen "{\"127.0.0.1\", $(( _erl_epmd_port + 1 + (9 - 1) * 2 + 0 ))}"

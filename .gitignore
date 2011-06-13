@@ -1,6 +1,7 @@
 
 .*
+!.gitignore
+!.hgignore
+
 *#
 *~
-
-!.gitignore

@@ -37,10 +37,18 @@ test () ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
 						{define_and_create_processes, java_abacus, term, defaults, 4}]};
-			{ok, create_rabbitmq} ->
+			{ok, create_rabbitmq_1} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
 						{define_and_create_processes, rabbitmq, term, defaults, 1}]};
+			{ok, create_riak_kv_1} ->
+				{ok, defaults, [
+						{boot}, {activate}, {ping, default}, {initialize},
+						{define_and_create_processes, riak_kv, term, defaults, 1}]};
+			{ok, create_riak_kv_4} ->
+				{ok, defaults, [
+						{boot}, {activate}, {ping, default}, {initialize},
+						{define_and_create_processes, riak_kv, term, defaults, 4}]};
 			{ok, ring_join_leave} ->
 				Self = erlang:node (),
 				case application:get_env (mosaic_cluster, tests_nodes) of
@@ -111,6 +119,8 @@ execute ({initialize}) ->
 	ok = mosaic_process_configurator:register (java_abacus, json, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register (rabbitmq, term, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register (rabbitmq, json, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register (riak_kv, term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register (riak_kv, json, {mosaic_component_process_tests, configure, defaults}),
 	ok;
 	
 execute ({ring, include, Node})

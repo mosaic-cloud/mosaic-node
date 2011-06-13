@@ -128,7 +128,7 @@ handle_info (
 	
 handle_info (
 			{mosaic_harness_frontend, HarnessToken, exit, ExitCode},
-			State = #state{harness_token = HarnessToken})
+			State = #state{status = executing, harness_token = HarnessToken})
 		when is_integer (ExitCode), (ExitCode >= 0) ->
 	if
 		(ExitCode =:= 0) ->
@@ -137,13 +137,25 @@ handle_info (
 			{stop, {error, {process_failed, ExitCode}}, State}
 	end;
 	
+handle_info (
+			{mosaic_harness_frontend, HarnessToken, exit, ExitCode},
+			State = #state{status = Status, harness_token = HarnessToken})
+		when is_integer (ExitCode), (ExitCode >= 0), ((Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
+	{noreply, State};
+	
 handle_info ({Reference, Outcome}, State)
 		when is_reference (Reference) ->
 	handle_outbound_call_return (Reference, Outcome, State);
 	
 handle_info ({'EXIT', Harness, HarnessExitReason}, OldState = #state{harness = Harness})
 		when is_pid (Harness) ->
-	{stop, {error, {harness_failed, HarnessExitReason}}, OldState#state{harness = none}};
+	NewState = OldState#state{harness = none, harness_token = none},
+	case HarnessExitReason of
+		normal ->
+			{noreply, NewState};
+		_ ->
+			{stop, {error, {harness_failed, HarnessExitReason}}, NewState}
+	end;
 	
 handle_info (Message, State) ->
 	{stop, {error, {invalid_message, Message}}, State}.
@@ -259,13 +271,25 @@ handle_acquire (Specification, Correlation, State = #state{identifier = Identifi
 	handle_info ({mosaic_component_process_internals, push_packet, Packet}, State).
 
 
-begin_migration (source, Configuration, CompletionFun, OldState = #state{status = executing, execute = ExecuteSpecification}) ->
+begin_migration (source, Configuration, CompletionFun, OldState = #state{status = executing, harness = Harness, execute = ExecuteSpecification}) ->
 	case Configuration of
 		defaults ->
-			NewState = OldState#state{status = migrating_as_source},
-			ok = CompletionFun ({prepared, [{execute, ExecuteSpecification}]}),
-			ok = CompletionFun (completed),
-			{continue, NewState};
+			case mosaic_harness_frontend:stop (Harness, normal) of
+				ok ->
+					Self = erlang:self (),
+					_ = erlang:spawn_link (
+								fun () ->
+									_ = mosaic_process_tools:wait (Harness, 60000),
+									ok = CompletionFun ({prepared, [{execute, ExecuteSpecification}]}),
+									ok = CompletionFun (completed),
+									true = erlang:unlink (Self),
+									ok
+								end),
+					NewState = OldState#state{status = migrating_as_source},
+					{continue, NewState};
+				{error, Reason} ->
+					{terminate, Reason, OldState#state{status = migrating_as_source_failed}}
+			end;
 		_ ->
 			{reject, {invalid_configuration, Configuration}, OldState}
 	end;
@@ -289,17 +313,12 @@ begin_migration (target, Configuration, CompletionFun, OldState = #state{status 
 		{continue, NewState}
 	catch
 		throw : {error, Reason} ->
-			{reject, Reason, OldState#state{status = migration_failed}}
+			{terminate, Reason, OldState#state{status = migration_failed}}
 	end.
 
 
-commit_migration (OldState = #state{status = migrating_as_source, harness = Harness}) ->
-	case mosaic_harness_frontend:stop (Harness, normal) of
-		ok ->
-			{continue, OldState#state{status = migrating_as_source_succeeded}};
-		{error, Reason} ->
-			{terminate, Reason, OldState#state{status = migrating_as_source_failed}}
-	end;
+commit_migration (OldState = #state{status = migrating_as_source}) ->
+	{continue, OldState#state{status = migrating_as_source_succeeded}};
 	
 commit_migration (OldState = #state{status = migrating_as_target, harness = Harness, execute = ExecuteSpecification}) ->
 	case mosaic_harness_frontend:execute (Harness, ExecuteSpecification) of
@@ -311,7 +330,7 @@ commit_migration (OldState = #state{status = migrating_as_target, harness = Harn
 
 
 rollback_migration (OldState = #state{status = migrating_as_source}) ->
-	{continue, OldState#state{status = executing}};
+	{terminate, unsupported, OldState#state{status = migrating_as_source_failed}};
 	
 rollback_migration (OldState = #state{status = Status}) when (Status =:= pre_migrating_as_target) orelse (Status =:= migrating_as_target) ->
 	{continue, OldState#state{status = migrating_as_target_failed}}.

@@ -9,7 +9,8 @@
 		test_cast/1,
 		test_migrate/1,
 		test_abacus/1,
-		test_rabbitmq/1]).
+		test_rabbitmq/1,
+		test_riak_kv/1]).
 -export ([configure/6]).
 
 
@@ -18,14 +19,15 @@
 -import (mosaic_enforcements, [enforce_ok_1/1]).
 
 
-%-test ({test_start_stop, [{defaults}]}).
-%-test ({test_call, [{defaults}]}).
-%-test ({test_cast, [{defaults}]}).
-%-test ({test_migrate, [{defaults}]}).
-%-test ({test_abacus, [{python}]}).
-%-test ({test_abacus, [{node}]}).
-%-test ({test_abacus, [{java}]}).
--test ({test_rabbitmq, [{defaults}]}).
+-test ({test_start_stop, [{defaults}]}).
+-test ({test_call, [{defaults}]}).
+-test ({test_cast, [{defaults}]}).
+-test ({test_migrate, [{defaults}]}).
+-test ({test_abacus, [{python}]}).
+-test ({test_abacus, [{node}]}).
+-test ({test_abacus, [{java}]}).
+%-test ({test_rabbitmq, [{defaults}]}).
+%-test ({test_riak_kv, [{defaults}]}).
 
 
 test_start_stop ({defaults}) ->
@@ -103,6 +105,19 @@ test_abacus ({Flavour}) ->
 test_rabbitmq ({defaults}) ->
 	{ok, Identifier} = mosaic_component_coders:generate_component (),
 	{ok, Configuration} = configure (rabbitmq, create, Identifier),
+	{ok, Router} = mosaic_cluster_processes_router:start_link ({local, mosaic_process_router}, defaults),
+	{ok, Resources} = mosaic_cluster_component_resources:start_link ({local, mosaic_component_resources}, defaults),
+	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
+	ok = timer:sleep (6 * 1000),
+	ok = stop_and_wait_process (Process),
+	true = erlang:exit (Router, normal),
+	true = erlang:exit (Resources, normal),
+	ok.
+
+
+test_riak_kv ({defaults}) ->
+	{ok, Identifier} = mosaic_component_coders:generate_component (),
+	{ok, Configuration} = configure (riak_kv, create, Identifier),
 	{ok, Router} = mosaic_cluster_processes_router:start_link ({local, mosaic_process_router}, defaults),
 	{ok, Resources} = mosaic_cluster_component_resources:start_link ({local, mosaic_component_resources}, defaults),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
@@ -217,6 +232,23 @@ configure (Type = rabbitmq, create, Identifier, term, defaults, ExtraOptions)
 				{executable, <<"./scripts/run-node">>},
 				{arguments, [enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]},
 				{working_directory, <<"../mosaic-components-rabbitmq">>}]}
+			| ExtraOptions],
+	case mosaic_component_process_coders:parse_configuration (create, term, Options) of
+		{ok, Configuration} ->
+			{ok, mosaic_component_process, Configuration};
+		Error = {error, _Reason} ->
+			Error
+	end;
+	
+configure (Type = riak_kv, create, Identifier, term, defaults, ExtraOptions)
+		when is_list (ExtraOptions) ->
+	Options = [
+			{harness, [
+				{argument0, <<"[mosaic_component#", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
+			{execute, [
+				{executable, <<"./scripts/run-node">>},
+				{arguments, [enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]},
+				{working_directory, <<"../mosaic-components-riak-kv">>}]}
 			| ExtraOptions],
 	case mosaic_component_process_coders:parse_configuration (create, term, Options) of
 		{ok, Configuration} ->

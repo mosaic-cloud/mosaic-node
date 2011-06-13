@@ -39,14 +39,12 @@ init ([Partition]) ->
 	end.
 
 
-terminate (_Reason, _State = #state{process_controller = ProcessController, partition = Partition}) ->
-	ok = mosaic_transcript:trace_information ("terminating processes vnode...", [{partition, Partition}]),
+terminate (_Reason, _State = #state{process_controller = ProcessController}) ->
 	ok = mosaic_process_controller:stop (ProcessController, normal),
 	ok.
 
 
-delete (State = #state{partition = Partition}) ->
-	ok = mosaic_transcript:trace_information ("destroying processes vnode...", [{partition, Partition}]),
+delete (State = #state{}) ->
 	{ok, State}.
 
 
@@ -146,7 +144,7 @@ handle_handoff_command ({riak_core_fold_req_v1, Function, InputAccumulator}, _Se
 	
 handle_handoff_command ({mosaic_cluster_processes, handoff_request, Vnode, Reference, process, Key, PeerProcessController}, _Sender, State = #state{process_controller = ProcessController})
 		when is_pid (Vnode), is_reference (Reference), is_binary (Key), (bit_size (Key) =:= 160), is_pid (PeerProcessController) ->
-	ok = mosaic_transcript:trace_information ("requested process handoff as source...", [{vnode, Vnode}, {key, Key}]),
+	% ok = mosaic_transcript:trace_information ("requested process handoff as source...", [{vnode, Vnode}, {key, Key}]),
 	case mosaic_cluster_storage:select (Key) of
 		{ok, undefined, {mosaic_cluster_processes, definition, Type, _, _}} ->
 			case mosaic_process_configurator:configure (Type, {migrate, source}, Key, term, defaults) of
@@ -155,7 +153,7 @@ handle_handoff_command ({mosaic_cluster_processes, handoff_request, Vnode, Refer
 						{ok, TargetModule, TargetConfiguration} ->
 							case mosaic_process_controller:migrate (ProcessController, PeerProcessController, Key, SourceConfiguration, TargetModule, TargetConfiguration) of
 								ok ->
-									ok = mosaic_transcript:trace_information ("succeeded process handoff as source;", [{vnode, Vnode}, {key, Key}]),
+									% ok = mosaic_transcript:trace_information ("succeeded process handoff as source;", [{vnode, Vnode}, {key, Key}]),
 									Vnode ! {mosaic_cluster_processes, handoff_request, Reference, succeeded},
 									{reply, ok, State};
 								Error = {error, Reason} ->
@@ -199,11 +197,11 @@ handle_handoff_data (DataBinary, State = #state{process_controller = ProcessCont
 	case DataTerm of
 		{mosaic_cluster_processes, Vnode, process, Key} when is_pid (Vnode), is_binary (Key), (bit_size (Key) =:= 160) ->
 			Reference = erlang:make_ref (),
-			ok = mosaic_transcript:trace_information ("requesting process handoff as target...", [{vnode, Vnode}, {key, Key}]),
+			% ok = mosaic_transcript:trace_information ("requesting process handoff as target...", [{vnode, Vnode}, {key, Key}]),
 			ok = riak_core_vnode:send_command (Vnode, {mosaic_cluster_processes, handoff_request, erlang:self (), Reference, process, Key, ProcessController}),
 			receive
 				{mosaic_cluster_processes, handoff_request, Reference, succeeded} ->
-					ok = mosaic_transcript:trace_information ("succeeded process handoff as target;", [{vnode, Vnode}, {key, Key}]),
+					% ok = mosaic_transcript:trace_information ("succeeded process handoff as target;", [{vnode, Vnode}, {key, Key}]),
 					{reply, ok, State};
 				{mosaic_cluster_processes, handoff_request, Reference, failed, Reason} ->
 					ok = mosaic_transcript:trace_error ("failed process handoff as target; ignoring!", [{vnode, Vnode}, {key, Key}, {reason, Reason}]),

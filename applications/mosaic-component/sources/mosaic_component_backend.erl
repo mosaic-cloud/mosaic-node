@@ -33,7 +33,11 @@ init ({QualifiedName = {local, mosaic_component_backend}, defaults}) ->
 		HarnessConfiguration = enforce_ok_1 (mosaic_harness_coders:decode_backend_configuration (
 					term, [{controller, erlang:self ()}, {controller_token, HarnessToken},
 								{input_descriptor, HarnessInputDescriptor}, {output_descriptor, HarnessOutputDescriptor}])),
-		Harness = enforce_ok_1 (mosaic_harness_backend:start_link (HarnessConfiguration)),
+		Harness = enforce_ok_1 (mosaic_harness_backend:start_link ({local, mosaic_component_harness}, HarnessConfiguration)),
+		ok = enforce_ok (
+					try
+						gen_server:call (Callbacks, {mosaic_component_callbacks, init})
+					catch exit : {CallReason, {gen_server, call, _}} -> throw ({error, {callbacks_failed, CallReason}}) end),
 		State = #state{
 					callbacks = Callbacks,
 					harness = Harness, harness_token = HarnessToken,
@@ -43,16 +47,18 @@ init ({QualifiedName = {local, mosaic_component_backend}, defaults}) ->
 
 
 terminate (Reason, State = #state{}) ->
+	ok = mosaic_application_tools:shutdown (),
 	ok = mosaic_transcript:trace_information ("terminating mosaic component...", [{reason, Reason}]),
 	terminate_1 (Reason, State).
 
 terminate_1 (_Reason, _State = #state{callbacks = none, harness = none}) ->
-	_ = erlang:spawn (fun mosaic_component_app:shutdown/0),
 	ok;
 	
 terminate_1 (Reason, OldState = #state{callbacks = Callbacks})
 		when is_pid (Callbacks) ->
-	_ = mosaic_component_callbacks:stop (),
+	ok = try gen_server:call (Callbacks, {mosaic_component_callbacks, stop}) of
+		_ -> ok
+	catch exit : {_, {gen_server, call, _}} -> ok end,
 	ok = case mosaic_process_tools:wait (Callbacks, 5000) of
 		{ok, _} ->
 			ok;
@@ -127,7 +133,10 @@ handle_info (
 			handle_acquire_return (Correlation, Error, State);
 		Packet ->
 			{stop, {error, {invalid_packet, Packet}}, State}
-	catch throw : Error = {error, _Reason} -> {stop, Error, State} end;
+	catch throw : Error = {error, Reason} ->
+		ok = mosaic_transcript:trace_error ("failed decoding packet; terminating!", [{packet, EncodedPacket}, {reason, Reason}]),
+		{stop, Error, State}
+	end;
 	
 handle_info (
 			{mosaic_component_backend_internals, push_packet, Packet},

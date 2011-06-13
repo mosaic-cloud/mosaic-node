@@ -21,8 +21,9 @@ if test "${_scenario}" != "shell" ; then
 	_erl_argv=(
 		"${_erl}"
 			"${_erl_args[@]}"
-			-sname "mosaic-cluster-${_index}" -setcookie "${_erl_cookie}"
-			-boot start_sasl -noinput -noshell
+			-noinput -noshell
+			-sname "mosaic-cluster-${_index}@${_erl_host}" -setcookie "${_erl_cookie}"
+			-boot start_sasl
 			-config "${_outputs}/erlang/applications/mosaic_cluster/priv/mosaic_cluster.config"
 			-mosaic_cluster tests_scenario "${_scenario}"
 			-mosaic_cluster webmachine_listen "{\"127.0.0.1\", $(( _erl_epmd_port + 1 + (_index - 1) * 2 + 0 ))}"
@@ -34,9 +35,10 @@ else
 	_erl_argv=(
 		"${_erl}"
 			"${_erl_args[@]}"
-			-sname "mosaic-shell-${_index}" -setcookie "${_erl_cookie}"
+			-name "mosaic-shell-${_index}@{_erl_host}" -setcookie "${_erl_cookie}"
 			-remsh "mosaic-cluster-${_index}@localhost"
 	)
 fi
 
-ERL_EPMD_PORT="${_erl_epmd_port}" exec "${_erl_argv[@]}"
+ERL_EPMD_PORT="${_erl_epmd_port}" \
+exec "${_erl_argv[@]}"

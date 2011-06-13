@@ -114,7 +114,18 @@ execute_resolve (Identifier) ->
 		{error, does_not_exist} ->
 			case mosaic_cluster_storage:select (Identifier) of
 				{ok, none, RegisteredProcesses} ->
-					LiveProcesses = lists:filter (fun erlang:is_process_alive/1, RegisteredProcesses),
+					LiveProcesses = lists:filter (
+								fun (Process) ->
+									Monitor = erlang:monitor (process, Process),
+									receive
+										{'DOWN', Monitor, process, Process, _} ->
+											false
+									after 0 ->
+										true = demonitor(Monitor, [flush]),
+										true
+									end
+								end,
+								RegisteredProcesses),
 					case LiveProcesses of
 						[] ->
 							{error, {noproc, group_is_empty}};
