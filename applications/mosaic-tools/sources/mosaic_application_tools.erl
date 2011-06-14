@@ -2,7 +2,7 @@
 -module (mosaic_application_tools).
 
 
--export ([boot/1, shutdown/0]).
+-export ([boot/1, shutdown_async/1, shutdown_async/2]).
 -export ([load/1, load/2, start/1, start/2]).
 
 
@@ -28,21 +28,27 @@ boot (Booter)
 	catch
 		throw : {error, Reason} ->
 			ok = error_logger:error_report (["failed booting...", {reason, Reason}, {stacktrace, erlang:get_stacktrace ()}]),
-			ok = shutdown (),
+			ok = shutdown_async (0),
 			{error, {failed_booting, Reason}};
 		_ : Reason ->
 			ok = error_logger:error_report (["failed booting...", {reason, Reason}, {stacktrace, erlang:get_stacktrace ()}]),
-			ok = shutdown (),
+			ok = shutdown_async (0),
 			{error, {failed_booting, Reason}}
 	end.
 
 
-shutdown () ->
+shutdown_async (StopDelay) ->
+	shutdown_async (StopDelay, 6 * 1000).
+
+shutdown_async (StopDelay, HaltDelay)
+		when is_integer (StopDelay), (StopDelay >= 0), is_integer (HaltDelay), (HaltDelay >= 0) ->
 	_ = erlang:spawn (
 				fun () ->
-					ok = error_logger:warning_report (["shutting-down..."]),
+					ok = timer:sleep (StopDelay),
+					ok = error_logger:warning_report (["stopping..."]),
 					ok = init:stop (),
-					ok = timer:sleep (60 * 1000),
+					ok = timer:sleep (HaltDelay),
+					ok = error_logger:warning_report (["halting..."]),
 					ok = erlang:halt (),
 					ok
 				end),

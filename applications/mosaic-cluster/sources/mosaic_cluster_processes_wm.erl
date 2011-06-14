@@ -70,7 +70,7 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 		{processes, Action} when ((Action =:= call) orelse (Action =:= cast)) ->
 			case mosaic_webmachine:enforce_request ('GET',
 					[
-						{"key", fun mosaic_component_coders:decode_component/1},
+						{"key", fun mosaic_generic_coders:decode_string/1},
 						{"operation", fun mosaic_generic_coders:decode_string/1},
 						{"inputs", fun mosaic_json_coders:decode_json/1}],
 					Request) of
@@ -158,43 +158,62 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 					Error
 			end;
 		{processes, Action} when ((Action =:= call) orelse (Action =:= cast)) ->
-			Key = dict:fetch (key, Arguments),
-			Operation = dict:fetch (operation, Arguments),
-			Inputs = dict:fetch (inputs, Arguments),
-			case Action of
-				call ->
-					case mosaic_process_router:call (Key, Operation, Inputs, <<>>, undefined) of
-						{ok, Outputs, _Data} ->
-							case mosaic_json_coders:coerce_json (Outputs) of
-								{ok, CoercedOutputs} ->
-									{ok, json_struct, [{ok, true}, {outputs, CoercedOutputs}]};
-								{error, _Reason} ->
-									{ok, EncodedOutputs} = mosaic_generic_coders:encode_term (json, Outputs),
-									{ok, json_struct, [{ok, true}, {outputs, EncodedOutputs}]}
-							end;
-						{error, Reason, _Data} ->
-							case mosaic_json_coders:coerce_json (Reason) of
-								{ok, CoercedReason} ->
-									{ok, json_struct, [{ok, false}, {error, CoercedReason}]};
-								{error, _Reason} ->
-									{ok, EncodedReason} = mosaic_generic_coders:encode_term (json, Reason),
-									{ok, json_struct, [{ok, true}, {error, EncodedReason}]}
-							end;
-						Error = {error, _Reason} ->
-							Error;
-						CallReply ->
-							{error, {invalid_reply, CallReply}}
-					end;
-				cast ->
-					case mosaic_process_router:cast (Key, Operation, Inputs, <<>>) of
-						ok ->
-							ok;
-						Error = {error, _Reason} ->
-							Error;
-						CastReply ->
-							{error, {invalid_reply, CastReply}}
-					end
-			end;
+			try
+				Key = case dict:fetch (key, Arguments) of
+					<<$#, Alias_ / binary>> ->
+						case mosaic_cluster_processes_router:resolve_alias (Alias_) of
+							{ok, Key_} ->
+								Key_;
+							{error, _Reason1} ->
+								throw ({error, {unresolved_alias, Alias_}})
+						end;
+					Key_ when (byte_size (Key_) =:= 40) ->
+						case mosaic_component_coders:decode_component (Key_) of
+							{ok, Key__} ->
+								Key__;
+							{error, _Reason1} ->
+								throw ({error, {invalid_component, Key_, invalid_content}})
+						end;
+					Key_ ->
+						throw ({error, {invalid_component, Key_, invalid_length}})
+				end,
+				Operation = dict:fetch (operation, Arguments),
+				Inputs = dict:fetch (inputs, Arguments),
+				case Action of
+					call ->
+						case mosaic_process_router:call (Key, Operation, Inputs, <<>>, undefined) of
+							{ok, Outputs, _Data} ->
+								case mosaic_json_coders:coerce_json (Outputs) of
+									{ok, CoercedOutputs} ->
+										{ok, json_struct, [{ok, true}, {outputs, CoercedOutputs}]};
+									{error, _Reason2} ->
+										{ok, EncodedOutputs} = mosaic_generic_coders:encode_term (json, Outputs),
+										{ok, json_struct, [{ok, true}, {outputs, EncodedOutputs}]}
+								end;
+							{error, Reason2, _Data} ->
+								case mosaic_json_coders:coerce_json (Reason2) of
+									{ok, CoercedReason2} ->
+										{ok, json_struct, [{ok, false}, {error, CoercedReason2}]};
+									{error, _Reason2} ->
+										{ok, EncodedReason2} = mosaic_generic_coders:encode_term (json, Reason2),
+										{ok, json_struct, [{ok, true}, {error, EncodedReason2}]}
+								end;
+							Error2 = {error, _Reason2} ->
+								Error2;
+							CallReply ->
+								{error, {invalid_reply, CallReply}}
+						end;
+					cast ->
+						case mosaic_process_router:cast (Key, Operation, Inputs, <<>>) of
+							ok ->
+								ok;
+							Error2 = {error, _Reason2} ->
+								Error2;
+							CastReply ->
+								{error, {invalid_reply, CastReply}}
+						end
+				end
+			catch throw : Error = {error, _Reason} -> Error end;
 		{ping} ->
 			Count = dict:fetch (count, Arguments),
 			case mosaic_cluster_processes:service_ping (Count) of

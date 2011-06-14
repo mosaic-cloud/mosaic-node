@@ -47,7 +47,7 @@ init ({QualifiedName = {local, mosaic_component_backend}, defaults}) ->
 
 
 terminate (Reason, State = #state{}) ->
-	ok = mosaic_application_tools:shutdown (),
+	ok = mosaic_application_tools:shutdown_async (60 * 1000),
 	ok = mosaic_transcript:trace_information ("terminating mosaic component...", [{reason, Reason}]),
 	terminate_1 (Reason, State).
 

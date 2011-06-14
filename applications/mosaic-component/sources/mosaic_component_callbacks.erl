@@ -131,7 +131,7 @@ terminate (Reason, _State = #state{callback_module = CallbackModule, callback_st
 			ok = mosaic_transcript:trace_error ("callbacks failed (invalid return)...", [{return, Return}]),
 			ok
 	catch _ : CaughtReason ->
-		ok = mosaic_transcript:trace_error ("callbacks failed...", [{reason, CaughtReason}]),
+		ok = mosaic_transcript:trace_error ("callbacks failed...", [{reason, CaughtReason}, {stacktrace, erlang:get_stacktrace ()}]),
 		ok
 	end.
 
@@ -163,7 +163,7 @@ handle_call (
 			ok = mosaic_transcript:trace_error ("callbacks failed (invalid return)...", [{return, Return}]),
 			{stop, {error, {callbacks_failed, {invalid_return, Return}}}, {error, callbacks_failed}, OldState}
 	catch _ : CaughtReason ->
-		ok = mosaic_transcript:trace_error ("callbacks failed...", [{reason, CaughtReason}]),
+		ok = mosaic_transcript:trace_error ("callbacks failed...", [{reason, CaughtReason}, {stacktrace, erlang:get_stacktrace ()}]),
 		{stop, {error, {callbacks_failed, CaughtReason}}, OldState}
 	end;
 	
@@ -183,7 +183,7 @@ handle_call ({mosaic_component_callbacks, init}, _Sender, OldState = #state{call
 		throw : Error = {error, _Reason} ->
 			{stop, Error, Error, OldState};
 		_ : CaughtReason ->
-			ok = mosaic_transcript:trace_error ("callbacks failed...", [{reason, CaughtReason}]),
+			ok = mosaic_transcript:trace_error ("callbacks failed...", [{reason, CaughtReason}, {stacktrace, erlang:get_stacktrace ()}]),
 			{stop, {error, {callbacks_failed, CaughtReason}}, OldState}
 	end;
 	
@@ -208,7 +208,7 @@ handle_cast (
 			ok = mosaic_transcript:trace_error ("callbacks failed (invalid return)...", [{return, Return}]),
 			{stop, {error, {callbacks_failed, {invalid_return, Return}}}, OldState}
 	catch _ : CaughtReason ->
-		ok = mosaic_transcript:trace_error ("callbacks failed...", [{reason, CaughtReason}]),
+		ok = mosaic_transcript:trace_error ("callbacks failed...", [{reason, CaughtReason}, {stacktrace, erlang:get_stacktrace ()}]),
 		{stop, {error, {callbacks_failed, CaughtReason}}, OldState}
 	end;
 	
@@ -226,7 +226,7 @@ handle_info (Message, OldState = #state{callback_module = CallbackModule, callba
 			ok = mosaic_transcript:trace_error ("callbacks failed (invalid return)...", [{return, Return}]),
 			{stop, {error, {callbacks_failed, {invalid_return, Return}}}, OldState}
 	catch _ : CaughtReason ->
-		ok = mosaic_transcript:trace_error ("callbacks failed...", [{reason, CaughtReason}]),
+		ok = mosaic_transcript:trace_error ("callbacks failed...", [{reason, CaughtReason}, {stacktrace, erlang:get_stacktrace ()}]),
 		{stop, {error, {callbacks_failed, CaughtReason}}, OldState}
 	end.
 

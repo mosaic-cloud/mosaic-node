@@ -35,7 +35,7 @@ else
 	_erl_argv=(
 		"${_erl}"
 			"${_erl_args[@]}"
-			-name "mosaic-shell-${_index}@{_erl_host}" -setcookie "${_erl_cookie}"
+			-sname "mosaic-shell-${_index}@{_erl_host}" -setcookie "${_erl_cookie}"
 			-remsh "mosaic-cluster-${_index}@localhost"
 	)
 fi

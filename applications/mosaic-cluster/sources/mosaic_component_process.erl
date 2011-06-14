@@ -173,7 +173,7 @@ handle_inbound_call (
 	handle_info ({mosaic_component_process_internals, push_packet, Packet}, NewState);
 	
 handle_inbound_call (Operation, Inputs, Data, Sender, State = #state{status = Status}) ->
-	ok = mosaic_tools:trace_warning ("received unexpected inbound call request; ignoring!", [{operation, Operation}, {inputs, Inputs}, {data, Data}, {sender, Sender}, {status, Status}]),
+	ok = mosaic_transcript:trace_warning ("received unexpected inbound call request; ignoring!", [{operation, Operation}, {inputs, Inputs}, {data, Data}, {sender, Sender}, {status, Status}]),
 	_ = gen_server:reply (Sender, {error, invalid_status}),
 	{noreply, State}.
 
@@ -194,7 +194,7 @@ handle_inbound_call_return (
 	end;
 	
 handle_inbound_call_return (Correlation, Outcome, State = #state{status = Status}) ->
-	ok = mosaic_tools:trace_warning ("received unexpected inbound call return; ignoring!", [{correlation, Correlation}, {outcome, Outcome}, {status, Status}]),
+	ok = mosaic_transcript:trace_warning ("received unexpected inbound call return; ignoring!", [{correlation, Correlation}, {outcome, Outcome}, {status, Status}]),
 	{noreply, State}.
 
 
@@ -204,7 +204,7 @@ handle_inbound_cast (Operation, Inputs, Data, State = #state{status = Status})
 	handle_info ({mosaic_component_process_internals, push_packet, Packet}, State);
 	
 handle_inbound_cast (Operation, Inputs, Data, State = #state{status = Status}) ->
-	ok = mosaic_tools:trace_warning ("received unexpected inbound cast request; ignoring!", [{operation, Operation}, {inputs, Inputs}, {data, Data}, {status, Status}]),
+	ok = mosaic_transcript:trace_warning ("received unexpected inbound cast request; ignoring!", [{operation, Operation}, {inputs, Inputs}, {data, Data}, {status, Status}]),
 	{noreply, State}.
 
 
@@ -225,7 +225,7 @@ handle_outbound_call (
 	end;
 	
 handle_outbound_call (Component, Operation, Correlation, Inputs, Data, State = #state{status = Status}) ->
-	ok = mosaic_tools:trace_warning ("received unexpected outbound call request; ignoring!", [{component, Component}, {operation, Operation}, {correlation, Correlation}, {inputs, Inputs}, {data, Data}, {status, Status}]),
+	ok = mosaic_transcript:trace_warning ("received unexpected outbound call request; ignoring!", [{component, Component}, {operation, Operation}, {correlation, Correlation}, {inputs, Inputs}, {data, Data}, {status, Status}]),
 	{noreply, State}.
 
 
@@ -245,7 +245,7 @@ handle_outbound_call_return (
 	end;
 	
 handle_outbound_call_return (Reference, Outcome, State = #state{status = Status}) ->
-	ok = mosaic_tools:trace_warning ("received unexpected outbound call return; ignoring!", [{reference, Reference}, {outcome, Outcome}, {status, Status}]),
+	ok = mosaic_transcript:trace_warning ("received unexpected outbound call return; ignoring!", [{reference, Reference}, {outcome, Outcome}, {status, Status}]),
 	{noreply, State}.
 
 
