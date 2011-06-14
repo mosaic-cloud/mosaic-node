@@ -8,6 +8,7 @@
 -export ([terminate/0, call/4, cast/4, call_return/2, register/1, acquire/1]).
 -export ([call_async/5, register_async/2, acquire_async/2]).
 -export ([start_link/0, init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2, handle_info/2]).
+-export ([configure/1]).
 
 
 -import (mosaic_enforcements, [enforce_ok/1, enforce_ok_1/1]).
@@ -228,3 +229,99 @@ handle_info (Message, OldState = #state{callback_module = CallbackModule, callba
 		ok = mosaic_transcript:trace_error ("callbacks failed...", [{reason, CaughtReason}]),
 		{stop, {error, {callbacks_failed, CaughtReason}}, OldState}
 	end.
+
+
+configure ([]) ->
+	ok;
+	
+configure ([Option | RemainingOptions])  ->
+	case configure_1 (Option) of
+		ok ->
+			configure (RemainingOptions);
+		Error = {error, _Reason} ->
+			Error
+	end.
+
+
+configure_1 ({load, ApplicationResolver, Dependencies})
+		when is_function (ApplicationResolver, 0) ->
+	case ApplicationResolver () of
+		{ok, Applications} ->
+			configure_1 ({load, Applications, Dependencies});
+		Error = {error, _Reason} ->
+			Error
+	end;
+	
+configure_1 ({load, Applications, Dependencies})
+		when is_list (Applications); is_atom (Applications) ->
+	mosaic_application_tools:load (Applications, Dependencies);
+	
+configure_1 ({start, ApplicationResolver, Dependencies})
+		when is_function (ApplicationResolver, 0) ->
+	case ApplicationResolver () of
+		{ok, Applications} ->
+			configure_1 ({start, Applications, Dependencies});
+		Error = {error, _Reason} ->
+			Error
+	end;
+	
+configure_1 ({start, Applications, Dependencies})
+		when is_list (Applications); is_atom (Applications) ->
+	mosaic_application_tools:start (Applications, Dependencies);
+	
+configure_1 ({env, Application, Name, Value})
+		when is_atom (Application), is_atom (Name) ->
+	case application:set_env (Application, Name, Value) of
+		ok ->
+			ok;
+		Error = {error, _Reason} ->
+			Error
+	end;
+	
+configure_1 ({identifier, Application})
+		when is_atom (Application) ->
+	try
+		AppEnvIdentifier = enforce_ok_1 (mosaic_generic_coders:application_env_get (identifier, Application,
+					{decode, fun mosaic_component_coders:decode_component/1}, {default, undefined})),
+		OsEnvIdentifier = enforce_ok_1 (mosaic_generic_coders:os_env_get (mosaic_component_identifier,
+					{decode, fun mosaic_component_coders:decode_component/1}, {default, undefined})),
+		Identifier = if
+			(OsEnvIdentifier =/= undefined) -> OsEnvIdentifier;
+			(AppEnvIdentifier =/= undefined) -> AppEnvIdentifier;
+			true -> throw ({error, missing_identifier})
+		end,
+		IdentifierString = erlang:binary_to_list (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))),
+		ok = enforce_ok (application:set_env (Application, identifier, IdentifierString)),
+		ok
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+configure_1 ({group, Application})
+		when is_atom (Application) ->
+	try
+		AppEnvGroup = enforce_ok_1 (mosaic_generic_coders:application_env_get (group, Application,
+					{decode, fun mosaic_component_coders:decode_group/1}, {default, undefined})),
+		OsEnvGroup = enforce_ok_1 (mosaic_generic_coders:os_env_get (mosaic_component_group,
+					{decode, fun mosaic_component_coders:decode_group/1}, {default, undefined})),
+		Group = if
+			(OsEnvGroup =/= undefined) -> OsEnvGroup;
+			(AppEnvGroup =/= undefined) -> AppEnvGroup;
+			true -> throw ({error, missing_group})
+		end,
+		GroupString = erlang:binary_to_list (enforce_ok_1 (mosaic_component_coders:encode_group (Group))),
+		ok = enforce_ok (application:set_env (Application, group, GroupString)),
+		ok
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+configure_1 (harness) ->
+	try
+		HarnessInputDescriptor = enforce_ok_1 (mosaic_generic_coders:os_env_get (mosaic_component_harness_input_descriptor,
+					{decode, fun mosaic_generic_coders:decode_integer/1}, {error, missing_harness_input_descriptor})),
+		HarnessOutputDescriptor = enforce_ok_1 (mosaic_generic_coders:os_env_get (mosaic_component_harness_output_descriptor,
+					{decode, fun mosaic_generic_coders:decode_integer/1}, {error, missing_harness_output_descriptor})),
+		ok = enforce_ok (application:set_env (mosaic_component, harness_input_descriptor, HarnessInputDescriptor)),
+		ok = enforce_ok (application:set_env (mosaic_component, harness_output_descriptor, HarnessOutputDescriptor)),
+		ok
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+configure_1 (Option) ->
+	{error, {invalid_configuration_option, Option}}.
