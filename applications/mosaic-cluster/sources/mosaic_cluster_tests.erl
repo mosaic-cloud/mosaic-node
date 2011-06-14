@@ -17,38 +17,44 @@ test () ->
 			{ok, boot} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize}]};
-			{ok, create_dummy_1} ->
+			{ok, test_dummy_1} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, dummy, term, defaults, 1}]};
-			{ok, create_dummy_4} ->
+						{define_and_create_processes, 'mosaic-tests:dummy', term, defaults, 1}]};
+			{ok, test_dummy_4} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, dummy, term, defaults, 4}]};
-			{ok, create_python_abacus_4} ->
+						{define_and_create_processes, 'mosaic-tests:dummy', term, defaults, 4}]};
+			{ok, test_python_abacus_4} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, python_abacus, term, defaults, 4}]};
-			{ok, create_node_abacus_4} ->
+						{define_and_create_processes, 'mosaic-tests:python-abacus', term, defaults, 4}]};
+			{ok, test_node_abacus_4} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, node_abacus, term, defaults, 4}]};
-			{ok, create_java_abacus_4} ->
+						{define_and_create_processes, 'mosaic-tests:node-abacus', term, defaults, 4}]};
+			{ok, test_java_abacus_4} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, java_abacus, term, defaults, 4}]};
-			{ok, create_rabbitmq_1} ->
+						{define_and_create_processes, 'mosaic-tests:java-abacus', term, defaults, 4}]};
+			{ok, test_rabbitmq_1} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, rabbitmq, term, defaults, 1}]};
-			{ok, create_riak_kv_1} ->
+						{define_and_create_processes, 'mosaic-tests:rabbitmq', term, defaults, 1}]};
+			{ok, test_riak_kv_1} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, riak_kv, term, defaults, 1}]};
-			{ok, create_riak_kv_4} ->
+						{define_and_create_processes, 'mosaic-tests:riak-kv', term, defaults, 1}]};
+			{ok, test_riak_kv_4} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, riak_kv, term, defaults, 4}]};
+						{define_and_create_processes, 'mosaic-tests:riak-kv', term, defaults, 4}]};
+			{ok, test_jetty_hello_world_1} ->
+				{ok, defaults, [
+						{boot}, {activate}, {ping, default}, {initialize},
+						{define_and_create_processes, 'mosaic-tests:rabbitmq', term, defaults, 1},
+						{sleep, 2 * 1000},
+						{define_and_create_processes, 'mosaic-tests:jetty-hello-world', term, defaults, 1}]};
 			{ok, ring_join_leave} ->
 				Self = erlang:node (),
 				case application:get_env (mosaic_cluster, tests_nodes) of
@@ -109,18 +115,20 @@ execute ({deactivate}) ->
 	ok;
 	
 execute ({initialize}) ->
-	ok = mosaic_process_configurator:register (dummy, term, {mosaic_process_tests, configure, defaults}),
-	ok = mosaic_process_configurator:register (dummy, json, {mosaic_process_tests, configure, defaults}),
-	ok = mosaic_process_configurator:register (python_abacus, term, {mosaic_component_process_tests, configure, defaults}),
-	ok = mosaic_process_configurator:register (python_abacus, json, {mosaic_component_process_tests, configure, defaults}),
-	ok = mosaic_process_configurator:register (node_abacus, term, {mosaic_component_process_tests, configure, defaults}),
-	ok = mosaic_process_configurator:register (node_abacus, json, {mosaic_component_process_tests, configure, defaults}),
-	ok = mosaic_process_configurator:register (java_abacus, term, {mosaic_component_process_tests, configure, defaults}),
-	ok = mosaic_process_configurator:register (java_abacus, json, {mosaic_component_process_tests, configure, defaults}),
-	ok = mosaic_process_configurator:register (rabbitmq, term, {mosaic_component_process_tests, configure, defaults}),
-	ok = mosaic_process_configurator:register (rabbitmq, json, {mosaic_component_process_tests, configure, defaults}),
-	ok = mosaic_process_configurator:register (riak_kv, term, {mosaic_component_process_tests, configure, defaults}),
-	ok = mosaic_process_configurator:register (riak_kv, json, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-tests:dummy', term, {mosaic_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-tests:dummy', json, {mosaic_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-tests:python-abacus', term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-tests:python-abacus', json, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-tests:node-abacus', term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-tests:node-abacus', json, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-tests:java-abacus', term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-tests:java-abacus', json, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-tests:rabbitmq', term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-tests:rabbitmq', json, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-tests:riak-kv', term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-tests:riak-kv', json, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-tests:jetty-hello-world', term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-tests:jetty-hello-world', json, {mosaic_component_process_tests, configure, defaults}),
 	ok;
 	
 execute ({ring, include, Node})

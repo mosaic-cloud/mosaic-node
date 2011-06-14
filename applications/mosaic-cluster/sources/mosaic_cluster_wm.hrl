@@ -5,7 +5,7 @@
 	<head>
 		<title>", (enforce_ok_1 (mosaic_generic_coders:encode_atom (erlang:node ()))) / binary, "</title>
 		<meta id=\"meta\" name=\"viewport\" content=\"width=device-width; height=device-height; user-scalable=no; initial-scale=1.0\" />
-		<link rel=\"stylesheet\" href=\"http://jsconsole.com/console.css\" type=\"text/css\" />
+		<link rel=\"stylesheet\" href=\"http://data.volution.ro/ciprian/41503a0aa1c2167edc98b3dba50d1d52/console.css\" type=\"text/css\" />
 	</head>
 	<body>
 		<div>

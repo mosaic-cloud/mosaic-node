@@ -315,7 +315,7 @@ def _frontend_test_rabbitmq () :
 	if _inbound_message["action"] != "acquire" : raise Exception ()
 	_correlation = _inbound_message["correlation"]
 	_specifications = _inbound_message["specifications"]
-	if _acquire_resources != {"broker_socket" : "socket:ipv4:tcp", "management_socket" : "socket:ipv4:tcp"} : raise Exception ()
+	if _specifications != {"broker_socket" : "socket:ipv4:tcp", "management_socket" : "socket:ipv4:tcp"} : raise Exception ()
 	_outbound_message = {
 			"__type__" : "resources",
 			"action" : "acquire-return",
@@ -331,16 +331,16 @@ def _frontend_test_rabbitmq () :
 					"port" : 15673,
 				}}}
 	_outbound_payload = ""
-	_outbound_packet = (_outbound_message, _outbound_packet)
+	_outbound_packet = (_outbound_message, _outbound_payload)
 	_output (_outbound_packet)
 	_inbound_packet = _input ()
 	if _inbound_packet == None : raise Exception ()
-	_inbound_meta_data, _inbound_data = _inbound_packet
+	_inbound_message, _inbound_data = _inbound_packet
 	if _inbound_message["__type__"] != "exchange" : raise Exception ()
 	if _inbound_message["action"] != "register" : raise Exception ()
 	_group = _inbound_message["group"]
 	_correlation = _inbound_message["correlation"]
-	if _group != "" : raise Exception ()
+	if _group == "" : raise Exception ()
 	_outbound_message = {
 			"__type__" : "exchange",
 			"action" : "register-return",

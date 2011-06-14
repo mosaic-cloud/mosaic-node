@@ -32,7 +32,7 @@
 
 test_start_stop ({defaults}) ->
 	{ok, Identifier} = mosaic_component_coders:generate_component (),
-	{ok, Configuration} = configure (python_parrot, create, Identifier),
+	{ok, Configuration} = configure ('mosaic-tests:python-parrot', create, Identifier),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
 	ok = stop_and_wait_process (Process),
 	ok.
@@ -40,7 +40,7 @@ test_start_stop ({defaults}) ->
 
 test_call ({defaults}) ->
 	{ok, Identifier} = mosaic_component_coders:generate_component (),
-	{ok, Configuration} = configure (python_parrot, create, Identifier),
+	{ok, Configuration} = configure ('mosaic-tests:python-parrot', create, Identifier),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
 	{ok, InputName1} = mosaic_generic_coders:generate_hex_data (8),
 	{ok, InputValue1} = mosaic_generic_coders:generate_hex_data (8),
@@ -53,7 +53,7 @@ test_call ({defaults}) ->
 
 test_cast ({defaults}) ->
 	{ok, Identifier} = mosaic_component_coders:generate_component (),
-	{ok, Configuration} = configure (python_parrot, create, Identifier),
+	{ok, Configuration} = configure ('mosaic-tests:spython-parrot', create, Identifier),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
 	{ok, InputName1} = mosaic_generic_coders:generate_hex_data (8),
 	{ok, InputValue1} = mosaic_generic_coders:generate_hex_data (8),
@@ -67,8 +67,8 @@ test_cast ({defaults}) ->
 
 test_migrate ({defaults}) ->
 	{ok, Identifier} = mosaic_component_coders:generate_component (),
-	{ok, SourceConfiguration} = configure (python_parrot, create, Identifier),
-	{ok, TargetConfiguration} = configure (python_parrot, migrate, Identifier),
+	{ok, SourceConfiguration} = configure ('mosaic-tests:python-parrot', create, Identifier),
+	{ok, TargetConfiguration} = configure ('mosaic-tests:python-parrot', migrate, Identifier),
 	Self = erlang:self (),
 	SelfToken = erlang:make_ref (),
 	SourceToken = erlang:make_ref (),
@@ -87,11 +87,11 @@ test_migrate ({defaults}) ->
 test_abacus ({Flavour}) ->
 	{ok, Type} = case Flavour of
 		python ->
-			{ok, python_abacus};
+			{ok, 'mosaic-tests:python-abacus'};
 		node ->
-			{ok, node_abacus};
+			{ok, 'mosaic-tests:node-abacus'};
 		java ->
-			{ok, java_abacus}
+			{ok, 'mosaic-tests:java-abacus'}
 	end,
 	{ok, Identifier} = mosaic_component_coders:generate_component (),
 	{ok, Configuration} = configure (Type, create, Identifier),
@@ -104,7 +104,7 @@ test_abacus ({Flavour}) ->
 
 test_rabbitmq ({defaults}) ->
 	{ok, Identifier} = mosaic_component_coders:generate_component (),
-	{ok, Configuration} = configure (rabbitmq, create, Identifier),
+	{ok, Configuration} = configure ('mosaic-tests:rabbitmq', create, Identifier),
 	{ok, Router} = mosaic_cluster_processes_router:start_link ({local, mosaic_process_router}, defaults),
 	{ok, Resources} = mosaic_cluster_component_resources:start_link ({local, mosaic_component_resources}, defaults),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
@@ -117,7 +117,7 @@ test_rabbitmq ({defaults}) ->
 
 test_riak_kv ({defaults}) ->
 	{ok, Identifier} = mosaic_component_coders:generate_component (),
-	{ok, Configuration} = configure (riak_kv, create, Identifier),
+	{ok, Configuration} = configure ('mosaic-tests:riak-kv', create, Identifier),
 	{ok, Router} = mosaic_cluster_processes_router:start_link ({local, mosaic_process_router}, defaults),
 	{ok, Resources} = mosaic_cluster_component_resources:start_link ({local, mosaic_component_resources}, defaults),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
@@ -145,7 +145,7 @@ configure (Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationCo
 	configure (Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent, []);
 	
 configure (Type, create, Identifier, term, defaults, ExtraOptions)
-		when ((Type =:= python_parrot) orelse (Type =:= python_abacus)), is_list (ExtraOptions) ->
+		when ((Type =:= 'mosaic-tests:python-parrot') orelse (Type =:= 'mosaic-tests:python-abacus')), is_list (ExtraOptions) ->
 	{ok, Python} = case os:find_executable ("python2") of
 		Python_ when is_list (Python_) ->
 			{ok, erlang:list_to_binary (Python_)};
@@ -153,9 +153,9 @@ configure (Type, create, Identifier, term, defaults, ExtraOptions)
 			{error, {unresolved_executable, <<"python2">>}}
 	end,
 	{ok, Scenario} = case Type of
-		python_parrot ->
+		'mosaic-tests:python-parrot' ->
 			{ok, <<"parrot">>};
-		python_abacus ->
+		'mosaic-tests:python-abacus' ->
 			{ok, <<"abacus">>}
 	end,
 	Options = [
@@ -174,7 +174,7 @@ configure (Type, create, Identifier, term, defaults, ExtraOptions)
 			Error
 	end;
 	
-configure (Type = node_abacus, create, Identifier, term, defaults, ExtraOptions)
+configure (Type = 'mosaic-tests:node-abacus', create, Identifier, term, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	{ok, Node} = case os:find_executable ("node") of
 		Node_ when is_list (Node_) ->
@@ -198,7 +198,7 @@ configure (Type = node_abacus, create, Identifier, term, defaults, ExtraOptions)
 			Error
 	end;
 	
-configure (Type = java_abacus, create, Identifier, term, defaults, ExtraOptions)
+configure (Type = 'mosaic-tests:java-abacus', create, Identifier, term, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	{ok, Java} = case os:find_executable ("java") of
 		Java_ when is_list (Java_) ->
@@ -223,7 +223,7 @@ configure (Type = java_abacus, create, Identifier, term, defaults, ExtraOptions)
 			Error
 	end;
 	
-configure (Type = rabbitmq, create, Identifier, term, defaults, ExtraOptions)
+configure (Type = 'mosaic-tests:rabbitmq', create, Identifier, term, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	Options = [
 			{harness, [
@@ -240,7 +240,7 @@ configure (Type = rabbitmq, create, Identifier, term, defaults, ExtraOptions)
 			Error
 	end;
 	
-configure (Type = riak_kv, create, Identifier, term, defaults, ExtraOptions)
+configure (Type = 'mosaic-tests:riak-kv', create, Identifier, term, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	Options = [
 			{harness, [
@@ -249,6 +249,31 @@ configure (Type = riak_kv, create, Identifier, term, defaults, ExtraOptions)
 				{executable, <<"./scripts/run-node">>},
 				{arguments, [enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]},
 				{working_directory, <<"../mosaic-components-riak-kv">>}]}
+			| ExtraOptions],
+	case mosaic_component_process_coders:parse_configuration (create, term, Options) of
+		{ok, Configuration} ->
+			{ok, mosaic_component_process, Configuration};
+		Error = {error, _Reason} ->
+			Error
+	end;
+	
+configure (Type = 'mosaic-tests:jetty-hello-world', create, Identifier, term, defaults, ExtraOptions)
+		when is_list (ExtraOptions) ->
+	{ok, Java} = case os:find_executable ("java") of
+		Java_ when is_list (Java_) ->
+			{ok, erlang:list_to_binary (Java_)};
+		false ->
+			{error, {unresolved_executable, <<"java">>}}
+	end,
+	Options = [
+			{harness, [
+				{argument0, <<"[mosaic_component#", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
+			{execute, [
+				{executable, Java},
+				{arguments, [
+					<<"-jar">>, <<"../mosaic-components-jetty/target/components-jetty-0.2-SNAPSHOT-jar-with-dependencies.jar">>,
+					enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
+					<<"../mosaic-components-jetty-examples/hello-world/target/components-jetty-examples-hello-world-0.2-SNAPSHOT.war">>]}]}
 			| ExtraOptions],
 	case mosaic_component_process_coders:parse_configuration (create, term, Options) of
 		{ok, Configuration} ->
