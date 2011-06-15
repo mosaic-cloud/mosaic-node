@@ -5,26 +5,25 @@ if ! test "${#}" -eq 1 ; then
 	exit 1
 fi
 
+_index=0
 _module="${1}"
 
-if test -e "/tmp/mosaic/cluster/0" ; then
-	rm -R "/tmp/mosaic/cluster/0"
-fi
-
-mkdir -p "/tmp/mosaic/cluster/0/ring"
-
-_erl_argv=(
-	"${_erl}"
+_erl_args=(
 		"${_erl_args[@]}"
-		-noshell -noinput
-		-sname "mosaic-cluster-tests@localhost" -setcookie "${_erl_cookie}"
-		-boot start_clean
+		-noinput -noshell
+		-sname "mosaic-cluster-${_index}@${_erl_host}" -setcookie "${_erl_cookie}"
+		-boot start_sasl
 		-config "${_outputs}/erlang/applications/mosaic_cluster/priv/mosaic_cluster.config"
-		-mosaic_cluster webmachine_listen "{\"127.0.0.1\", $(( _erl_epmd_port + 1 + (9 - 1) * 2 + 0 ))}"
-		-riak_core ring_state_dir "\"/tmp/mosaic/cluster/0/ring\""
-		-riak_core handoff_port "$(( _erl_epmd_port + 1 + (9 - 1) * 2 + 1 ))"
+		-mosaic_cluster tests_scenario "${_scenario}"
+		-mosaic_cluster webmachine_listen "{\"127.0.0.1\", $(( _erl_epmd_port + 1 + (_index - 1) * 2 + 0 ))}"
+		-riak_core handoff_port "$(( _erl_epmd_port + 1 + (_index - 1) * 2 + 1 ))"
 		-run "${_module}" test
-		-run init stop
+)
+_erl_env=(
+		ERL_EPMD_PORT="${_erl_epmd_port}"
 )
 
-ERL_EPMD_PORT="${_erl_epmd_port}" exec "${_erl_argv[@]}"
+#mkdir -p "/tmp/mosaic/cluster/0"
+#cd "/tmp/mosaic/cluster/0"
+
+exec env "${_erl_env[@]}" "${_erl}" "${_erl_args[@]}"
