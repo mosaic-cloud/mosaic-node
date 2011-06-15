@@ -31,6 +31,9 @@ if test "${_scenario}" != "shell" ; then
 			-riak_core handoff_port "$(( _erl_epmd_port + 1 + (_index - 1) * 2 + 1 ))"
 			-run mosaic_cluster_tests test
 	)
+	_erl_env=(
+		ERL_EPMD_PORT="${_erl_epmd_port}"
+	)
 else
 	_erl_argv=(
 		"${_erl}"
@@ -38,7 +41,9 @@ else
 			-sname "mosaic-shell-${_index}@{_erl_host}" -setcookie "${_erl_cookie}"
 			-remsh "mosaic-cluster-${_index}@localhost"
 	)
+	_erl_env=(
+		ERL_EPMD_PORT="${_erl_epmd_port}"
+	)
 fi
 
-ERL_EPMD_PORT="${_erl_epmd_port}" \
-exec "${_erl_argv[@]}"
+exec env "${_erl_env[@]}" "${_erl_argv[@]}"
