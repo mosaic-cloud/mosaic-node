@@ -17,23 +17,23 @@ test () ->
 			{ok, boot} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize}]};
-			{ok, test_dummy} ->
+			{ok, 'test-dummy'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
 						{define_and_create_processes, 'mosaic-tests:dummy', term, defaults, 4}]};
-			{ok, test_rabbitmq} ->
+			{ok, 'test-rabbitmq'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
 						{define_and_create_processes, 'mosaic-tests:rabbitmq', term, defaults, 1}]};
-			{ok, test_riak_kv} ->
+			{ok, 'test-riak-kv'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
 						{define_and_create_processes, 'mosaic-tests:riak-kv', term, defaults, 1}]};
-			{ok, test_riak_kv_4} ->
+			{ok, 'test-riak-kv-4'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
 						{define_and_create_processes, 'mosaic-tests:riak-kv', term, defaults, 4}]};
-			{ok, test_http_hello_world_4} ->
+			{ok, 'test-http-hello-world-4'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
 						{define_and_create_processes, 'mosaic-tests:rabbitmq', term, defaults, 1},
@@ -41,9 +41,27 @@ test () ->
 						{define_and_create_processes, 'mosaic-tests:httpg', term, defaults, 1},
 						{sleep, 2 * 1000},
 						{define_and_create_processes, 'mosaic-tests:jetty-hello-world', term, defaults, 4},
-						{sleep, 1}
-						]};
-			{ok, ring_join_leave} ->
+						{sleep, 2 * 1000}]};
+			{ok, 'examples-realtime-feeds'} ->
+				{ok, defaults, [
+						{boot}, {activate}, {ping, default}, {initialize},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:rabbit', term, defaults, 1},
+						{sleep, 12 * 1000},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:riak', term, defaults, 1},
+						{sleep, 12 * 1000},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:httpg', term, defaults, 1},
+						{sleep, 12 * 1000},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:fetcher', term, defaults, 1},
+						{sleep, 12 * 1000},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer', term, defaults, 1},
+						{sleep, 12 * 1000},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:scavanger', term, defaults, 1},
+						{sleep, 12 * 1000},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:leacher', term, defaults, 1},
+						{sleep, 12 * 1000},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:pusher', term, defaults, 1},
+						{sleep, 12 * 1000}]};
+			{ok, 'test-ring-join-leave'} ->
 				Self = erlang:node (),
 				case application:get_env (mosaic_cluster, tests_nodes) of
 					{ok, [Self | _Peers]} ->
@@ -79,8 +97,7 @@ test () ->
 	catch
 		throw : _Error3 = {error, Reason3} ->
 			ok = mosaic_transcript:trace_error ("failed executing scenario; stopping!", [{reason, Reason3}]),
-			ok = timer:sleep (100),
-			ok = init:halt (),
+			ok = mosaic_application_tools:shutdown_async (0),
 			ok
 	end,
 	ok.
@@ -130,6 +147,33 @@ execute ({initialize}) ->
 	
 	ok = mosaic_process_configurator:register ('mosaic-tests:jetty-hello-world', term, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register ('mosaic-tests:jetty-hello-world', json, {mosaic_component_process_tests, configure, defaults}),
+	
+	ok = mosaic_cluster_processes_router:register_alias (<<"mosaic-examples-realtime-feeds:rabbit">>, <<16#8cd74b5e4ecd322fd7bbfc762ed6cf7d601eede8 : 160>>),
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:rabbit', term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:rabbit', json, {mosaic_component_process_tests, configure, defaults}),
+	
+	ok = mosaic_cluster_processes_router:register_alias (<<"mosaic-examples-realtime-feeds:riak">>, <<16#9cdce23e78027ef6a52636da7db820c47e695d11 : 160>>),
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:riak', term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:riak', json, {mosaic_component_process_tests, configure, defaults}),
+	
+	ok = mosaic_cluster_processes_router:register_alias (<<"mosaic-examples-realtime-feeds:httpg">>, <<16#0891f3a4b73a16cc5ac6947c56924d3e1dd2395e : 160>>),
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:httpg', term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:httpg', json, {mosaic_component_process_tests, configure, defaults}),
+	
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:fetcher', term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:fetcher', json, {mosaic_component_process_tests, configure, defaults}),
+	
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:indexer', term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:indexer', json, {mosaic_component_process_tests, configure, defaults}),
+	
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:scavanger', term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:scavanger', json, {mosaic_component_process_tests, configure, defaults}),
+	
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:leacher', term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:leacher', json, {mosaic_component_process_tests, configure, defaults}),
+	
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:pusher', term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:pusher', json, {mosaic_component_process_tests, configure, defaults}),
 	
 	ok;
 	
@@ -197,5 +241,5 @@ execute ({sleep, Timeout}) ->
 	ok;
 	
 execute ({exit}) ->
-	ok = init:stop (),
+	ok = mosaic_application_tools:shutdown_async (0),
 	ok.
