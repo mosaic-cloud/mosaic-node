@@ -97,4 +97,6 @@ test_push_packet ({defaults}) ->
 
 
 test () ->
-	mosaic_tests:test_module (mosaic_harness_frontend_tests).
+	_ = mosaic_tests:test_module (mosaic_harness_frontend_tests),
+	ok = mosaic_application_tools:shutdown_async (0),
+	ok.

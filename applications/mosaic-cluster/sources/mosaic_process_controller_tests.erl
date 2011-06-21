@@ -114,4 +114,6 @@ stop_and_wait_process_controller (Controller, Signal, Reasons) ->
 
 
 test () ->
-	mosaic_tests:test_module (mosaic_process_controller_tests).
+	_ = mosaic_tests:test_module (mosaic_process_controller_tests),
+	ok = mosaic_application_tools:shutdown_async (0),
+	ok.

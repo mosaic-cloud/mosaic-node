@@ -43,4 +43,6 @@ wait_process_migrator (Migrator) ->
 
 
 test () ->
-	mosaic_tests:test_module (mosaic_process_migrator_tests).
+	_ = mosaic_tests:test_module (mosaic_process_migrator_tests),
+	ok = mosaic_application_tools:shutdown_async (0),
+	ok.

@@ -108,7 +108,9 @@ configure (Type, migrate, Identifier) ->
 
 
 test () ->
-	mosaic_tests:test_module (mosaic_component_process_tests).
+	_ = mosaic_tests:test_module (mosaic_component_process_tests),
+	ok = mosaic_application_tools:shutdown_async (0),
+	ok.
 
 
 configure (Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent, defaults) ->

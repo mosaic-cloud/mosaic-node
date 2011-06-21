@@ -241,7 +241,9 @@ cast_process (Process, Operation, Inputs, Data) ->
 
 
 test () ->
-	mosaic_tests:test_module (mosaic_process_tests).
+	_ = mosaic_tests:test_module (mosaic_process_tests),
+	ok = mosaic_application_tools:shutdown_async (0),
+	ok.
 
 
 configure (dummy, create, Identifier, term, defaults, defaults) ->
