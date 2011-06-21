@@ -46,21 +46,23 @@ test () ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:rabbit', term, defaults, 1},
-						{sleep, 12 * 1000},
+						{sleep, 6 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:riak', term, defaults, 1},
-						{sleep, 12 * 1000},
+						{sleep, 6 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:httpg', term, defaults, 1},
-						{sleep, 12 * 1000},
+						{sleep, 6 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:fetcher', term, defaults, 1},
-						{sleep, 12 * 1000},
+						{sleep, 6 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer', term, defaults, 1},
-						{sleep, 12 * 1000},
+						{sleep, 6 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:scavanger', term, defaults, 1},
-						{sleep, 12 * 1000},
+						{sleep, 6 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:leacher', term, defaults, 1},
-						{sleep, 12 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:pusher', term, defaults, 1},
-						{sleep, 12 * 1000}]};
+						{sleep, 6 * 1000},
+						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:pusher', term, defaults, 1},
+						%{sleep, 6 * 1000},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend', term, defaults, 1},
+						{sleep, 6 * 1000}]};
 			{ok, 'test-ring-join-leave'} ->
 				Self = erlang:node (),
 				case application:get_env (mosaic_cluster, tests_nodes) of
@@ -174,6 +176,9 @@ execute ({initialize}) ->
 	
 	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:pusher', term, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:pusher', json, {mosaic_component_process_tests, configure, defaults}),
+	
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:frontend', term, {mosaic_component_process_tests, configure, defaults}),
+	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:frontend', json, {mosaic_component_process_tests, configure, defaults}),
 	
 	ok;
 	

@@ -297,6 +297,23 @@ configure_1 (Type, Identifier, ExtraOptions)
 			| ExtraOptions],
 	{ok, Options};
 	
+configure_1 (Type = 'mosaic-examples-realtime-feeds:frontend', Identifier, ExtraOptions)
+		when is_list (ExtraOptions) ->
+	{ok, Java} = case os:find_executable ("java") of
+		Java_ when is_list (Java_) ->
+			{ok, erlang:list_to_binary (Java_)};
+		false ->
+			{error, {unresolved_executable, <<"java">>}}
+	end,
+	Options = [
+			{harness, [
+				{argument0, <<"[mosaic_component#", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
+			{execute, [
+				{executable, <<"../mosaic-examples-realtime-feeds/frontend/scripts/run-frontend">>},
+				{arguments, [enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]}]}
+			| ExtraOptions],
+	{ok, Options};
+	
 configure_1 (Type, _Identifier, _ExtraOptions)
 		when is_atom (Type) ->
 	{error, {invalid_type, Type}}.
