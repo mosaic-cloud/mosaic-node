@@ -679,7 +679,7 @@ static void _context_handle_controller_packet (
 		case _packet_type_exchange :
 			if ((_context->process != 0) && (_context->process->output_stream != 0)) {
 				_trace_debugging ("transferring inbound packet from controller to component...");
-				// _trace_information (((char *) _packet->buffer->data) + 4);
+				// _trace_information (((char *) _packet->buffer->data) + 4); // !!!!
 				_packet->state = _packet_state_output_ready;
 				_packet->buffer->offset = 0;
 				_packet_stream_enqueue (_context->process->output_stream, &_packet);
@@ -718,7 +718,7 @@ static void _context_handle_component_packet (
 		case _packet_type_exchange :
 			if (_context->controller_output_stream != 0) {
 				_trace_debugging ("transferring inbound packet from component to controller...");
-				// _trace_information (((char *) _packet->buffer->data) + 4);
+				// _trace_information (((char *) _packet->buffer->data) + 4); // !!!!
 				_packet->state = _packet_state_output_ready;
 				_packet->buffer->offset = 0;
 				_packet_stream_enqueue (_context->controller_output_stream, &_packet);

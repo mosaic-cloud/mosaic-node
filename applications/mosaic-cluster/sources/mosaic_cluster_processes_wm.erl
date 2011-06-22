@@ -46,7 +46,7 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 		{processes, create} ->
 			case mosaic_webmachine:enforce_request ('GET',
 					[
-						{"type", fun mosaic_generic_coders:decode_atom/1},
+						{"type", fun mosaic_generic_coders:decode_string/1},
 						{"configuration", fun mosaic_json_coders:decode_json/1},
 						{"count", fun mosaic_generic_coders:decode_integer/1}],
 					Request) of
@@ -61,7 +61,7 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 					Error
 			end;
 		{processes, stop} ->
-			case mosaic_webmachine:enforce_request ('GET', [{"key", fun mosaic_component_coders:decode_component/1}], Request) of
+			case mosaic_webmachine:enforce_request ('GET', [{"key", fun mosaic_generic_coders:decode_string/1}], Request) of
 				{ok, false, [Key]} ->
 					{ok, false, State#state{arguments = dict:from_list ([{key, Key}])}};
 				Error = {error, _Reason} ->
@@ -135,28 +135,64 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 					Error
 			end;
 		{processes, create} ->
-			ProcessType = dict:fetch (type, Arguments),
-			ProcessConfigurationContent = dict:fetch (configuration, Arguments),
-			Count = dict:fetch (count, Arguments),
-			case mosaic_cluster_processes:define_and_create (ProcessType, json, ProcessConfigurationContent, Count) of
-				{ok, Processes, []} ->
-					{ok, json_struct, [
-							{keys, [enforce_ok_1 (mosaic_component_coders:encode_component (Key)) || {Key, _Process} <- Processes]}]};
-				{ok, Processes, Reasons} ->
-					{ok, json_struct, [
-							{keys, [enforce_ok_1 (mosaic_component_coders:encode_component (Key)) || {Key, _Process} <- Processes]},
-							{error, [enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reason)) || Reason <- Reasons]}]};
-				Error = {error, _Reason} ->
-					Error
-			end;
+			try
+				ProcessType = case dict:fetch (type, Arguments) of
+					<<$#, ProcessType_ / binary>> ->
+						case mosaic_generic_coders:decode_atom (ProcessType_) of
+							{ok, ProcessType__} ->
+								ProcessType__;
+							Error1 = {error, _Reason1} ->
+								throw (Error1)
+						end;
+					ProcessType_ ->
+						throw ({error, {invalid_type, ProcessType_}})
+				end,
+				ProcessConfigurationContent = dict:fetch (configuration, Arguments),
+				Count = dict:fetch (count, Arguments),
+				case mosaic_cluster_processes:define_and_create (ProcessType, json, ProcessConfigurationContent, Count) of
+					{ok, Processes, []} ->
+						{ok, json_struct, [
+								{keys, [enforce_ok_1 (mosaic_component_coders:encode_component (Key)) || {Key, _Process} <- Processes]}]};
+					{ok, Processes, Reasons} ->
+						{ok, json_struct, [
+								{keys, [enforce_ok_1 (mosaic_component_coders:encode_component (Key)) || {Key, _Process} <- Processes]},
+								{error, [enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reason)) || Reason <- Reasons]}]};
+					Error2 = {error, _Reason2} ->
+						Error2
+				end
+			catch throw : Error = {error, _Reason} -> Error end;
 		{processes, stop} ->
-			Key = dict:fetch (key, Arguments),
-			case mosaic_cluster_processes:stop (Key) of
-				ok ->
-					ok;
-				Error = {error, _Reason} ->
-					Error
-			end;
+			try
+				Key = case dict:fetch (key, Arguments) of
+					<<$#, Alias_ / binary>> ->
+						case mosaic_cluster_processes_router:resolve_alias (Alias_) of
+							{ok, Key_} ->
+								Key_;
+							{error, _Reason1} ->
+								throw ({error, {unresolved_alias, Alias_}})
+						end;
+					Key_ when (byte_size (Key_) =:= 40) ->
+						case mosaic_component_coders:decode_component (Key_) of
+							{ok, Key__} ->
+								Key__;
+							{error, _Reason1} ->
+								throw ({error, {invalid_component, Key_, invalid_content}})
+						end;
+					Key_ ->
+						throw ({error, {invalid_component, Key_, invalid_length}})
+				end,
+				case mosaic_process_router:resolve (Key) of
+					{ok, Process} ->
+						case mosaic_process:stop (Process) of
+							ok ->
+								ok;
+							Error2 = {error, _Reason2} ->
+								Error2
+						end;
+					Error2 = {error, _Reason2} ->
+						Error2
+				end
+			catch throw : Error = {error, _Reason} -> Error end;
 		{processes, Action} when ((Action =:= call) orelse (Action =:= cast)) ->
 			try
 				Key = case dict:fetch (key, Arguments) of

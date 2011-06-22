@@ -46,23 +46,23 @@ test () ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:rabbit', term, defaults, 1},
-						{sleep, 6 * 1000},
+						{sleep, 2 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:riak', term, defaults, 1},
-						{sleep, 6 * 1000},
+						{sleep, 2 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:httpg', term, defaults, 1},
-						{sleep, 6 * 1000},
+						{sleep, 1 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:fetcher', term, defaults, 1},
-						{sleep, 6 * 1000},
+						{sleep, 1 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer', term, defaults, 1},
-						{sleep, 6 * 1000},
+						{sleep, 1 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:scavanger', term, defaults, 1},
-						{sleep, 6 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:leacher', term, defaults, 1},
-						{sleep, 6 * 1000},
+						{sleep, 1 * 1000},
+						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:leacher', term, defaults, 1},
+						%{sleep, 1 * 1000},
 						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:pusher', term, defaults, 1},
-						%{sleep, 6 * 1000},
+						%{sleep, 1 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend', term, defaults, 1},
-						{sleep, 6 * 1000}]};
+						{sleep, 1 * 1000}]};
 			{ok, 'test-ring-join-leave'} ->
 				Self = erlang:node (),
 				case application:get_env (mosaic_cluster, tests_nodes) of
@@ -147,6 +147,7 @@ execute ({initialize}) ->
 	ok = mosaic_process_configurator:register ('mosaic-tests:httpg', term, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register ('mosaic-tests:httpg', json, {mosaic_component_process_tests, configure, defaults}),
 	
+	ok = mosaic_cluster_processes_router:register_alias (<<"mosaic-tests:httpc">>, <<16#a2e40f0b2c041bc694ace68ace08420d40f9cbc0 : 160>>),
 	ok = mosaic_process_configurator:register ('mosaic-tests:jetty-hello-world', term, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register ('mosaic-tests:jetty-hello-world', json, {mosaic_component_process_tests, configure, defaults}),
 	
@@ -162,21 +163,27 @@ execute ({initialize}) ->
 	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:httpg', term, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:httpg', json, {mosaic_component_process_tests, configure, defaults}),
 	
+	ok = mosaic_cluster_processes_router:register_alias (<<"mosaic-examples-realtime-feeds:fetcher">>, <<16#4cb6ba9f09150c29b590b82b02a5a295ffc742d2 : 160>>),
 	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:fetcher', term, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:fetcher', json, {mosaic_component_process_tests, configure, defaults}),
 	
+	ok = mosaic_cluster_processes_router:register_alias (<<"mosaic-examples-realtime-feeds:indexer">>, <<16#d4a751daa35f3661797b3fff37eb12dd4c9a8ce8 : 160>>),
 	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:indexer', term, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:indexer', json, {mosaic_component_process_tests, configure, defaults}),
 	
+	ok = mosaic_cluster_processes_router:register_alias (<<"mosaic-examples-realtime-feeds:scavanger">>, <<16#1f0818a9870f401b3795097be1806a8b9c2c2240 : 160>>),
 	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:scavanger', term, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:scavanger', json, {mosaic_component_process_tests, configure, defaults}),
 	
+	ok = mosaic_cluster_processes_router:register_alias (<<"mosaic-examples-realtime-feeds:leacher">>, <<16#cdb21a6acac6f9a798d5dab03b9309f92bd15c9d : 160>>),
 	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:leacher', term, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:leacher', json, {mosaic_component_process_tests, configure, defaults}),
 	
+	ok = mosaic_cluster_processes_router:register_alias (<<"mosaic-examples-realtime-feeds:pusher">>, <<16#b3310a2ea81b7ccfc03e38d1fc32fcc634b92735 : 160>>),
 	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:pusher', term, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:pusher', json, {mosaic_component_process_tests, configure, defaults}),
 	
+	ok = mosaic_cluster_processes_router:register_alias (<<"mosaic-examples-realtime-feeds:frontend">>, <<16#a2e40f0b2c041bc694ace68ace08420d40f9cbc0 : 160>>),
 	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:frontend', term, {mosaic_component_process_tests, configure, defaults}),
 	ok = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:frontend', json, {mosaic_component_process_tests, configure, defaults}),
 	
