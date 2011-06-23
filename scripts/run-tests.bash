@@ -5,20 +5,26 @@ if ! test "${#}" -eq 1 ; then
 	exit 1
 fi
 
-_index=0
 _module="${1}"
+_webmachine_port="$(( _erl_epmd_port + 1 ))"
+_riak_handoff_port="$(( _erl_epmd_port + 2 ))"
 
 _erl_args+=(
 		-noinput -noshell
-		-sname "mosaic-cluster-${_index}@${_erl_host}" -setcookie "${_erl_cookie}"
+		-name mosaic-cluster-0@mosaic-0.loopback.vnet
+		-setcookie "${_erl_cookie}"
 		-boot start_sasl
 		-config "${_outputs}/erlang/applications/mosaic_cluster/priv/mosaic_cluster.config"
-		-mosaic_cluster webmachine_listen "{\"127.0.0.1\", $(( _erl_epmd_port + 1 + (_index - 1) * 2 + 0 ))}"
-		-riak_core handoff_port "$(( _erl_epmd_port + 1 + (_index - 1) * 2 + 1 ))"
+		-mosaic_cluster webmachine_listen "{\"127.0.0.1\", ${_webmachine_port}}"
+		-riak_core handoff_ip "\"127.0.0.1\""
+		-riak_core handoff_port "${_riak_handoff_port}"
 		-run "${_module}" test
 )
+_erl_env+=(
+		_mosaic_cluster_workbench="${_workbench}"
+)
 
-#mkdir -p "/tmp/mosaic/cluster/0"
-#cd "/tmp/mosaic/cluster/0"
+mkdir -p "/tmp/mosaic/cluster/0"
+cd "/tmp/mosaic/cluster/0"
 
 exec env "${_erl_env[@]}" "${_erl}" "${_erl_args[@]}"

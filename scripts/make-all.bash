@@ -5,9 +5,11 @@ if ! test "${#}" -eq 0 ; then
 	exit 1
 fi
 
-./scripts/make
-../mosaic-components-rabbitmq/scripts/make
-../mosaic-components-riak-kv/scripts/make
-../mosaic-components-httpg/scripts/make
+"${_workbench}/scripts/make"
+"${_workbench}/../mosaic-components-rabbitmq/scripts/make"
+"${_workbench}/../mosaic-components-riak-kv/scripts/make"
+"${_workbench}/../mosaic-components-httpg/scripts/make"
+
+#"${_workbench}/../mosaic-examples-realtime-feeds/frontend/scripts/make"
 
 exit 0

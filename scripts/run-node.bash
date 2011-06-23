@@ -1,28 +1,57 @@
 #!/dev/null
 
-if ! test "${#}" -eq 2 ; then
+if ! test "${#}" -eq 2 -o "${#}" -eq 0 ; then
 	echo "[ee] invalid arguments; aborting!" >&2
 	exit 1
 fi
 
-_index="${1}"
-_scenario="${2}"
+_fqdn="${mosaic_node_fqdn:-}"
+_ip="${mosaic_node_ip:-}"
 
-test "${_index}" -ge 1
-test "${_index}" -le 8
+if test "${#}" -eq 0 ; then
+	_index=0
+	_scenario=boot
+	_fqdn="${_fqdn:-mosaic-1.loopback.vnet}"
+	_ip="${_ip:-127.0.155.1}"
+	_erl_name="mosaic-cluster-1@${_fqdn}"
+	_webmachine_port="$(( _erl_epmd_port + 1 ))"
+	_riak_handoff_port="$(( _erl_epmd_port + 2 ))"
+else
+	_index="${1}"
+	_scenario="${2}"
+	test "${_index}" -ge 1
+	test "${_index}" -le 8
+	_fqdn="${_fqdn:-mosaic-${_index}.loopback.vnet}"
+	_ip="${_ip:-127.0.155.${_index}}"
+	_erl_name="mosaic-cluster-${_index}@${_fqdn}"
+	_webmachine_port="$(( _erl_epmd_port + 1 + (_index - 1) * 2 + 0 ))"
+	_riak_handoff_port="$(( _erl_epmd_port + 1 + (_index - 1) * 2 + 1 ))"
+fi
 
 _erl_args+=(
 		-noinput -noshell
-		-sname "mosaic-cluster-${_index}@${_erl_host}" -setcookie "${_erl_cookie}"
+		-name "${_erl_name}" -setcookie "${_erl_cookie}"
 		-boot start_sasl
-		-config "${_outputs}/erlang/applications/mosaic_cluster/priv/mosaic_cluster.config"
+		-config "${_erl_libs}/mosaic_cluster/priv/mosaic_cluster.config"
 		-mosaic_cluster tests_scenario "'${_scenario}'"
-		-mosaic_cluster webmachine_listen "{\"127.0.0.1\", $(( _erl_epmd_port + 1 + (_index - 1) * 2 + 0 ))}"
-		-riak_core handoff_port "$(( _erl_epmd_port + 1 + (_index - 1) * 2 + 1 ))"
+		-mosaic_cluster webmachine_listen "{\"${_ip}\", ${_webmachine_port}}"
+		-mosaic_cluster node_ip "\"${_ip}\""
+		-riak_core handoff_ip "\"${_ip}\""
+		-riak_core handoff_port "${_riak_handoff_port}"
 		-run mosaic_cluster_tests test
 )
+_erl_env+=(
+		mosaic_node_fqdn="${_fqdn}"
+		mosaic_node_ip="${_ip}"
+)
 
-#mkdir -p "/tmp/mosaic/cluster/${_index}"
-#cd "/tmp/mosaic/cluster/${_index}"
+if test -n "${_workbench:-}" ; then
+		_erl_env+=(
+				_mosaic_cluster_workbench="${_workbench}"
+		)
+fi
+
+mkdir -p "/tmp/mosaic/cluster/${_index}"
+cd "/tmp/mosaic/cluster/${_index}"
 
 exec env "${_erl_env[@]}" "${_erl}" "${_erl_args[@]}"

@@ -17,7 +17,8 @@
 -export ([
 		proplist_get/4, proplist_pop/4,
 		application_env_get/4,
-		os_env_get/3]).
+		os_env_get/3, os_env_get/1,
+		os_bin_get/2, os_bin_get/1]).
 
 
 -import (mosaic_enforcements, [enforce_ok/1, enforce_ok_1/1]).
@@ -544,9 +545,16 @@ application_env_get (Key, Application, Enforce, Default)
 	catch throw : Error = {error, _Reason} -> Error end.
 
 
+os_env_get (Key) ->
+	os_env_get (Key, {decode, fun decode_string/1}, {error, {unresolved_environment_variable, Key}}).
+
 os_env_get (Key, Enforce, Default)
 		when is_atom (Key) ->
 	os_env_get (erlang:atom_to_list (Key), Enforce, Default);
+	
+os_env_get (Key, Enforce, Default)
+		when is_binary (Key) ->
+	os_env_get (erlang:binary_to_list (Key), Enforce, Default);
 	
 os_env_get (Key, Enforce, Default)
 		when is_list (Key) ->
@@ -556,6 +564,29 @@ os_env_get (Key, Enforce, Default)
 				apply_default_get (Default);
 			EncodedTerm ->
 				apply_enforce_get (EncodedTerm, Enforce)
+		end
+	catch throw : Error = {error, _Reason} -> Error end.
+
+
+os_bin_get (Key) ->
+	os_bin_get (Key, {error, {unresolved_executable, Key}}).
+
+os_bin_get (Key, Default)
+		when is_atom (Key) ->
+	os_bin_get (erlang:atom_to_list (Key), Default);
+	
+os_bin_get (Key, Default)
+		when is_binary (Key) ->
+	os_bin_get (erlang:binary_to_list (Key), Default);
+	
+os_bin_get (Key, Default)
+		when is_list (Key) ->
+	try
+		case os:find_executable (Key) of
+			false ->
+				apply_default_get (Default);
+			EncodedTerm ->
+				apply_enforce_get (EncodedTerm, {decode, fun decode_string/1})
 		end
 	catch throw : Error = {error, _Reason} -> Error end.
 

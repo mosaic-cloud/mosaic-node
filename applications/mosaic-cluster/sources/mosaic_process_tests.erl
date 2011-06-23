@@ -246,26 +246,28 @@ test () ->
 	ok.
 
 
-configure (dummy, create, Identifier, term, defaults, defaults) ->
-	Configuration = {
-			{spawn_executable, <<"./.outputs/gcc/applications-elf/mosaic_port_process_dummy.elf">>},
-			[{arg0, <<"[mosaic_process#dummy#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
-	{ok, mosaic_port_process, Configuration};
+configure ('mosaic-tests:dummy', create, Identifier, term, defaults, defaults) ->
+	try
+		Configuration = {
+				{spawn_executable, enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic_port_process_dummy.elf">>))},
+				[{arg0, <<"[mosaic-tests:dummy#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
+		{ok, mosaic_port_process, Configuration}
+	catch throw : Error = {error, _Reason} -> Error end;
 	
-configure (dummy, {migrate, source}, _Identifier, term, defaults, defaults) ->
+configure ('mosaic-tests:dummy', {migrate, source}, _Identifier, term, defaults, defaults) ->
 	{ok, none, defaults};
 	
-configure (dummy, {migrate, target}, _Identifier, term, defaults, defaults) ->
+configure ('mosaic-tests:dummy', {migrate, target}, _Identifier, term, defaults, defaults) ->
 	{ok, mosaic_port_process, defaults};
 	
-configure (dummy, _Disposition, _Identifier, term, Configuration, defaults) ->
+configure ('mosaic-tests:dummy', _Disposition, _Identifier, term, Configuration, defaults) ->
 	{error, {invalid_configuration, Configuration}};
 	
-configure (dummy, Disposition, Identifier, json, null, defaults) ->
-	configure (dummy, Disposition, Identifier, term, defaults, defaults);
+configure ('mosaic-tests:dummy', Disposition, Identifier, json, null, defaults) ->
+	configure ('mosaic-tests:dummy', Disposition, Identifier, term, defaults, defaults);
 	
-configure (dummy, Disposition, Identifier, json, {struct, []}, defaults) ->
-	configure (dummy, Disposition, Identifier, term, defaults, defaults);
+configure ('mosaic-tests:dummy', Disposition, Identifier, json, {struct, []}, defaults) ->
+	configure ('mosaic-tests:dummy', Disposition, Identifier, term, defaults, defaults);
 	
-configure (dummy, _Disposition, _Identifier, json, Configuration, defaults) ->
+configure ('mosaic-tests:dummy', _Disposition, _Identifier, json, Configuration, defaults) ->
 	{error, {invalid_configuration, Configuration}}.

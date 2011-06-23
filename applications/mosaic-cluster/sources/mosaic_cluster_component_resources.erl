@@ -81,12 +81,15 @@ execute_acquire (OwnerIdentifier, OwnerProcess, Specifications, Table) ->
 
 
 try_acquire (Owner, Specification = {Identifier, Type = <<"socket:ipv4:tcp">>, defaults}) ->
-	Ip = <<"127.0.0.1">>,
-	Port = crypto:rand_uniform (32769, 49150),
-	Key = {Type, Ip, Port},
-	Data = {Identifier, Type, Owner, {Ip, Port}},
-	Descriptor = {Identifier, [{<<"ip">>, Ip}, {<<"port">>, Port}]},
-	{ok, {Key, Data, Descriptor, Specification}};
+	try
+		Ip = enforce_ok_1 (mosaic_generic_coders:application_env_get (node_ip, mosaic_cluster,
+				{decode, fun mosaic_generic_coders:decode_string/1}, {error, missing_node_ip})),
+		Port = crypto:rand_uniform (32769, 49150),
+		Key = {Type, Ip, Port},
+		Data = {Identifier, Type, Owner, {Ip, Port}},
+		Descriptor = {Identifier, [{<<"ip">>, Ip}, {<<"port">>, Port}]},
+		{ok, {Key, Data, Descriptor, Specification}}
+	catch throw : Error = {error, _Reason} -> Error end;
 	
 try_acquire (_Owner, Specification) ->
 	throw ({error, {invalid_specification, Specification}}).

@@ -115,4 +115,15 @@ start_discovery () ->
 
 
 boot () ->
+	RiakCoreStopIntercepterLoop = fun (Loop) ->
+			receive
+				{riak_core, stop, _Reason} ->
+					Loop (Loop)
+			end
+	end,
+	_ = erlang:spawn (
+			fun () ->
+				true = erlang:register (riak_core_stop_intercepter, erlang:self ()),
+				RiakCoreStopIntercepterLoop (RiakCoreStopIntercepterLoop)
+			end),
 	mosaic_application_tools:boot (mosaic_cluster).

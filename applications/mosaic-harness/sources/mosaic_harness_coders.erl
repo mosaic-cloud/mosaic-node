@@ -57,7 +57,7 @@ decode_frontend_configuration (term, OriginalOptions)
 					Executable_ when is_binary (Executable_) ->
 						{ok, Executable_};
 					defaults ->
-						{ok, <<"./.outputs/gcc/applications-elf/mosaic_harness.elf">>};
+						{ok, enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic_harness.elf">>))};
 					undefined ->
 						throw ({error, missing_executable});
 					Executable_ ->
