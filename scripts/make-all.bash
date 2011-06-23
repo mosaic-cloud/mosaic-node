@@ -5,6 +5,7 @@ if ! test "${#}" -eq 0 ; then
 	exit 1
 fi
 
+"${_workbench}/../mosaic-erlang-dependencies/scripts/make"
 "${_workbench}/scripts/make"
 "${_workbench}/../mosaic-components-rabbitmq/scripts/make"
 "${_workbench}/../mosaic-components-riak-kv/scripts/make"
