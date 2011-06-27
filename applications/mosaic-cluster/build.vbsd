@@ -11,4 +11,5 @@
 (vbs:require-gcc)
 
 (vbs:define-gcc-application 'mosaic_port_process_dummy
-	c: "\\./sources/mosaic_port_process_dummy.c")
+	c: "\\./sources/mosaic_port_process_dummy.c"
+	ldflags: '("-static"))

@@ -10,5 +10,4 @@
 
 (vbs:define-gcc-application 'mosaic_harness
 	c: "\\./sources/mosaic_harness.c"
-	cflags: '("-g")
-	ldflags: '("-ljansson"))
+	ldflags: '("-static" "-ljansson"))

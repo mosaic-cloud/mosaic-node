@@ -13,7 +13,7 @@ if test "${#}" -eq 0 ; then
 	_scenario=boot
 	_fqdn="${_fqdn:-mosaic-1.loopback.vnet}"
 	_ip="${_ip:-127.0.155.1}"
-	_erl_name="mosaic-cluster-1@${_fqdn}"
+	_erl_name="mosaic-cluster@${_fqdn}"
 	_webmachine_port="$(( _erl_epmd_port + 1 ))"
 	_riak_handoff_port="$(( _erl_epmd_port + 2 ))"
 else
@@ -35,6 +35,7 @@ _erl_args+=(
 		-config "${_erl_libs}/mosaic_cluster/priv/mosaic_cluster.config"
 		-mosaic_cluster tests_scenario "'${_scenario}'"
 		-mosaic_cluster webmachine_listen "{\"${_ip}\", ${_webmachine_port}}"
+		-mosaic_cluster node_fqdn "\"${_fqdn}\""
 		-mosaic_cluster node_ip "\"${_ip}\""
 		-riak_core handoff_ip "\"${_ip}\""
 		-riak_core handoff_port "${_riak_handoff_port}"

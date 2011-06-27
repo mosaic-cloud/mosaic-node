@@ -7,11 +7,15 @@
 -export ([start/2, stop/1, boot/0]).
 
 
+-import (mosaic_enforcements, [enforce_ok_1/1]).
+
+
 start (normal, defaults) ->
 	try
 		{ok, Supervisor} = start_supervisor (),
 		ok = start_discovery (),
 		ok = start_daemons (),
+		ok = report (),
 		{ok, Supervisor, void}
 	catch
 		throw : Error = {error, _Reason} ->
@@ -112,6 +116,26 @@ start_discovery () ->
 			throw (Error4)
 	end,
 	ok.
+
+
+report () ->
+	try
+		{WebmachineSocketIp, WebmachineSocketPort} = enforce_ok_1 (mosaic_generic_coders:application_env_get (webmachine_listen, mosaic_cluster,
+				{decode,
+						fun
+							({Ip, Port}) when is_list (Ip), is_integer (Port) -> {ok, {erlang:list_to_binary (Ip), Port}};
+							(Descriptor) -> {error, {invalid_socket_descriptor, Descriptor}}
+						end},
+				{error, missing_webmachine_socket})),
+		WebmachineSocketFqdn = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"mosaic_node_fqdn">>,
+				{decode, fun mosaic_generic_coders:decode_string/1}, {error, missing_webmachine_fqdn})),
+		WebmachineSocketFqdnString = erlang:binary_to_list (WebmachineSocketFqdn),
+		WebmachineSocket = {WebmachineSocketIp, WebmachineSocketPort, WebmachineSocketFqdn},
+		ok = error_logger:info_report (["Configuring mOSAIC cluster manager...",
+					{url, erlang:list_to_binary ("http://" ++ WebmachineSocketFqdnString ++ ":" ++ erlang:integer_to_list (WebmachineSocketPort) ++ "/")},
+					{webmachine_endpoint, WebmachineSocket}]),
+		ok
+	catch throw : Error = {error, _Reason} -> Error end.
 
 
 boot () ->
