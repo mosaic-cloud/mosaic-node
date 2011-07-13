@@ -135,6 +135,9 @@ execute ({initialize}) ->
 	_ = mosaic_process_configurator:register ('mosaic-tests:java-abacus', term, {mosaic_component_process_tests, configure, defaults}),
 	_ = mosaic_process_configurator:register ('mosaic-tests:java-abacus', json, {mosaic_component_process_tests, configure, defaults}),
 	
+	_ = mosaic_process_configurator:register ('mosaic-tests:java-component', term, {mosaic_component_process_tests, configure, defaults}),
+	_ = mosaic_process_configurator:register ('mosaic-tests:java-component', json, {mosaic_component_process_tests, configure, defaults}),
+	
 	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-tests:rabbitmq">>, <<16#8cd74b5e4ecd322fd7bbfc762ed6cf7d601eede8 : 160>>),
 	_ = mosaic_process_configurator:register ('mosaic-tests:rabbitmq', term, {mosaic_component_process_tests, configure, defaults}),
 	_ = mosaic_process_configurator:register ('mosaic-tests:rabbitmq', json, {mosaic_component_process_tests, configure, defaults}),

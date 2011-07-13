@@ -116,9 +116,9 @@ test () ->
 configure (Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent, defaults) ->
 	configure (Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent, []);
 	
-configure (Type, create, Identifier, term, defaults, ExtraOptions)
+configure (Type, create, Identifier, term, OriginalConfiguration, ExtraOptions)
 		when is_atom (Type) ->
-	case configure_1 (Type, Identifier, ExtraOptions) of
+	case configure_1 (Type, Identifier, OriginalConfiguration, ExtraOptions) of
 		{ok, Options} ->
 			case mosaic_component_process_coders:parse_configuration (create, term, Options) of
 				{ok, Configuration} ->
@@ -157,12 +157,12 @@ configure (Type, Disposition, Identifier, json, {struct, []}, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	configure (Type, Disposition, Identifier, term, defaults, ExtraOptions);
 	
-configure (_Type, _Disposition, _Identifier, json, Configuration, ExtraOptions)
+configure (Type, Disposition, Identifier, json, Configuration, ExtraOptions)
 		when is_list (ExtraOptions) ->
-	{error, {invalid_configuration, Configuration}}.
+	configure (Type, Disposition, Identifier, term, {json, Configuration}, ExtraOptions).
 
 
-configure_1 (Type, Identifier, ExtraOptions)
+configure_1 (Type, Identifier, defaults, ExtraOptions)
 		when ((Type =:= 'mosaic-tests:python-parrot') orelse (Type =:= 'mosaic-tests:python-abacus')), is_list (ExtraOptions) ->
 	try
 		{ok, Scenario} = case Type of
@@ -184,7 +184,7 @@ configure_1 (Type, Identifier, ExtraOptions)
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-configure_1 (Type = 'mosaic-tests:node-abacus', Identifier, ExtraOptions)
+configure_1 (Type = 'mosaic-tests:node-abacus', Identifier, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	try
 		Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
@@ -200,7 +200,7 @@ configure_1 (Type = 'mosaic-tests:node-abacus', Identifier, ExtraOptions)
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-configure_1 (Type = 'mosaic-tests:java-abacus', Identifier, ExtraOptions)
+configure_1 (Type = 'mosaic-tests:java-abacus', Identifier, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	try
 		Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
@@ -217,7 +217,37 @@ configure_1 (Type = 'mosaic-tests:java-abacus', Identifier, ExtraOptions)
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-configure_1 (Type, Identifier, ExtraOptions)
+configure_1 (Type = 'mosaic-tests:java-component', Identifier, {json, JarPath}, ExtraOptions)
+		when is_binary (JarPath), is_list (ExtraOptions) ->
+	try
+		Options = [
+				{harness, [
+					{argument0, <<"[", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
+				{execute, [
+					{executable, enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"java">>))},
+					{arguments, [
+						<<"-jar">>, JarPath,
+						enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]}]}
+				| ExtraOptions],
+		{ok, Options}
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+configure_1 (Type = 'mosaic-tests:java-component', Identifier, {json, [JarPath, MainClass]}, ExtraOptions)
+		when is_binary (JarPath), is_binary (MainClass), is_list (ExtraOptions) ->
+	try
+		Options = [
+				{harness, [
+					{argument0, <<"[", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
+				{execute, [
+					{executable, enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"java">>))},
+					{arguments, [
+						<<"-classpath">>, JarPath, MainClass,
+						enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]}]}
+				| ExtraOptions],
+		{ok, Options}
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+configure_1 (Type, Identifier, defaults, ExtraOptions)
 		when ((Type =:= 'mosaic-tests:rabbitmq') orelse (Type =:= 'mosaic-examples-realtime-feeds:rabbit')), is_list (ExtraOptions) ->
 	try
 		Executable = case Type of
@@ -237,7 +267,7 @@ configure_1 (Type, Identifier, ExtraOptions)
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-configure_1 (Type, Identifier, ExtraOptions)
+configure_1 (Type, Identifier, defaults, ExtraOptions)
 		when ((Type =:= 'mosaic-tests:riak-kv') orelse (Type =:= 'mosaic-examples-realtime-feeds:riak')), is_list (ExtraOptions) ->
 	try
 		Executable = case Type of
@@ -257,7 +287,7 @@ configure_1 (Type, Identifier, ExtraOptions)
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-configure_1 (Type, Identifier, ExtraOptions)
+configure_1 (Type, Identifier, defaults, ExtraOptions)
 		when ((Type =:= 'mosaic-tests:httpg') orelse (Type =:= 'mosaic-examples-realtime-feeds:httpg')), is_list (ExtraOptions) ->
 	try
 		Executable = case Type of
@@ -277,7 +307,7 @@ configure_1 (Type, Identifier, ExtraOptions)
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-configure_1 (Type = 'mosaic-tests:jetty-hello-world', Identifier, ExtraOptions)
+configure_1 (Type = 'mosaic-tests:jetty-hello-world', Identifier, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	try
 		Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
@@ -294,7 +324,7 @@ configure_1 (Type = 'mosaic-tests:jetty-hello-world', Identifier, ExtraOptions)
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-configure_1 (Type, Identifier, ExtraOptions)
+configure_1 (Type, Identifier, defaults, ExtraOptions)
 		when ((Type =:= 'mosaic-examples-realtime-feeds:fetcher') orelse (Type =:= 'mosaic-examples-realtime-feeds:indexer') orelse
 					(Type =:= 'mosaic-examples-realtime-feeds:scavanger') orelse (Type =:= 'mosaic-examples-realtime-feeds:leacher') orelse
 					(Type =:= 'mosaic-examples-realtime-feeds:pusher') orelse (Type =:= 'mosaic-examples-realtime-feeds:frontend')),
@@ -312,6 +342,6 @@ configure_1 (Type, Identifier, ExtraOptions)
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-configure_1 (Type, _Identifier, _ExtraOptions)
+configure_1 (Type, _Identifier, Configuration, _ExtraOptions)
 		when is_atom (Type) ->
-	{error, {invalid_type, Type}}.
+	{error, {invalid_type_or_configuration, {Type, Configuration}}}.
