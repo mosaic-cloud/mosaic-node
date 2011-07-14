@@ -210,9 +210,8 @@ configure_1 (Type = 'mosaic-tests:java-abacus', Identifier, defaults, ExtraOptio
 				{execute, [
 					{executable, enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"java">>))},
 					{arguments, [
-						<<"-jar">>, <<Workbench / binary, "/../mosaic-java-components/components-container/target/components-container-0.2-SNAPSHOT-jar-with-dependencies.jar">>,
-						<<"eu.mosaic_cloud.components.examples.abacus.AbacusComponentCallbacks">>,
-						<<"file://", Workbench / binary, "/../mosaic-java-components/components-examples/target/components-examples-0.2-SNAPSHOT.jar">>]}]}
+						<<"-jar">>, <<Workbench / binary, "/../mosaic-java-components/components-examples/target/components-examples-abacus-0.2-SNAPSHOT-jar-with-dependencies.jar">>,
+						enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]}]}
 				| ExtraOptions],
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
@@ -232,8 +231,8 @@ configure_1 (Type = 'mosaic-tests:java-component', Identifier, {json, JarPath}, 
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-configure_1 (Type = 'mosaic-tests:java-component', Identifier, {json, [JarPath, MainClass]}, ExtraOptions)
-		when is_binary (JarPath), is_binary (MainClass), is_list (ExtraOptions) ->
+configure_1 (Type = 'mosaic-tests:java-component', Identifier, {json, [MainClass, ClassPath]}, ExtraOptions)
+		when is_binary (MainClass), is_binary (ClassPath), is_list (ExtraOptions) ->
 	try
 		Options = [
 				{harness, [
@@ -241,20 +240,21 @@ configure_1 (Type = 'mosaic-tests:java-component', Identifier, {json, [JarPath, 
 				{execute, [
 					{executable, enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"java">>))},
 					{arguments, [
-						<<"-classpath">>, JarPath, MainClass,
+						<<"-classpath">>, ClassPath,
+						MainClass,
 						enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]}]}
 				| ExtraOptions],
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
 configure_1 (Type, Identifier, defaults, ExtraOptions)
-		when ((Type =:= 'mosaic-tests:rabbitmq') orelse (Type =:= 'mosaic-examples-realtime-feeds:rabbit')), is_list (ExtraOptions) ->
+		when ((Type =:= 'mosaic-tests:rabbitmq') orelse (Type =:= 'mosaic-components:rabbitmq')), is_list (ExtraOptions) ->
 	try
 		Executable = case Type of
 			'mosaic-tests:rabbitmq' ->
 				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
 				<<Workbench / binary, "/../mosaic-components-rabbitmq/scripts/run-node">>;
-			'mosaic-examples-realtime-feeds:rabbit' ->
+			'mosaic-components:rabbitmq' ->
 				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-rabbitmq--run-node">>))
 		end,
 		Options = [
@@ -268,13 +268,13 @@ configure_1 (Type, Identifier, defaults, ExtraOptions)
 	catch throw : Error = {error, _Reason} -> Error end;
 	
 configure_1 (Type, Identifier, defaults, ExtraOptions)
-		when ((Type =:= 'mosaic-tests:riak-kv') orelse (Type =:= 'mosaic-examples-realtime-feeds:riak')), is_list (ExtraOptions) ->
+		when ((Type =:= 'mosaic-tests:riak-kv') orelse (Type =:= 'mosaic-components:riak-kv')), is_list (ExtraOptions) ->
 	try
 		Executable = case Type of
 			'mosaic-tests:riak-kv' ->
 				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
 				<<Workbench / binary, "/../mosaic-components-riak-kv/scripts/run-node">>;
-			'mosaic-examples-realtime-feeds:riak' ->
+			'mosaic-components:riak-kv' ->
 				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-riak-kv--run-node">>))
 		end,
 		Options = [
@@ -288,13 +288,13 @@ configure_1 (Type, Identifier, defaults, ExtraOptions)
 	catch throw : Error = {error, _Reason} -> Error end;
 	
 configure_1 (Type, Identifier, defaults, ExtraOptions)
-		when ((Type =:= 'mosaic-tests:httpg') orelse (Type =:= 'mosaic-examples-realtime-feeds:httpg')), is_list (ExtraOptions) ->
+		when ((Type =:= 'mosaic-tests:httpg') orelse (Type =:= 'mosaic-components:httpg')), is_list (ExtraOptions) ->
 	try
 		Executable = case Type of
 			'mosaic-tests:httpg' ->
 				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
 				<<Workbench / binary, "/../mosaic-components-httpg/scripts/run-node">>;
-			'mosaic-examples-realtime-feeds:httpg' ->
+			'mosaic-components:httpg' ->
 				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-httpg--run-node">>))
 		end,
 		Options = [
@@ -303,6 +303,29 @@ configure_1 (Type, Identifier, defaults, ExtraOptions)
 				{execute, [
 					{executable, Executable},
 					{arguments, [enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]}]}
+				| ExtraOptions],
+		{ok, Options}
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+configure_1 (Type, Identifier, {json, [MainClass, ClassPath]}, ExtraOptions)
+		when ((Type =:= 'mosaic-tests:java-container') orelse (Type =:= 'mosaic-components:java-container')),
+			is_binary (MainClass), is_binary (ClassPath), is_list (ExtraOptions) ->
+	try
+		Executable = case Type of
+			'mosaic-tests:java-container' ->
+				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
+				<<Workbench / binary, "/../mosaic-java-components/components-container/scripts/run-component">>;
+			'mosaic-components:java-container' ->
+				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-java-container--run-component">>))
+		end,
+		Options = [
+				{harness, [
+					{argument0, <<"[", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
+				{execute, [
+					{executable, Executable},
+					{arguments, [
+						enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
+						MainClass, ClassPath]}]}
 				| ExtraOptions],
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;

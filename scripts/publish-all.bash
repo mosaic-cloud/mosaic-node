@@ -11,6 +11,7 @@ fi
 "${_workbench}/../mosaic-components-riak-kv/scripts/publish"
 "${_workbench}/../mosaic-components-httpg/scripts/publish"
 
+"${_workbench}/../mosaic-java-components/components-container/scripts/publish"
 "${_workbench}/../mosaic-examples-realtime-feeds/backend/scripts/publish"
 
 "${_workbench}/scripts/publish-boot"

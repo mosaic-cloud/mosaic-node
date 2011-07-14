@@ -109,6 +109,7 @@ cat >"${_outputs}/package-boot/pkg.json" <<EOS
 		"mosaic-components-rabbitmq",
 		"mosaic-components-riak-kv",
 		"mosaic-components-httpg",
+		"mosaic-components-java-container",
 		"mosaic-examples-realtime-feeds"
 	]
 }

@@ -45,11 +45,11 @@ test () ->
 			{ok, 'examples-realtime-feeds'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:rabbit', term, defaults, 1},
+						{define_and_create_processes, 'mosaic-components:rabbitmq', term, defaults, 1},
 						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:riak', term, defaults, 1},
+						{define_and_create_processes, 'mosaic-components:riak-kv', term, defaults, 1},
 						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:httpg', term, defaults, 1},
+						{define_and_create_processes, 'mosaic-components:httpg', term, defaults, 1},
 						{sleep, 1 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:fetcher', term, defaults, 1},
 						{sleep, 1 * 1000},
@@ -150,21 +150,27 @@ execute ({initialize}) ->
 	_ = mosaic_process_configurator:register ('mosaic-tests:httpg', term, {mosaic_component_process_tests, configure, defaults}),
 	_ = mosaic_process_configurator:register ('mosaic-tests:httpg', json, {mosaic_component_process_tests, configure, defaults}),
 	
+	_ = mosaic_process_configurator:register ('mosaic-tests:java-container', term, {mosaic_component_process_tests, configure, defaults}),
+	_ = mosaic_process_configurator:register ('mosaic-tests:java-container', json, {mosaic_component_process_tests, configure, defaults}),
+	
 	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-tests:httpc">>, <<16#a2e40f0b2c041bc694ace68ace08420d40f9cbc0 : 160>>),
 	_ = mosaic_process_configurator:register ('mosaic-tests:jetty-hello-world', term, {mosaic_component_process_tests, configure, defaults}),
 	_ = mosaic_process_configurator:register ('mosaic-tests:jetty-hello-world', json, {mosaic_component_process_tests, configure, defaults}),
 	
-	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-examples-realtime-feeds:rabbit">>, <<16#8cd74b5e4ecd322fd7bbfc762ed6cf7d601eede8 : 160>>),
-	_ = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:rabbit', term, {mosaic_component_process_tests, configure, defaults}),
-	_ = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:rabbit', json, {mosaic_component_process_tests, configure, defaults}),
+	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-components:rabbitmq">>, <<16#8cd74b5e4ecd322fd7bbfc762ed6cf7d601eede8 : 160>>),
+	_ = mosaic_process_configurator:register ('mosaic-components:rabbitmq', term, {mosaic_component_process_tests, configure, defaults}),
+	_ = mosaic_process_configurator:register ('mosaic-components:rabbitmq', json, {mosaic_component_process_tests, configure, defaults}),
 	
-	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-examples-realtime-feeds:riak">>, <<16#9cdce23e78027ef6a52636da7db820c47e695d11 : 160>>),
-	_ = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:riak', term, {mosaic_component_process_tests, configure, defaults}),
-	_ = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:riak', json, {mosaic_component_process_tests, configure, defaults}),
+	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-components:riak">>, <<16#9cdce23e78027ef6a52636da7db820c47e695d11 : 160>>),
+	_ = mosaic_process_configurator:register ('mosaic-components:riak-kv', term, {mosaic_component_process_tests, configure, defaults}),
+	_ = mosaic_process_configurator:register ('mosaic-components:riak-kv', json, {mosaic_component_process_tests, configure, defaults}),
 	
-	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-examples-realtime-feeds:httpg">>, <<16#0891f3a4b73a16cc5ac6947c56924d3e1dd2395e : 160>>),
-	_ = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:httpg', term, {mosaic_component_process_tests, configure, defaults}),
-	_ = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:httpg', json, {mosaic_component_process_tests, configure, defaults}),
+	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-components:httpg">>, <<16#0891f3a4b73a16cc5ac6947c56924d3e1dd2395e : 160>>),
+	_ = mosaic_process_configurator:register ('mosaic-components:httpg', term, {mosaic_component_process_tests, configure, defaults}),
+	_ = mosaic_process_configurator:register ('mosaic-components:httpg', json, {mosaic_component_process_tests, configure, defaults}),
+	
+	_ = mosaic_process_configurator:register ('mosaic-components:java-container', term, {mosaic_component_process_tests, configure, defaults}),
+	_ = mosaic_process_configurator:register ('mosaic-components:java-container', json, {mosaic_component_process_tests, configure, defaults}),
 	
 	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-examples-realtime-feeds:fetcher">>, <<16#4cb6ba9f09150c29b590b82b02a5a295ffc742d2 : 160>>),
 	_ = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:fetcher', term, {mosaic_component_process_tests, configure, defaults}),

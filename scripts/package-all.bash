@@ -11,6 +11,7 @@ fi
 "${_workbench}/../mosaic-components-riak-kv/scripts/package"
 "${_workbench}/../mosaic-components-httpg/scripts/package"
 
+"${_workbench}/../mosaic-java-components/components-container/scripts/package"
 "${_workbench}/../mosaic-examples-realtime-feeds/backend/scripts/package"
 
 "${_workbench}/scripts/package-boot"
