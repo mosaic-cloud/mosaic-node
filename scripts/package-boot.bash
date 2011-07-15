@@ -31,11 +31,11 @@ cd ..
 _package="$( readlink -e -- . )"
 cmp -s -- "${_package}/bin/run" "${_self_realpath}"
 
-PATH="$(
+export PATH="$(
 		find /opt -maxdepth 1 -exec test -d {} -a -d {}/bin \; -print \
 		| sed -r -e 's|^.*$|&/bin|' \
 		| tr '\n' ':'
-):${PATH}"
+):${PATH:-}"
 
 export mosaic_node_fqdn="$( hostname -f | tr ' ' '\n' | head -n 1 || true )"
 export mosaic_node_ip="$( hostname -i | tr ' ' '\n' | head -n 1 || true )"
