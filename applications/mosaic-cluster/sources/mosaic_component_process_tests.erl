@@ -330,6 +330,29 @@ configure_1 (Type, Identifier, {json, [MainClass, ClassPath]}, ExtraOptions)
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
+configure_1 (Type, Identifier, {json, [MainClass, ClassPath, Logger]}, ExtraOptions)
+		when ((Type =:= 'mosaic-tests:java-container') orelse (Type =:= 'mosaic-components:java-container')),
+			is_binary (MainClass), is_binary (ClassPath), is_binary (Logger), is_list (ExtraOptions) ->
+	try
+		Executable = case Type of
+			'mosaic-tests:java-container' ->
+				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
+				<<Workbench / binary, "/../mosaic-java-components/components-container/scripts/run-component">>;
+			'mosaic-components:java-container' ->
+				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-java-container--run-component">>))
+		end,
+		Options = [
+				{harness, [
+					{argument0, <<"[", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
+				{execute, [
+					{executable, Executable},
+					{arguments, [
+						enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
+						MainClass, ClassPath, Logger]}]}
+				| ExtraOptions],
+		{ok, Options}
+	catch throw : Error = {error, _Reason} -> Error end;
+	
 configure_1 (Type = 'mosaic-tests:jetty-hello-world', Identifier, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	try

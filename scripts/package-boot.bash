@@ -66,6 +66,7 @@ tazpkg get-install mosaic-cluster --forced
 tazpkg get-install mosaic-components-rabbitmq --forced
 tazpkg get-install mosaic-components-riak-kv --forced
 tazpkg get-install mosaic-components-httpg --forced
+tazpkg get-install mosaic-components-java-container --forced
 tazpkg get-install mosaic-examples-realtime-feeds --forced
 tazpkg get-install mosaic-cluster-boot --forced
 
