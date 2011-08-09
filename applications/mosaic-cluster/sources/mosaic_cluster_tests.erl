@@ -20,48 +20,48 @@ test () ->
 			{ok, 'test-dummy'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, 'mosaic-tests:dummy', term, defaults, 4}]};
+						{define_and_create_processes, 'mosaic-tests:dummy', json, null, 4}]};
 			{ok, 'test-rabbitmq'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, 'mosaic-tests:rabbitmq', term, defaults, 1}]};
+						{define_and_create_processes, 'mosaic-tests:rabbitmq', json, null, 1}]};
 			{ok, 'test-riak-kv'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, 'mosaic-tests:riak-kv', term, defaults, 1}]};
+						{define_and_create_processes, 'mosaic-tests:riak-kv', json, null, 1}]};
 			{ok, 'test-riak-kv-4'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, 'mosaic-tests:riak-kv', term, defaults, 4}]};
+						{define_and_create_processes, 'mosaic-tests:riak-kv', json, null, 4}]};
 			{ok, 'test-http-hello-world-4'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, 'mosaic-tests:rabbitmq', term, defaults, 1},
+						{define_and_create_processes, 'mosaic-tests:rabbitmq', json, null, 1},
 						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-tests:httpg', term, defaults, 1},
+						{define_and_create_processes, 'mosaic-tests:httpg', json, null, 1},
 						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-tests:jetty-hello-world', term, defaults, 4},
+						{define_and_create_processes, 'mosaic-tests:jetty-hello-world', json, null, 4},
 						{sleep, 2 * 1000}]};
 			{ok, 'examples-realtime-feeds'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, 'mosaic-components:rabbitmq', term, defaults, 1},
+						{define_and_create_processes, 'mosaic-components:rabbitmq', json, null, 1},
 						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-components:riak-kv', term, defaults, 1},
+						{define_and_create_processes, 'mosaic-components:riak-kv', json, null, 1},
 						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-components:httpg', term, defaults, 1},
+						{define_and_create_processes, 'mosaic-components:httpg', json, null, 1},
 						{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:fetcher', term, defaults, 1},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:fetcher', json, null, 1},
 						{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer', term, defaults, 1},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer', json, null, 1},
 						{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:scavanger', term, defaults, 1},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:scavanger', json, null, 1},
 						{sleep, 1 * 1000},
-						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:leacher', term, defaults, 1},
+						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:leacher', json, null, 1},
 						%{sleep, 1 * 1000},
-						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:pusher', term, defaults, 1},
+						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:pusher', json, null, 1},
 						%{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend', term, defaults, 1},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend', json, null, 1},
 						{sleep, 1 * 1000}]};
 			{ok, 'test-ring-join-leave'} ->
 				Self = erlang:node (),
