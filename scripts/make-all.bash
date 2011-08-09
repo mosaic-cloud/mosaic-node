@@ -11,7 +11,7 @@ fi
 "${_workbench}/../mosaic-components-riak-kv/scripts/make"
 "${_workbench}/../mosaic-components-httpg/scripts/make"
 
-"${_workbench}/../mosaic-java-components/components-container/scripts/make"
-"${_workbench}/../mosaic-examples-realtime-feeds/frontend/scripts/make"
+#"${_workbench}/../mosaic-java-components/components-container/scripts/make"
+#"${_workbench}/../mosaic-examples-realtime-feeds/frontend/scripts/make"
 
 exit 0

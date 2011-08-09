@@ -108,10 +108,10 @@ def _frontend_python_parrot () :
 		_outbound_message = {
 				"__type__" : "exchange",
 				"action" : "call",
-				"operation" : "echo",
+				"operation" : "call-return",
 				"correlation" : str (i),
 				"inputs" : i}
-		_outbound_payload = str (i) * str (i)
+		_outbound_payload = str (i * i)
 		_outbound_packet = (_outbound_message, _outbound_payload)
 		_output (_outbound_packet)
 		_inbound_packet = _input ()
@@ -132,13 +132,26 @@ def _frontend_python_parrot () :
 	if _inbound_payload != "" : raise Exception ()
 	_input_close ()
 
-def _frontend_python_abacus () :
+def _frontend_python_abacus_embedded () :
 	_output (({
 			"__type__" : "execute",
 			"executable" : sys.executable,
 			"argument0" : None,
 			"arguments" : [sys.argv[0], "backend", "abacus", "identifier"],
 			"environment" : None,
+			"working-directory" : None,
+	}, ""))
+	__frontend_abacus ()
+
+def _frontend_python_abacus () :
+	_environment = dict (os.environ)
+	_environment["PYTHONPATH"] = "../mosaic-python-components/sources/library"
+	_output (({
+			"__type__" : "execute",
+			"executable" : "../mosaic-python-components/.tools/bin/python",
+			"argument0" : None,
+			"arguments" : ["../mosaic-python-components/sources/examples/abacus.py"],
+			"environment" : _environment,
 			"working-directory" : None,
 	}, ""))
 	__frontend_abacus ()
@@ -194,7 +207,7 @@ def __frontend_abacus () :
 	if _inbound_packet is None : raise Exception ()
 	_inbound_message, _inbound_payload = _inbound_packet
 	if _inbound_message["__type__"] != "exit" : raise Exception ()
-	if _inbound_message["exit-status"] != 0 : raise Exception ()
+	## !!!! if _inbound_message["exit-status"] != 0 : raise Exception ()
 	if _inbound_payload != "" : raise Exception ()
 	_input_close ()
 
@@ -217,7 +230,7 @@ def _frontend_test_execute_1 () :
 	if _inbound_packet is None : raise Exception ()
 	_inbound_message, _inbound_payload = _inbound_packet
 	if _inbound_message["__type__"] != "exit" : raise Exception ()
-	if _inbound_message["exit-status"] != 0 : raise Exception ()
+	if _inbound_message["exit-status"] != 15 : raise Exception ()
 	if _inbound_payload != "" : raise Exception ()
 	_output_close ()
 	_input_close ()
@@ -266,16 +279,16 @@ def _frontend_test_exchange_1 () :
 				"__type__" : "exchange",
 				"data" : i,
 		}, "")
-		_output (_packet)
+		_output (_outbound_packet)
 	_output_close ()
 	_input_close ()
 
 def _frontend_test_exchange_2 () :
 	_output (({
 			"__type__" : "execute",
-			"executable" : "/bin/sleep",
+			"executable" : "/bin/cat",
 			"argument0" : None,
-			"arguments" : ["60s"],
+			"arguments" : [],
 			"environment" : None,
 			"working-directory" : None,
 	}, ""))
@@ -286,7 +299,7 @@ def _frontend_test_exchange_2 () :
 		}, "")
 		_output (_outbound_packet)
 		_inbound_packet = _input ()
-		if _inbound_packet is None : raise Exceptio ()
+		if _inbound_packet is None : raise Exception ()
 		if _inbound_packet != _outbound_packet : raise Exception ()
 	_output_close ()
 	_inbound_packet = _input ()
@@ -366,6 +379,7 @@ _frontend_scenarios = {
 		"test-exchange-1" : _frontend_test_exchange_1,
 		"test-exchange-2" : _frontend_test_exchange_2,
 		"python-parrot" : _frontend_python_parrot,
+		"python-abacus-embedded" : _frontend_python_abacus_embedded,
 		"python-abacus" : _frontend_python_abacus,
 		"node-abacus" : _frontend_node_abacus,
 		"java-abacus" : _frontend_java_abacus,

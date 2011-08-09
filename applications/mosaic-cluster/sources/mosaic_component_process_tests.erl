@@ -162,15 +162,9 @@ configure (Type, Disposition, Identifier, json, Configuration, ExtraOptions)
 	configure (Type, Disposition, Identifier, term, {json, Configuration}, ExtraOptions).
 
 
-configure_1 (Type, Identifier, defaults, ExtraOptions)
-		when ((Type =:= 'mosaic-tests:python-parrot') orelse (Type =:= 'mosaic-tests:python-abacus')), is_list (ExtraOptions) ->
+configure_1 (Type = 'mosaic-tests:python-parrot', Identifier, defaults, ExtraOptions)
+		when is_list (ExtraOptions) ->
 	try
-		{ok, Scenario} = case Type of
-			'mosaic-tests:python-parrot' ->
-				{ok, <<"parrot">>};
-			'mosaic-tests:python-abacus' ->
-				{ok, <<"abacus">>}
-		end,
 		Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
 		Options = [
 				{harness, [
@@ -179,7 +173,24 @@ configure_1 (Type, Identifier, defaults, ExtraOptions)
 					{executable, enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"python2">>))},
 					{arguments, [
 						<<Workbench / binary, "/applications/mosaic-harness/sources/mosaic_harness_tester.py">>,
-						<<"backend">>, Scenario, enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]}]}
+						<<"backend">>, <<"python-parrot">>, enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]}]}
+				| ExtraOptions],
+		{ok, Options}
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+configure_1 (Type = 'mosaic-tests:python-abacus', Identifier, defaults, ExtraOptions)
+		when is_list (ExtraOptions) ->
+	try
+		Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
+		Options = [
+				{harness, [
+					{argument0, <<"[", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
+				{execute, [
+					{executable, <<Workbench / binary, "/../mosaic-python-components/.tools/bin/python">>},
+					{arguments, [
+						<<Workbench / binary, "/../mosaic-python-components/sources/examples/abacus.py">>]},
+					{environment, [
+						{<<"PYTHONPATH">>, <<Workbench / binary, "/../mosaic-python-components/sources/library">>}]}]}
 				| ExtraOptions],
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;

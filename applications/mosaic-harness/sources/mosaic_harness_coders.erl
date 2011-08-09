@@ -115,7 +115,7 @@ validate_frontend_execute_specification (Specification) ->
 												invalid_arguments},
 								environment = {'orelse', [{matches, defaults},
 												{is_list,
-													{is_tuple, {{is_binary, invalid_name}, {is_atom, invalid_value}}, invalid_environment},
+													{is_tuple, {{is_binary, invalid_name}, {is_binary, invalid_value}}, invalid_environment},
 													'_'}],
 											invalid_environment},
 								working_directory = {'orelse', [{matches, defaults}, is_binary], invalid_working_directory}},
@@ -164,7 +164,7 @@ decode_frontend_execute_specification (term, OriginalOptions)
 				end,
 				{ok, Environment} = case proplists:get_value (environment, FinalOptions) of
 					Environment_ when is_list (Environment_) ->
-						Environment__ = list:map (
+						Environment__ = lists:map (
 								fun
 									(EnvironmentPair_ = {EnvironmentName_, EnvironmentValue_})
 											when is_binary (EnvironmentName_), is_binary (EnvironmentValue_) ->
