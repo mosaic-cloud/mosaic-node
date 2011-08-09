@@ -600,8 +600,7 @@ static void _context_check (
 			break;
 		case _context_state_flushing :
 			if (
-					(_context->process == 0)
-					&& ((_context->controller_input_stream == 0)
+					((_context->controller_input_stream == 0)
 						|| ((_context->controller_input_stream->pending == 0)
 							&& (_context->controller_input_stream->queue_head == 0)))
 					&& ((_context->controller_output_stream == 0)
