@@ -94,9 +94,8 @@ malformed_request (Request, State = #state{target = Target}) ->
 	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
 
-
 content_types_provided (Request, State = #state{target = {root}}) ->
-	{[], Request, State};
+	{[{"application/octet-stream", handle_empty}], Request, State};
 	
 content_types_provided (Request, State = #state{target = {static}}) ->
 	Path = erlang:list_to_binary (lists:map (fun (PathToken) -> [$/, PathToken] end, wrq:path_tokens (Request))),
