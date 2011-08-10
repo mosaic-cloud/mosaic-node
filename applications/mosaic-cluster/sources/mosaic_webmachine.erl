@@ -135,10 +135,12 @@ respond_with_outcome (Outcome, Request, State) ->
 	case Outcome of
 		ok ->
 			mosaic_webmachine:respond_with_content (json, {struct, [{ok, true}]}, Request, State);
-		{ok, html, HtmlBody} ->
-			mosaic_webmachine:respond_with_content (html, HtmlBody, Request, State);
+		{ok, html, Body} ->
+			mosaic_webmachine:respond_with_content (html, Body, Request, State);
 		{ok, json_struct, AttributeTerms} ->
 			mosaic_webmachine:respond_with_content (json, {struct, [{ok, true} | AttributeTerms]}, Request, State);
+		{ok, {mime, MimeType}, Body} when is_binary (MimeType) ->
+			mosaic_webmachine:respond_with_content ({mime, MimeType}, Body, Request, State);
 		{error, Reason} ->
 			mosaic_webmachine:respond_with_content (error, Reason, Request, State)
 	end.
@@ -165,6 +167,10 @@ encode_content (json, Content) ->
 		Error = {error, _Reason} ->
 			Error
 	end;
+	
+encode_content ({mime, MimeType}, Content)
+		when is_binary (MimeType) ->
+	{ok, erlang:binary_to_list (MimeType), Content};
 	
 encode_content (error, Reason) ->
 	case mosaic_generic_coders:encode_reason (json, Reason) of

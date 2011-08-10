@@ -2,14 +2,20 @@
 -module (mosaic_cluster_wm).
 
 
--export ([init/1, allowed_methods/2, content_types_provided/2, malformed_request/2, handle_as_html/2, handle_as_json/2, ping/2]).
+-export ([
+		init/1, ping/2,
+		allowed_methods/2,
+		resource_exists/2, previously_existed/2, moved_temporarily/2,
+		malformed_request/2,
+		content_types_provided/2,
+		handle_as_json/2, handle_static/2]).
 
 
 -import (mosaic_enforcements, [enforce_ok_1/1]).
 
 
--dispatch ({[], {console}}).
--dispatch ({["console"], {console}}).
+-dispatch ({[], {root}}).
+-dispatch ({["static", '*'], {static}}).
 
 -dispatch ({["cluster", "nodes"], {nodes}}).
 -dispatch ({["cluster", "nodes", "self", "activate"], {nodes, self, activate}}).
@@ -23,11 +29,9 @@
 
 -record (state, {target, arguments}).
 
--include ("mosaic_cluster_wm.hrl").
-
 
 init (Target) ->
-	{ok, #state{target = Target, arguments = none}}.
+	{{trace, "/tmp/mosaic-cluster-webmachine"}, #state{target = Target, arguments = none}}.
 
 
 ping(Request, State = #state{}) ->
@@ -38,30 +42,38 @@ allowed_methods (Request, State = #state{}) ->
 	{['GET'], Request, State}.
 
 
-content_types_provided (Request, State = #state{target = Target}) ->
-	{ok, Type} = case Target of
-		{console} ->
-			{ok, html};
-		{nodes} ->
-			{ok, json};
-		{nodes, _, _} ->
-			{ok, json};
-		{ring} ->
-			{ok, json};
-		{ring, _} ->
-			{ok, json}
-	end,
-	case Type of
-		html ->
-			{[{"text/html", handle_as_html}], Request, State};
-		json ->
-			{[{"application/json", handle_as_json}], Request, State}
+resource_exists (Request, State = #state{target = Target}) ->
+	case Target of
+		{root} ->
+			{false, Request, State};
+		_ ->
+			{true, Request, State}
 	end.
 
 
-malformed_request (Request, State = #state{target = Target, arguments = none}) ->
+previously_existed (Request, State = #state{target = Target}) ->
+	case Target of
+		{root} ->
+			{true, Request, State};
+		_ ->
+			{true, Request, State}
+	end.
+
+
+moved_temporarily (Request, State = #state{target = Target}) ->
+	case Target of
+		{root} ->
+			{{true, "/static/console.html"}, Request, State};
+		_ ->
+			{false, Request, State}
+	end.
+
+
+malformed_request (Request, State = #state{target = Target}) ->
 	Outcome = case Target of
-		{console} ->
+		{root} ->
+			mosaic_webmachine:enforce_request ('GET', [], Request);
+		{static} ->
 			mosaic_webmachine:enforce_request ('GET', [], Request);
 		{nodes} ->
 			mosaic_webmachine:enforce_request ('GET', [], Request);
@@ -82,12 +94,34 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
 
-handle_as_html (Request, State = #state{target = Target}) ->
-	Outcome = case Target of
-		{console} ->
-			{ok, html, ?console_html_body}
+
+content_types_provided (Request, State = #state{target = {root}}) ->
+	{[], Request, State};
+	
+content_types_provided (Request, State = #state{target = {static}}) ->
+	Path = erlang:list_to_binary (lists:map (fun (PathToken) -> [$/, PathToken] end, wrq:path_tokens (Request))),
+	case mosaic_static_resources:contents (Path) of
+		{ok, MimeType, Data} ->
+			{[{erlang:binary_to_list (MimeType), handle_static}], Request, State#state{arguments = {Path, MimeType, Data}}};
+		{error, _Reason} ->
+			{[], Request, State}
+	end;
+	
+content_types_provided (Request, State = #state{target = Target}) ->
+	{ok, Type} = case Target of
+		{nodes} ->
+			{ok, json};
+		{nodes, _, _} ->
+			{ok, json};
+		{ring} ->
+			{ok, json};
+		{ring, _} ->
+			{ok, json}
 	end,
-	mosaic_webmachine:respond_with_outcome (Outcome, Request, State).
+	case Type of
+		json ->
+			{[{"application/json", handle_as_json}], Request, State}
+	end.
 
 
 handle_as_json (Request, State = #state{target = Target, arguments = Arguments}) ->
@@ -148,4 +182,9 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 					Error
 			end
 	end,
+	mosaic_webmachine:respond_with_outcome (Outcome, Request, State).
+
+
+handle_static (Request, State = #state{target = {static}, arguments = {_Path, MimeType, Data}}) ->
+	Outcome = {ok, {mime, MimeType}, Data},
 	mosaic_webmachine:respond_with_outcome (Outcome, Request, State).

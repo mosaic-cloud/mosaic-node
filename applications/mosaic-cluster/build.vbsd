@@ -3,7 +3,7 @@
 
 (vbs:define-erlang-application 'mosaic_cluster
 	dependencies: '(mosaic_tools mosaic_harness riak_core webmachine mochiweb)
-	erl: "\\./sources/.*\\.erl"
+	erl: "\\./(sources|\\.generated)/.*\\.erl"
 	hrl: "\\./sources/.*\\.hrl"
 	additional-ebin: "\\./sources/.*\\.app"
 	additional-priv: "\\./sources/.*\\.config")
