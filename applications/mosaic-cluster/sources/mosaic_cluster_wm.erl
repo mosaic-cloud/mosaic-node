@@ -31,7 +31,7 @@
 
 
 init (Target) ->
-	{{trace, "/tmp/mosaic-cluster-webmachine"}, #state{target = Target, arguments = none}}.
+	{ok, #state{target = Target, arguments = none}}.
 
 
 ping(Request, State = #state{}) ->
@@ -39,34 +39,38 @@ ping(Request, State = #state{}) ->
 
 
 allowed_methods (Request, State = #state{}) ->
-	{['GET'], Request, State}.
+	Outcome = {ok, ['GET']},
+	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
 
 resource_exists (Request, State = #state{target = Target}) ->
-	case Target of
+	Outcome = case Target of
 		{root} ->
-			{false, Request, State};
+			{ok, false};
 		_ ->
-			{true, Request, State}
-	end.
+			{ok, true}
+	end,
+	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
 
 previously_existed (Request, State = #state{target = Target}) ->
-	case Target of
+	Outcome = case Target of
 		{root} ->
-			{true, Request, State};
+			{ok, true};
 		_ ->
-			{true, Request, State}
-	end.
+			{ok, true}
+	end,
+	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
 
 moved_temporarily (Request, State = #state{target = Target}) ->
-	case Target of
+	Outcome = case Target of
 		{root} ->
-			{{true, "/static/console.html"}, Request, State};
+			{ok, {true, "/static/console.html"}};
 		_ ->
-			{false, Request, State}
-	end.
+			{ok, false}
+	end,
+	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
 
 malformed_request (Request, State = #state{target = Target}) ->
@@ -95,32 +99,35 @@ malformed_request (Request, State = #state{target = Target}) ->
 
 
 content_types_provided (Request, State = #state{target = {root}}) ->
-	{[{"application/octet-stream", handle_empty}], Request, State};
+	Outcome = {ok, [{"application/octet-stream", handle_empty}]},
+	mosaic_webmachine:return_with_outcome (Outcome, Request, State);
 	
-content_types_provided (Request, State = #state{target = {static}}) ->
+content_types_provided (Request, OldState = #state{target = {static}}) ->
 	Path = erlang:list_to_binary (lists:map (fun (PathToken) -> [$/, PathToken] end, wrq:path_tokens (Request))),
-	case mosaic_static_resources:contents (Path) of
+	{Outcome, NewState} = case mosaic_static_resources:contents (Path) of
 		{ok, MimeType, Data} ->
-			{[{erlang:binary_to_list (MimeType), handle_static}], Request, State#state{arguments = {Path, MimeType, Data}}};
-		{error, _Reason} ->
-			{[], Request, State}
-	end;
+			{{ok, [{erlang:binary_to_list (MimeType), handle_static}]}, OldState#state{arguments = {Path, MimeType, Data}}};
+		Error = {error, _Reason} ->
+			{Error, OldState}
+	end,
+	mosaic_webmachine:return_with_outcome (Outcome, Request, NewState);
 	
 content_types_provided (Request, State = #state{target = Target}) ->
-	{ok, Type} = case Target of
+	Type = case Target of
 		{nodes} ->
-			{ok, json};
+			json;
 		{nodes, _, _} ->
-			{ok, json};
+			json;
 		{ring} ->
-			{ok, json};
+			json;
 		{ring, _} ->
-			{ok, json}
+			json
 	end,
-	case Type of
+	Outcome = case Type of
 		json ->
-			{[{"application/json", handle_as_json}], Request, State}
-	end.
+			{ok, [{"application/json", handle_as_json}]}
+	end,
+	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
 
 handle_as_json (Request, State = #state{target = Target, arguments = Arguments}) ->

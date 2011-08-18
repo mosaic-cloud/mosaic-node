@@ -29,10 +29,12 @@ ping(Request, State = #state{}) ->
     {pong, Request, State}.
 
 allowed_methods (Request, State = #state{}) ->
-	{['GET'], Request, State}.
+	Outcome = {ok, ['GET']},
+	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
 content_types_provided (Request, State = #state{}) ->
-	{[{"application/json", handle_as_json}], Request, State}.
+	Outcome = {ok, [{"application/json", handle_as_json}]},
+	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
 
 malformed_request (Request, State = #state{target = Target, arguments = none}) ->
