@@ -11,18 +11,15 @@
 		handle_static/2]).
 
 
--import (mosaic_enforcements, [enforce_ok_1/1]).
-
-
 -dispatch ({[], {root}}).
--dispatch ({["static", '*'], {static}}).
+-dispatch ({[<<"static">>, '*'], {static}}).
 
 
--record (state, {target, arguments}).
+-record (state, {target, resource}).
 
 
 init (Target) ->
-	{ok, #state{target = Target, arguments = none}}.
+	{ok, #state{target = Target, resource = none}}.
 
 
 ping(Request, State = #state{}) ->
@@ -67,9 +64,9 @@ moved_temporarily (Request, State = #state{target = Target}) ->
 malformed_request (Request, State = #state{target = Target}) ->
 	Outcome = case Target of
 		{root} ->
-			mosaic_webmachine:enforce_request ('GET', [], Request);
+			mosaic_webmachine:enforce_get_request ([], Request);
 		{static} ->
-			mosaic_webmachine:enforce_request ('GET', [], Request)
+			mosaic_webmachine:enforce_get_request ([], Request)
 	end,
 	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
@@ -82,13 +79,13 @@ content_types_provided (Request, OldState = #state{target = {static}}) ->
 	Path = erlang:list_to_binary (lists:map (fun (PathToken) -> [$/, PathToken] end, wrq:path_tokens (Request))),
 	{Outcome, NewState} = case mosaic_static_resources:contents (Path) of
 		{ok, MimeType, Data} ->
-			{{ok, [{erlang:binary_to_list (MimeType), handle_static}]}, OldState#state{arguments = {Path, MimeType, Data}}};
+			{{ok, [{erlang:binary_to_list (MimeType), handle_static}]}, OldState#state{resource = {Path, MimeType, Data}}};
 		Error = {error, _Reason} ->
 			{Error, OldState}
 	end,
 	mosaic_webmachine:return_with_outcome (Outcome, Request, NewState).
 
 
-handle_static (Request, State = #state{target = {static}, arguments = {_Path, MimeType, Data}}) ->
+handle_static (Request, State = #state{target = {static}, resource = {_Path, MimeType, Data}}) ->
 	Outcome = {ok, {mime, MimeType}, Data},
 	mosaic_webmachine:respond_with_outcome (Outcome, Request, State).

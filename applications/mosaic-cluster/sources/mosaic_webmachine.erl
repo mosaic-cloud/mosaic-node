@@ -5,7 +5,7 @@
 -export ([start_supervised/0, start_supervised/1]).
 -export ([return_with_outcome/3, respond_with_outcome/3]).
 -export ([return_with_content/5, respond_with_content/4]).
--export ([enforce_request/3]).
+-export ([enforce_get_request/2]).
 
 
 start () ->
@@ -92,7 +92,7 @@ dispatches (Module)
 				fun
 					({dispatch, [{Path, Arguments}]})
 							when is_list (Path) ->
-						[{Path, Module, Arguments}];
+						[{lists:map (fun (Token) when is_binary (Token) -> erlang:binary_to_list (Token); (Token) when is_atom (Token) -> Token end, Path), Module, Arguments}];
 					({Name, _Value})
 							when (Name =/= dispatch) ->
 						[]
@@ -181,35 +181,29 @@ encode_content (error, Reason) ->
 	end.
 
 
-enforce_request (Method, Arguments, Request)
-		when is_atom (Method), is_list (Arguments) ->
-	case wrq:method (Request) of
-		Method ->
-			case Arguments of
+enforce_get_request (Arguments, Request)
+		when is_list (Arguments) ->
+	case parse_arguments (Arguments, Request) of
+		{ok, ArgumentNames, ArgumentValues} ->
+			case lists:filter (
+					fun (Name) -> not lists:member (Name, ArgumentNames) end,
+					lists:map (fun ({Name, _}) -> erlang:list_to_binary (Name) end, wrq:req_qs (Request))) of
 				[] ->
-					{ok, false};
-				_ ->
-					case parse_arguments (Arguments, Request) of
-						{ok, ArgumentNames, ArgumentValues} ->
-							case lists:filter (
-									fun (Name) -> not lists:member (Name, ArgumentNames) end,
-									lists:map (fun ({Name, _}) -> Name end, wrq:req_qs (Request))) of
-								[] ->
-									{ok, false, ArgumentValues};
-								UnexpectedArgumentNames ->
-									{error, {unexpected_arguments, UnexpectedArgumentNames}}
-							end;
-						{error, Reason} ->
-							{error, Reason}
-					end
+					case Arguments of
+						[] ->
+							{ok, false};
+						_ ->
+							{ok, false, ArgumentValues}
+					end;
+				UnexpectedArgumentNames ->
+					{error, {unexpected_arguments, UnexpectedArgumentNames}}
 			end;
-		OtherMethod ->
-			{error, {invalid_method, OtherMethod}}
+		{error, Reason} ->
+			{error, Reason}
 	end.
 
 
-parse_arguments (Arguments, Request)
-		when is_list (Arguments) ->
+parse_arguments (Arguments, Request) ->
 	case parse_arguments (Arguments, Request, [], []) of
 		{ok, Names, Values} ->
 			{ok, lists:reverse (Names), lists:reverse (Values)};
@@ -221,17 +215,17 @@ parse_arguments ([], _Request, Names, Values) ->
 	{ok, Names, Values};
 	
 parse_arguments ([Name | Arguments], Request, Names, Values)
-		when is_list (Name) ->
-	case wrq:get_qs_value (Name, Request) of
+		when is_binary (Name) ->
+	case wrq:get_qs_value (erlang:binary_to_list (Name), Request) of
 		Value when is_list (Value) ->
-			parse_arguments (Arguments, Request, [Name | Names], [Value | Values]);
+			parse_arguments (Arguments, Request, [Name | Names], [erlang:list_to_binary (Value) | Values]);
 		undefined ->
 			{error, {missing_argument, Name}}
 	end;
 	
 parse_arguments ([{Name, Parser} | Arguments], Request, Names, Values)
-		when is_list (Name), is_function (Parser, 1) ->
-	case wrq:get_qs_value (Name, Request) of
+		when is_binary (Name), is_function (Parser, 1) ->
+	case wrq:get_qs_value (erlang:binary_to_list (Name), Request) of
 		ValueString when is_list (ValueString) ->
 			case Parser (ValueString) of
 				{ok, ValueTerm} ->

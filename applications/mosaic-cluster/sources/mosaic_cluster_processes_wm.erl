@@ -13,15 +13,15 @@
 -import (mosaic_enforcements, [enforce_ok_1/1]).
 
 
--dispatch ({["processes"], {processes}}).
--dispatch ({["processes", "create"], {processes, create}}).
--dispatch ({["processes", "stop"], {processes, stop}}).
--dispatch ({["processes", "call"], {processes, call}}).
--dispatch ({["processes", "cast"], {processes, cast}}).
--dispatch ({["processes", "ping"], {ping}}).
--dispatch ({["processes", "nodes"], {nodes}}).
--dispatch ({["processes", "nodes", "self", "activate"], {nodes, self, activate}}).
--dispatch ({["processes", "nodes", "self", "deactivate"], {nodes, self, deactivate}}).
+-dispatch ({[<<"processes">>], {processes}}).
+-dispatch ({[<<"processes">>, <<"create">>], {processes, create}}).
+-dispatch ({[<<"processes">>, <<"stop">>], {processes, stop}}).
+-dispatch ({[<<"processes">>, <<"call">>], {processes, call}}).
+-dispatch ({[<<"processes">>, <<"cast">>], {processes, cast}}).
+-dispatch ({[<<"processes">>, <<"ping">>], {ping}}).
+-dispatch ({[<<"processes">>, <<"nodes">>], {nodes}}).
+-dispatch ({[<<"processes">>, <<"nodes">>, <<"self">>, <<"activate">>], {nodes, self, activate}}).
+-dispatch ({[<<"processes">>, <<"nodes">>, <<"self">>, <<"deactivate">>], {nodes, self, deactivate}}).
 
 
 -record (state, {target, arguments}).
@@ -40,49 +40,46 @@ allowed_methods (Request, State = #state{}) ->
 	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
 
-content_types_provided (Request, State = #state{}) ->
-	Outcome = {ok, [{"application/json", handle_as_json}]},
-	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
-
-
 malformed_request (Request, OldState = #state{target = Target, arguments = none}) ->
 	Outcome = case Target of
 		{nodes} ->
-			mosaic_webmachine:enforce_request ('GET', [], Request);
+			mosaic_webmachine:enforce_get_request ([], Request);
 		{nodes, self, Operation} when ((Operation =:= activate) orelse (Operation =:= deactivate)) ->
-			mosaic_webmachine:enforce_request ('GET', [], Request);
+			mosaic_webmachine:enforce_get_request ([], Request);
 		{processes} ->
-			mosaic_webmachine:enforce_request ('GET', [], Request);
+			mosaic_webmachine:enforce_get_request ([], Request);
 		{processes, create} ->
-			case mosaic_webmachine:enforce_request ('GET',
+			case mosaic_webmachine:enforce_get_request (
 					[
-						{"type", fun mosaic_generic_coders:decode_string/1},
-						{"configuration", fun mosaic_json_coders:decode_json/1},
-						{"count", fun mosaic_generic_coders:decode_integer/1}],
+						{<<"type">>, fun mosaic_generic_coders:decode_string/1},
+						{<<"configuration">>, fun mosaic_json_coders:decode_json/1},
+						{<<"count">>, fun mosaic_generic_coders:decode_integer/1}],
 					Request) of
 				{ok, false, [Type, Configuration, Count]} ->
 					if
 						(Count > 0), (Count =< 128) ->
 							{ok, false, OldState#state{arguments = dict:from_list ([{type, Type}, {configuration, Configuration}, {count, Count}])}};
 						true ->
-							{error, {invalid_argument, "count", {out_of_range, 1, 128}}}
+							{error, {invalid_argument, <<"count">>, {out_of_range, 1, 128}}}
 					end;
 				Error = {error, _Reason} ->
 					Error
 			end;
 		{processes, stop} ->
-			case mosaic_webmachine:enforce_request ('GET', [{"key", fun mosaic_generic_coders:decode_string/1}], Request) of
+			case mosaic_webmachine:enforce_get_request (
+					[{<<"key">>, fun mosaic_generic_coders:decode_string/1}],
+					Request) of
 				{ok, false, [Key]} ->
 					{ok, false, OldState#state{arguments = dict:from_list ([{key, Key}])}};
 				Error = {error, _Reason} ->
 					Error
 			end;
 		{processes, Action} when ((Action =:= call) orelse (Action =:= cast)) ->
-			case mosaic_webmachine:enforce_request ('GET',
+			case mosaic_webmachine:enforce_get_request (
 					[
-						{"key", fun mosaic_generic_coders:decode_string/1},
-						{"operation", fun mosaic_generic_coders:decode_string/1},
-						{"inputs", fun mosaic_json_coders:decode_json/1}],
+						{<<"key">>, fun mosaic_generic_coders:decode_string/1},
+						{<<"operation">>, fun mosaic_generic_coders:decode_string/1},
+						{<<"inputs">>, fun mosaic_json_coders:decode_json/1}],
 					Request) of
 				{ok, false, [Key, Operation, Inputs]} ->
 					{ok, false, OldState#state{arguments = dict:from_list ([{key, Key}, {operation, Operation}, {inputs, Inputs}])}};
@@ -90,7 +87,9 @@ malformed_request (Request, OldState = #state{target = Target, arguments = none}
 					Error
 			end;
 		{ping} ->
-			case mosaic_webmachine:enforce_request ('GET', [{"count", fun mosaic_generic_coders:decode_integer/1}], Request) of
+			case mosaic_webmachine:enforce_get_request (
+					[{<<"count">>, fun mosaic_generic_coders:decode_integer/1}],
+					Request) of
 				{ok, false, [Count]} ->
 					if
 						Count =:= 0 ->
@@ -98,13 +97,18 @@ malformed_request (Request, OldState = #state{target = Target, arguments = none}
 						(Count > 0), (Count =< 128) ->
 							{ok, false, OldState#state{arguments = dict:from_list ([{count, Count}])}};
 						true ->
-							{error, {invalid_argument, "count", {out_of_range, 1, 128}}}
+							{error, {invalid_argument, <<"count">>, {out_of_range, 1, 128}}}
 					end;
 				Error = {error, _Reason} ->
 					Error
 			end
 	end,
 	mosaic_webmachine:return_with_outcome (Outcome, Request, OldState).
+
+
+content_types_provided (Request, State = #state{}) ->
+	Outcome = {ok, [{"application/json", handle_as_json}]},
+	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
 
 handle_as_json (Request, State = #state{target = Target, arguments = Arguments}) ->

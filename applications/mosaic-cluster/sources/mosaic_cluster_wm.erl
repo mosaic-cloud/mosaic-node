@@ -13,13 +13,13 @@
 -import (mosaic_enforcements, [enforce_ok_1/1]).
 
 
--dispatch ({["cluster", "nodes"], {nodes}}).
--dispatch ({["cluster", "nodes", "self", "activate"], {nodes, self, activate}}).
--dispatch ({["cluster", "nodes", "self", "deactivate"], {nodes, self, deactivate}}).
--dispatch ({["cluster", "ring"], {ring}}).
--dispatch ({["cluster", "ring", "include"], {ring, include}}).
--dispatch ({["cluster", "ring", "exclude"], {ring, exclude}}).
--dispatch ({["cluster", "ring", "reboot"], {ring, reboot}}).
+-dispatch ({[<<"cluster">>, <<"nodes">>], {nodes}}).
+-dispatch ({[<<"cluster">>, <<"nodes">>, <<"self">>, <<"activate">>], {nodes, self, activate}}).
+-dispatch ({[<<"cluster">>, <<"nodes">>, <<"self">>, <<"deactivate">>], {nodes, self, deactivate}}).
+-dispatch ({[<<"cluster">>, <<"ring">>], {ring}}).
+-dispatch ({[<<"cluster">>, <<"ring">>, <<"include">>], {ring, include}}).
+-dispatch ({[<<"cluster">>, <<"ring">>, <<"exclude">>], {ring, exclude}}).
+-dispatch ({[<<"cluster">>, <<"ring">>, <<"reboot">>], {ring, reboot}}).
 
 
 -record (state, {target, arguments}).
@@ -38,30 +38,32 @@ allowed_methods (Request, State = #state{}) ->
 	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
 
-content_types_provided (Request, State = #state{}) ->
-	Outcome = {ok, [{"application/json", handle_as_json}]},
-	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
-
-
 malformed_request (Request, OldState = #state{target = Target, arguments = none}) ->
 	Outcome = case Target of
 		{nodes} ->
-			mosaic_webmachine:enforce_request ('GET', [], Request);
+			mosaic_webmachine:enforce_get_request ([], Request);
 		{nodes, self, Operation} when ((Operation =:= activate) orelse (Operation =:= deactivate)) ->
-			mosaic_webmachine:enforce_request ('GET', [], Request);
+			mosaic_webmachine:enforce_get_request ([], Request);
 		{ring} ->
-			mosaic_webmachine:enforce_request ('GET', [], Request);
+			mosaic_webmachine:enforce_get_request ([], Request);
 		{ring, Operation} when ((Operation =:= include) orelse (Operation =:= exclude)) ->
-			case mosaic_webmachine:enforce_request ('GET', [{"node", fun mosaic_generic_coders:decode_atom/1}], Request) of
+			case mosaic_webmachine:enforce_get_request (
+					[{<<"node">>, fun mosaic_generic_coders:decode_atom/1}],
+					Request) of
 				{ok, false, [Node]} ->
 					{ok, false, OldState#state{arguments = dict:from_list ([{node, Node}])}};
 				Error = {error, _Reason} ->
 					Error
 			end;
 		{ring, reboot} ->
-			mosaic_webmachine:enforce_request ('GET', [], Request)
+			mosaic_webmachine:enforce_get_request ([], Request)
 	end,
 	mosaic_webmachine:return_with_outcome (Outcome, Request, OldState).
+
+
+content_types_provided (Request, State = #state{}) ->
+	Outcome = {ok, [{"application/json", handle_as_json}]},
+	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
 
 handle_as_json (Request, State = #state{target = Target, arguments = Arguments}) ->
