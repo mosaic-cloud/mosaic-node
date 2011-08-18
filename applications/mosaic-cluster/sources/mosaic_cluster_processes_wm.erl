@@ -2,21 +2,26 @@
 -module (mosaic_cluster_processes_wm).
 
 
--export ([init/1, allowed_methods/2, content_types_provided/2, malformed_request/2, handle_as_json/2, ping/2]).
+-export ([
+		init/1, ping/2,
+		allowed_methods/2,
+		malformed_request/2,
+		content_types_provided/2,
+		handle_as_json/2]).
 
 
 -import (mosaic_enforcements, [enforce_ok_1/1]).
 
 
--dispatch ({["processes", "nodes"], {nodes}}).
--dispatch ({["processes", "nodes", "self", "activate"], {nodes, self, activate}}).
--dispatch ({["processes", "nodes", "self", "deactivate"], {nodes, self, deactivate}}).
 -dispatch ({["processes"], {processes}}).
 -dispatch ({["processes", "create"], {processes, create}}).
 -dispatch ({["processes", "stop"], {processes, stop}}).
 -dispatch ({["processes", "call"], {processes, call}}).
 -dispatch ({["processes", "cast"], {processes, cast}}).
 -dispatch ({["processes", "ping"], {ping}}).
+-dispatch ({["processes", "nodes"], {nodes}}).
+-dispatch ({["processes", "nodes", "self", "activate"], {nodes, self, activate}}).
+-dispatch ({["processes", "nodes", "self", "deactivate"], {nodes, self, deactivate}}).
 
 
 -record (state, {target, arguments}).
@@ -25,19 +30,22 @@
 init (Target) ->
 	{ok, #state{target = Target, arguments = none}}.
 
+
 ping(Request, State = #state{}) ->
     {pong, Request, State}.
+
 
 allowed_methods (Request, State = #state{}) ->
 	Outcome = {ok, ['GET']},
 	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
+
 
 content_types_provided (Request, State = #state{}) ->
 	Outcome = {ok, [{"application/json", handle_as_json}]},
 	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
 
-malformed_request (Request, State = #state{target = Target, arguments = none}) ->
+malformed_request (Request, OldState = #state{target = Target, arguments = none}) ->
 	Outcome = case Target of
 		{nodes} ->
 			mosaic_webmachine:enforce_request ('GET', [], Request);
@@ -55,7 +63,7 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 				{ok, false, [Type, Configuration, Count]} ->
 					if
 						(Count > 0), (Count =< 128) ->
-							{ok, false, State#state{arguments = dict:from_list ([{type, Type}, {configuration, Configuration}, {count, Count}])}};
+							{ok, false, OldState#state{arguments = dict:from_list ([{type, Type}, {configuration, Configuration}, {count, Count}])}};
 						true ->
 							{error, {invalid_argument, "count", {out_of_range, 1, 128}}}
 					end;
@@ -65,7 +73,7 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 		{processes, stop} ->
 			case mosaic_webmachine:enforce_request ('GET', [{"key", fun mosaic_generic_coders:decode_string/1}], Request) of
 				{ok, false, [Key]} ->
-					{ok, false, State#state{arguments = dict:from_list ([{key, Key}])}};
+					{ok, false, OldState#state{arguments = dict:from_list ([{key, Key}])}};
 				Error = {error, _Reason} ->
 					Error
 			end;
@@ -77,7 +85,7 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 						{"inputs", fun mosaic_json_coders:decode_json/1}],
 					Request) of
 				{ok, false, [Key, Operation, Inputs]} ->
-					{ok, false, State#state{arguments = dict:from_list ([{key, Key}, {operation, Operation}, {inputs, Inputs}])}};
+					{ok, false, OldState#state{arguments = dict:from_list ([{key, Key}, {operation, Operation}, {inputs, Inputs}])}};
 				Error = {error, _Reason} ->
 					Error
 			end;
@@ -86,9 +94,9 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 				{ok, false, [Count]} ->
 					if
 						Count =:= 0 ->
-							{ok, false, State#state{arguments = dict:from_list ([{count, default}])}};
+							{ok, false, OldState#state{arguments = dict:from_list ([{count, default}])}};
 						(Count > 0), (Count =< 128) ->
-							{ok, false, State#state{arguments = dict:from_list ([{count, Count}])}};
+							{ok, false, OldState#state{arguments = dict:from_list ([{count, Count}])}};
 						true ->
 							{error, {invalid_argument, "count", {out_of_range, 1, 128}}}
 					end;
@@ -96,7 +104,7 @@ malformed_request (Request, State = #state{target = Target, arguments = none}) -
 					Error
 			end
 	end,
-	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
+	mosaic_webmachine:return_with_outcome (Outcome, Request, OldState).
 
 
 handle_as_json (Request, State = #state{target = Target, arguments = Arguments}) ->

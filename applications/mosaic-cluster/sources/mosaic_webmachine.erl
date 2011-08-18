@@ -55,7 +55,7 @@ start_supervised (Configuration) ->
 options (defaults) ->
 	case application:get_env (mosaic_cluster, webmachine_listen) of
 		{ok, {Address, Port}} when is_list (Address), is_integer (Port), (Port >= 0), (Port < 65536) ->
-			case dispatches ([mosaic_cluster_wm, mosaic_cluster_processes_wm]) of
+			case dispatches ([mosaic_cluster_wm, mosaic_cluster_processes_wm, mosaic_static_resources_wm]) of
 				{ok, Dispatches} ->
 					Options = [
 							{ip, Address},
