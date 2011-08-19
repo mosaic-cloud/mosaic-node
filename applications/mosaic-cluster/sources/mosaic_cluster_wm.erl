@@ -52,7 +52,7 @@ malformed_request (Request, OldState = #state{target = Target, arguments = none}
 					Request) of
 				{ok, false, [Node]} ->
 					{ok, false, OldState#state{arguments = dict:from_list ([{node, Node}])}};
-				Error = {error, _Reason} ->
+				Error = {error, true, _Reason} ->
 					Error
 			end;
 		{ring, reboot} ->

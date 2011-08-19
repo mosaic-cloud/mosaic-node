@@ -109,16 +109,16 @@ validate_frontend_execute_specification (Specification) ->
 	mosaic_generic_coders:validate_term (Specification,
 				{is_record, #frontend_execute_specification{
 								executable = {is_binary, invalid_executable},
-								argument0 = {'orelse', [{matches, defaults}, is_binary], invalid_argument0},
-								arguments = {'orelse', [{matches, defaults},
+								argument0 = {'orelse', [{equals, defaults}, is_binary], invalid_argument0},
+								arguments = {'orelse', [{equals, defaults},
 												{is_list, {is_binary, invalid_argument}, '_'}],
 												invalid_arguments},
-								environment = {'orelse', [{matches, defaults},
+								environment = {'orelse', [{equals, defaults},
 												{is_list,
 													{is_tuple, {{is_binary, invalid_name}, {is_binary, invalid_value}}, invalid_environment},
 													'_'}],
 											invalid_environment},
-								working_directory = {'orelse', [{matches, defaults}, is_binary], invalid_working_directory}},
+								working_directory = {'orelse', [{equals, defaults}, is_binary], invalid_working_directory}},
 							invalid_specification}).
 
 decode_frontend_execute_specification (term, OriginalOptions)

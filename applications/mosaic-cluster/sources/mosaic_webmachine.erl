@@ -5,7 +5,7 @@
 -export ([start_supervised/0, start_supervised/1]).
 -export ([return_with_outcome/3, respond_with_outcome/3]).
 -export ([return_with_content/5, respond_with_content/4]).
--export ([enforce_get_request/2]).
+-export ([enforce_get_request/2, enforce_post_request/3]).
 
 
 start () ->
@@ -127,22 +127,32 @@ return_with_outcome (Outcome, Request, State) ->
 			{Return, Request, State};
 		{ok, Return, NewState} ->
 			{Return, Request, NewState};
-		{error, Reason} ->
-			mosaic_webmachine:return_with_content (true, error, Reason, Request, State)
+		{ok, Return, html, Body} when is_binary (Body) ->
+			return_with_content (Return, html, Body, Request, State);
+		{ok, Return, json, Object} ->
+			return_with_content (Return, json, Object, Request, State);
+		{ok, Return, json_struct, Attributes} ->
+			return_with_content (Return, json, {struct, [{ok, true} | Attributes]}, Request, State);
+		{ok, Return, {mime, MimeType}, Body} when is_binary (MimeType) ->
+			return_with_content (Return, {mime, MimeType}, Body, Request, State);
+		{error, Return, Reason} ->
+			return_with_content (Return, error, Reason, Request, State)
 	end.
 
 respond_with_outcome (Outcome, Request, State) ->
 	case Outcome of
 		ok ->
-			mosaic_webmachine:respond_with_content (json, {struct, [{ok, true}]}, Request, State);
-		{ok, html, Body} ->
-			mosaic_webmachine:respond_with_content (html, Body, Request, State);
-		{ok, json_struct, AttributeTerms} ->
-			mosaic_webmachine:respond_with_content (json, {struct, [{ok, true} | AttributeTerms]}, Request, State);
+			respond_with_content (json, {struct, [{ok, true}]}, Request, State);
+		{ok, html, Body} when is_binary (Body) ->
+			respond_with_content (html, Body, Request, State);
+		{ok, json, Object} ->
+			respond_with_content (json, Object, Request, State);
+		{ok, json_struct, Attributes} ->
+			respond_with_content (json, {struct, [{ok, true} | Attributes]}, Request, State);
 		{ok, {mime, MimeType}, Body} when is_binary (MimeType) ->
-			mosaic_webmachine:respond_with_content ({mime, MimeType}, Body, Request, State);
+			respond_with_content ({mime, MimeType}, Body, Request, State);
 		{error, Reason} ->
-			mosaic_webmachine:respond_with_content (error, Reason, Request, State)
+			respond_with_content (error, Reason, Request, State)
 	end.
 
 
@@ -160,8 +170,8 @@ respond_with_content (Type, ContentTerm, Request, State) ->
 encode_content (html, Content) ->
 	{ok, "text/html", Content};
 	
-encode_content (json, Content) ->
-	case mosaic_json_coders:encode_json (Content) of
+encode_content (json, Object) ->
+	case mosaic_json_coders:encode_json (Object) of
 		{ok, EncodedContent} ->
 			{ok, "application/json", EncodedContent};
 		Error = {error, _Reason} ->
@@ -181,7 +191,50 @@ encode_content (error, Reason) ->
 	end.
 
 
-enforce_get_request (Arguments, Request)
+enforce_get_request (Arguments, Request) ->
+	case wrq:method (Request) of
+		'GET' ->
+			case enforce_arguments (Arguments, Request) of
+				{ok, false, ArgumentValues} ->
+					case ArgumentValues of
+						[] ->
+							{ok, false};
+						_ ->
+							{ok, false, ArgumentValues}
+					end;
+				Error = {error, true, _Reason} ->
+					Error
+			end;
+		OtherMethod ->
+			{error, true, {invalid_method, OtherMethod}}
+	end.
+
+
+enforce_post_request (Arguments, Body, Request) ->
+	case wrq:method (Request) of
+		'POST' ->
+			case enforce_arguments (Arguments, Request) of
+				{ok, false, ArgumentValues} ->
+					case enforce_body (Body, Request) of
+						{ok, false, BodyValue} ->
+							case ArgumentValues of
+								[] ->
+									{ok, false, BodyValue};
+								_ ->
+									{ok, false, ArgumentValues, BodyValue}
+							end;
+						Error = {error, true, _Reason} ->
+							Error
+					end;
+				Error = {error, true, _Reason} ->
+					Error
+			end;
+		OtherMethod ->
+			{error, true, {invalid_method, OtherMethod}}
+	end.
+
+
+enforce_arguments (Arguments, Request)
 		when is_list (Arguments) ->
 	case parse_arguments (Arguments, Request) of
 		{ok, ArgumentNames, ArgumentValues} ->
@@ -189,19 +242,13 @@ enforce_get_request (Arguments, Request)
 					fun (Name) -> not lists:member (Name, ArgumentNames) end,
 					lists:map (fun ({Name, _}) -> erlang:list_to_binary (Name) end, wrq:req_qs (Request))) of
 				[] ->
-					case Arguments of
-						[] ->
-							{ok, false};
-						_ ->
-							{ok, false, ArgumentValues}
-					end;
+					{ok, false, ArgumentValues};
 				UnexpectedArgumentNames ->
-					{error, {unexpected_arguments, UnexpectedArgumentNames}}
+					{error, true, {unexpected_arguments, UnexpectedArgumentNames}}
 			end;
 		{error, Reason} ->
-			{error, Reason}
+			{error, true, Reason}
 	end.
-
 
 parse_arguments (Arguments, Request) ->
 	case parse_arguments (Arguments, Request, [], []) of
@@ -235,4 +282,63 @@ parse_arguments ([{Name, Parser} | Arguments], Request, Names, Values)
 			end;
 		undefined ->
 			{error, {missing_argument, Name}}
+	end.
+
+
+enforce_body (MimeType, Request)
+		when is_atom (MimeType) ->
+	enforce_body ({MimeType}, Request);
+	
+enforce_body (MimeType, Request)
+		when is_binary (MimeType) ->
+	enforce_body ({MimeType}, Request);
+	
+enforce_body ({json}, Request) ->
+	enforce_body ({<<"application/json">>, fun mosaic_json_coders:decode_json/1}, Request);
+	
+enforce_body ({json, Parser}, Request)
+		when is_function (Parser, 1) ->
+	enforce_body ({<<"application/json">>, Parser}, Request);
+	
+enforce_body ({MimeType}, Request)
+		when is_binary (MimeType) ->
+	case wrq:get_req_header ("Content-Type", Request) of
+		EncodedContentType when is_list (EncodedContentType) ->
+			case erlang:list_to_binary (EncodedContentType) of
+				MimeType ->
+					case wrq:req_body (Request) of
+						Body when is_binary (Body) ->
+							{ok, false, Body};
+						undefined ->
+							{error, true, missing_body}
+					end;
+				OtherMimeType ->
+					{error, true, {invalid_content_type, OtherMimeType}}
+			end;
+		undefined ->
+			{error, true, missing_content_type}
+	end;
+	
+enforce_body ({MimeType, Parser}, Request)
+		when is_binary (MimeType), is_function (Parser, 1) ->
+	case wrq:get_req_header ("Content-Type", Request) of
+		EncodedContentType when is_list (EncodedContentType) ->
+			case erlang:list_to_binary (EncodedContentType) of
+				MimeType ->
+					case wrq:req_body (Request) of
+						Body when is_binary (Body) ->
+							case Parser (Body) of
+								{ok, BodyTerm} ->
+									{ok, false, BodyTerm};
+								{error, Reason} ->
+									{error, true, {invalid_body, Reason}}
+							end;
+						undefined ->
+							{error, true, missing_body}
+					end;
+				OtherMimeType ->
+					{error, true, {invalid_content_type, OtherMimeType}}
+			end;
+		undefined ->
+			{error, true, missing_content_type}
 	end.

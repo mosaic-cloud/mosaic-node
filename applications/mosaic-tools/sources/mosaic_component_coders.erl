@@ -87,7 +87,7 @@ validate_resource_specifications (Specifications) ->
 
 validate_resource_specification (Specification) ->
 	mosaic_generic_coders:validate_term (Specification,
-				{is_tuple, {{is_binary, invalid_identifier}, {is_binary, invalid_type}, {matches, defaults}}, invalid_specification}).
+				{is_tuple, {{is_binary, invalid_identifier}, {is_binary, invalid_type}, {equals, defaults}}, invalid_specification}).
 
 encode_resource_specifications (json, Specifications)
 		when is_list (Specifications), (Specifications =/= []) ->

@@ -221,156 +221,156 @@ generate_hex_data (Size)
 
 validate_term (Term, Schema) ->
 	try
-		validate_term_ok (Term, Schema)
+		ok = validate_term_ok (Term, Schema)
 	catch throw : Error = {error, _Reason} -> Error end.
 
 validate_term_ok (Term, is_atom) ->
 	if
 		is_atom (Term) -> ok;
-		true -> throw ({error, {invalid_atom, Term}})
+		true -> throw ({error, {expected_atom, Term}})
 	end;
 	
 validate_term_ok (Term, {is_atom, Reason}) ->
 	if
 		is_atom (Term) -> ok;
-		true -> throw ({error, {Reason, Term, invalid_atom}})
+		true -> throw ({error, {Reason, Term, expected_atom}})
 	end;
 	
 validate_term_ok (Term, is_binary) ->
 	if
 		is_binary (Term) -> ok;
-		true -> throw ({error, {invalid_binary, Term}})
+		true -> throw ({error, {expected_binary, Term}})
 	end;
 	
 validate_term_ok (Term, {is_binary, Reason}) ->
 	if
 		is_binary (Term) -> ok;
-		true -> throw ({error, {Reason, Term, invalid_binary}})
+		true -> throw ({error, {Reason, Term, expected_binary}})
 	end;
 	
 validate_term_ok (Term, {is_binary, Size, Reason})
 		when is_integer (Size), (Size >= 0) ->
 	if
-		is_binary (Term), (byte_size (Term) =:= Size) -> ok;
-		is_binary (Term) -> throw ({error, {Reason, Term, mismatched_binary_size}});
-		true -> throw ({error, {Reason, Term, invalid_binary}})
+		is_binary (Term), (erlang:byte_size (Term) =:= Size) -> ok;
+		is_binary (Term) -> throw ({error, {Reason, Term, {expected_binary_size, Size}}});
+		true -> throw ({error, {Reason, Term, expected_binary}})
 	end;
 	
 validate_term_ok (Term, is_bitstring) ->
 	if
 		is_bitstring (Term) -> ok;
-		true -> throw ({error, {invalid_bitstring, Term}})
+		true -> throw ({error, {expected_bitstring, Term}})
 	end;
 	
 validate_term_ok (Term, {is_bitstring, Reason}) ->
 	if
 		is_bitstring (Term) -> ok;
-		true -> throw ({error, {Reason, Term, invalid_bitstring}})
+		true -> throw ({error, {Reason, Term, expected_bitstring}})
 	end;
 	
 validate_term_ok (Term, {is_bitstring, Size, Reason}) ->
 	if
-		is_bitstring (Term), (bit_size (Term) =:= Size) -> ok;
-		is_bitstring (Term) -> throw ({error, {Reason, Term, mismatched_bitstring_size}});
-		true -> throw ({error, {Reason, Term, invalid_bitstring}})
+		is_bitstring (Term), (erlang:bit_size (Term) =:= Size) -> ok;
+		is_bitstring (Term) -> throw ({error, {Reason, Term, {expected_bitstring_size, Size}}});
+		true -> throw ({error, {Reason, Term, expected_bitstring}})
 	end;
 	
 validate_term_ok (Term, is_boolean) ->
 	if
 		is_boolean (Term) -> ok;
-		true -> throw ({error, {invalid_boolean, Term}})
+		true -> throw ({error, {expected_boolean, Term}})
 	end;
 	
 validate_term_ok (Term, {is_boolean, Reason}) ->
 	if
 		is_boolean (Term) -> ok;
-		true -> throw ({error, {Reason, Term, invalid_boolean}})
+		true -> throw ({error, {Reason, Term, expected_boolean}})
 	end;
 	
 validate_term_ok (Term, is_integer) ->
 	if
 		is_integer (Term) -> ok;
-		true -> throw ({error, {invalid_integer, Term}})
+		true -> throw ({error, {expected_integer, Term}})
 	end;
 	
 validate_term_ok (Term, {is_integer, Reason}) ->
 	if
 		is_integer (Term) -> ok;
-		true -> throw ({error, {Reason, Term, invalid_integer}})
+		true -> throw ({error, {Reason, Term, expected_integer}})
 	end;
 	
 validate_term_ok (Term, {is_integer, {Min, Max}, Reason})
 		when (is_integer (Min) orelse (Min =:= undefined)), (is_integer (Max) orelse (Max =:= undefined)) ->
 	if
 		is_integer (Term), ((Min =:= undefined) orelse (Term >= Min)), ((Max =:= undefined) orelse (Term =< Max)) -> ok;
-		is_integer (Term) -> throw ({error, {Reason, Term, mismatched_integer_range}});
-		true -> throw ({error, {Reason, Term, invalid_integer}})
+		is_integer (Term) -> throw ({error, {Reason, Term, {expected_integer_range, Min, Max}}});
+		true -> throw ({error, {Reason, Term, expected_integer}})
 	end;
 	
 validate_term_ok (Term, is_float) ->
 	if
 		is_float (Term) -> ok;
-		true -> throw ({error, {invalid_float, Term}})
+		true -> throw ({error, {expected_float, Term}})
 	end;
 	
 validate_term_ok (Term, {is_float, Reason}) ->
 	if
 		is_float (Term) -> ok;
-		true -> throw ({error, {Reason, Term, invalid_float}})
+		true -> throw ({error, {Reason, Term, expected_float}})
 	end;
 	
 validate_term_ok (Term, {is_float, {Min, Max}, Reason})
 		when (is_float (Min) orelse (Min =:= undefined)), (is_float (Max) orelse (Max =:= undefined)) ->
 	if
 		is_float (Term), ((Min =:= undefined) orelse (Term >= Min)), ((Max =:= undefined) orelse (Term =< Max)) -> ok;
-		is_float (Term) -> throw ({error, {Reason, Term, mismatched_float_range}});
-		true -> throw ({error, {Reason, Term, invalid_float}})
+		is_float (Term) -> throw ({error, {Reason, Term, {expected_float_range, Min, Max}}});
+		true -> throw ({error, {Reason, Term, expected_float}})
 	end;
 	
 validate_term_ok (Term, {is_function, Reason}) ->
 	if
 		is_function (Term) -> ok;
-		true -> throw ({error, {Reason, Term, invalid_function}})
+		true -> throw ({error, {Reason, Term, expected_function}})
 	end;
 	
 validate_term_ok (Term, {is_function, Arity, Reason})
 		when is_integer (Arity), (Arity >= 0) ->
 	if
 		is_function (Term, Arity) -> ok;
-		is_function (Term) -> throw ({error, {Reason, Term, mismatched_function_arity}});
-		true -> throw ({error, {Reason, Term, invalid_function}})
+		is_function (Term) -> throw ({error, {Reason, Term, {expected_function_arity, Arity}}});
+		true -> throw ({error, {Reason, Term, expected_function}})
 	end;
 	
 validate_term_ok (Term, is_reference) ->
 	if
 		is_reference (Term) -> ok;
-		true -> throw ({error, {invalid_reference, Term}})
+		true -> throw ({error, {expected_reference, Term}})
 	end;
 	
 validate_term_ok (Term, {is_reference, Reason}) ->
 	if
 		is_reference (Term) -> ok;
-		true -> throw ({error, {Reason, Term, invalid_reference}})
+		true -> throw ({error, {Reason, Term, expected_reference}})
 	end;
 	
 validate_term_ok (Term, is_list) ->
 	if
 		is_list (Term) -> ok;
-		true -> throw ({error, {invalid_list, Term}})
+		true -> throw ({error, {expected_list, Term}})
 	end;
 	
 validate_term_ok (Term, {is_list, Reason}) ->
 	if
 		is_list (Term) -> ok;
-		true -> throw ({error, {Reason, Term, invalid_list}})
+		true -> throw ({error, {Reason, Term, expected_list}})
 	end;
 	
 validate_term_ok (Term, {is_list, Length, Reason})
 		when is_integer (Length) ->
 	if
 		is_list (Term), (Length =:= length (Term)) -> ok;
-		is_list (Term) -> throw ({error, {Reason, Term, mismatched_list_length}});
-		true -> throw ({error, {Reason, Term, invalid_list}})
+		is_list (Term) -> throw ({error, {Reason, Term, {expected_list_length, Length}}});
+		true -> throw ({error, {Reason, Term, expected_list}})
 	end;
 	
 validate_term_ok (Term, {is_list, ElementSchema, Reason}) ->
@@ -378,28 +378,28 @@ validate_term_ok (Term, {is_list, ElementSchema, Reason}) ->
 		is_list (Term) ->
 			try
 				ok = lists:foreach (fun (Element) -> ok = validate_term_ok (Element, ElementSchema) end, Term)
-			catch throw : {error, ElementReason} -> throw ({error, {Reason, Term, ElementReason}}) end;
-		true -> throw ({error, {Reason, Term, invalid_list}})
+			catch throw : {error, ElementReason} -> throw ({error, {Reason, Term, {invalid_list_element, ElementReason}}}) end;
+		true -> throw ({error, {Reason, Term, expected_list}})
 	end;
 	
 validate_term_ok (Term, is_tuple) ->
 	if
 		is_tuple (Term) -> ok;
-		true -> throw ({error, {invalid_tuple, Term}})
+		true -> throw ({error, {expected_tuple, Term}})
 	end;
 	
 validate_term_ok (Term, {is_tuple, Reason}) ->
 	if
 		is_tuple (Term) -> ok;
-		true -> throw ({error, {Reason, Term, invalid_tuple}})
+		true -> throw ({error, {Reason, Term, expected_tuple}})
 	end;
 	
 validate_term_ok (Term, {is_tuple, Size, Reason})
 		when is_integer (Size) ->
 	if
 		is_tuple (Term), (Size =:= tuple_size (Term)) -> ok;
-		is_tuple (Term) -> throw ({error, {Reason, Term, mismatched_tuple_size}});
-		true -> throw ({error, {Reason, Term, invalid_tuple}})
+		is_tuple (Term) -> throw ({error, {Reason, Term, {expected_tuple_size, Size}}});
+		true -> throw ({error, {Reason, Term, expected_tuple}})
 	end;
 	
 validate_term_ok (Term, {is_tuple, TupleSchema, Reason})
@@ -409,62 +409,66 @@ validate_term_ok (Term, {is_tuple, TupleSchema, Reason})
 			try
 				ok = lists:foreach (fun ({Element, ElementSchema}) -> ok = validate_term_ok (Element, ElementSchema) end,
 							lists:zip (erlang:tuple_to_list (Term), erlang:tuple_to_list (TupleSchema)))
-			catch throw : {error, ElementReason} -> throw ({error, {Reason, Term, ElementReason}}) end;
-		true -> throw ({error, {Reason, Term, invalid_tuple}})
+			catch throw : {error, ElementReason} -> throw ({error, {Reason, Term, {invalid_tuple_element, ElementReason}}}) end;
+		true -> throw ({error, {Reason, Term, expected_tuple}})
 	end;
 	
 validate_term_ok (Term, {is_record, Tag, Size, Reason})
 		when is_atom (Tag), is_integer (Size) ->
 	if
-		is_tuple (Term), (Size =:= tuple_size (Term)), (Tag =:= element (1, Term)) -> ok;
-		true -> throw ({error, {Reason, Term, invalid_record}})
+		is_tuple (Term), (Tag =:= element (1, Term)), (Size =:= tuple_size (Term)) -> ok;
+		is_tuple (Term), (Tag =:= element (1, Term)) -> throw ({error, {Reason, Term, {expected_record_size, Size}}});
+		is_tuple (Term) -> throw ({error, {Reason, Term, {expected_record_tag, Tag}}});
+		true -> throw ({error, {Reason, Term, expected_record}})
 	end;
 	
 validate_term_ok (Term, {is_record, RecordSchema, Reason})
 		when is_tuple (RecordSchema), (tuple_size (RecordSchema) >= 2), is_atom (element (1, RecordSchema)) ->
 	if
-		is_tuple (Term), (tuple_size (RecordSchema) =:= tuple_size (Term)), (element (1, RecordSchema) =:= element (1, Term)) ->
+		is_tuple (Term), (element (1, RecordSchema) =:= element (1, Term)), (tuple_size (RecordSchema) =:= tuple_size (Term)) ->
 			try
 				ok = lists:foreach (fun ({Element, ElementSchema}) -> ok = validate_term_ok (Element, ElementSchema) end,
 							erlang:tl (lists:zip (erlang:tuple_to_list (Term), erlang:tuple_to_list (RecordSchema))))
-			catch throw : {error, ElementReason} -> throw ({error, {Reason, Term, ElementReason}}) end;
-		true -> throw ({error, {Reason, Term, invalid_record}})
+			catch throw : {error, ElementReason} -> throw ({error, {Reason, Term, {invalid_record_element, ElementReason}}}) end;
+		is_tuple (Term), (element (1, RecordSchema) =:= element (1, Term)) -> throw ({error, {Reason, Term, {expected_record_size, erlang:tuple_size (RecordSchema)}}});
+		is_tuple (Term) -> throw ({error, {Reason, Term, {expected_record_tag, erlang:element (1, RecordSchema)}}});
+		true -> throw ({error, {Reason, Term, expected_record}})
 	end;
 	
 validate_term_ok (Term, is_pid) ->
 	if
 		is_pid (Term) -> ok;
-		true -> throw ({error, {invalid_pid, Term}})
+		true -> throw ({error, {expected_pid, Term}})
 	end;
 	
 validate_term_ok (Term, {is_pid, Reason}) ->
 	if
 		is_pid (Term) -> ok;
-		true -> throw ({error, {Reason, Term, invalid_pid}})
+		true -> throw ({error, {Reason, Term, expected_pid}})
 	end;
 	
 validate_term_ok (Term, is_port) ->
 	if
 		is_port (Term) -> ok;
-		true -> throw ({error, {invalid_port, Term}})
+		true -> throw ({error, {expected_port, Term}})
 	end;
 	
 validate_term_ok (Term, {is_port, Reason}) ->
 	if
 		is_port (Term) -> ok;
-		true -> throw ({error, {Reason, Term, invalid_port}})
+		true -> throw ({error, {Reason, Term, expected_port}})
 	end;
 	
 validate_term_ok (Term, is_process) ->
 	if
 		is_pid (Term); is_port (Term) -> ok;
-		true -> throw ({error, {invalid_process, Term}})
+		true -> throw ({error, {expected_process, Term}})
 	end;
 	
 validate_term_ok (Term, {is_process, Reason}) ->
 	if
 		is_pid (Term); is_port (Term) -> ok;
-		true -> throw ({error, {Reason, Term, invalid_process}})
+		true -> throw ({error, {Reason, Term, expected_process}})
 	end;
 	
 validate_term_ok (Term, {validator, Validator})
@@ -485,7 +489,7 @@ validate_term_ok (Term, {'andalso', Schemas, Reason})
 		when is_list (Schemas), (Schemas =/= []) ->
 	try
 		ok = lists:foreach (fun (Schema) -> ok = validate_term_ok (Term, Schema) end, Schemas)
-	catch throw : {error, AndalsoError} -> throw ({error, {Reason, Term, AndalsoError}}) end;
+	catch throw : {error, AndalsoReason} -> throw ({error, {Reason, Term, AndalsoReason}}) end;
 	
 validate_term_ok (Term, {'orelse', Schemas, Reason})
 		when is_list (Schemas), (Schemas =/= []) ->
@@ -499,16 +503,16 @@ validate_term_ok (Term, {'orelse', Schemas, Reason})
 		throw ({error, {Reason, Term}})
 	catch ok -> ok end;
 	
-validate_term_ok (Term, {matches, Expected}) ->
+validate_term_ok (Term, {equals, Expected}) ->
 	if
 		(Term =:= Expected) -> ok;
-		true -> throw ({error, {mismatched_value, Term}})
+		true -> throw ({error, {unexpected_value, Term}})
 	end;
 	
-validate_term_ok (Term, {matches, Expected, Reason}) ->
+validate_term_ok (Term, {equals, Expected, Reason}) ->
 	if
 		(Term =:= Expected) -> ok;
-		true -> throw ({error, {Reason, Term, mismatched_value}})
+		true -> throw ({error, {Reason, Term, {expected_value, Expected}}})
 	end.
 
 

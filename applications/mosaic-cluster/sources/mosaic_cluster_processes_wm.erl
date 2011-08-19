@@ -7,10 +7,11 @@
 		allowed_methods/2,
 		malformed_request/2,
 		content_types_provided/2,
-		handle_as_json/2]).
+		handle_as_json/2,
+		process_post/2]).
 
 
--import (mosaic_enforcements, [enforce_ok_1/1]).
+-import (mosaic_enforcements, [enforce_ok/1, enforce_ok_1/1]).
 
 
 -dispatch ({[<<"processes">>], {processes}}).
@@ -35,8 +36,13 @@ ping(Request, State = #state{}) ->
     {pong, Request, State}.
 
 
-allowed_methods (Request, State = #state{}) ->
-	Outcome = {ok, ['GET']},
+allowed_methods (Request, State = #state{target = Target}) ->
+	Outcome = case Target of
+		{processes, create} ->
+			{ok, ['GET', 'POST']};
+		_ ->
+			{ok, ['GET']}
+	end,
 	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
 
 
@@ -49,21 +55,31 @@ malformed_request (Request, OldState = #state{target = Target, arguments = none}
 		{processes} ->
 			mosaic_webmachine:enforce_get_request ([], Request);
 		{processes, create} ->
-			case mosaic_webmachine:enforce_get_request (
-					[
-						{<<"type">>, fun mosaic_generic_coders:decode_string/1},
-						{<<"configuration">>, fun mosaic_json_coders:decode_json/1},
-						{<<"count">>, fun mosaic_generic_coders:decode_integer/1}],
-					Request) of
-				{ok, false, [Type, Configuration, Count]} ->
-					if
-						(Count > 0), (Count =< 128) ->
-							{ok, false, OldState#state{arguments = dict:from_list ([{type, Type}, {configuration, Configuration}, {count, Count}])}};
-						true ->
-							{error, {invalid_argument, <<"count">>, {out_of_range, 1, 128}}}
+			case wrq:method (Request) of
+				'GET' ->
+					case mosaic_webmachine:enforce_get_request (
+							[
+								{<<"type">>, fun mosaic_generic_coders:decode_string/1},
+								{<<"configuration">>, fun mosaic_json_coders:decode_json/1},
+								{<<"count">>, fun mosaic_generic_coders:decode_integer/1}],
+							Request) of
+						{ok, false, [Type, Configuration, Count]} ->
+							if
+								(Count > 0), (Count =< 128) ->
+									{ok, false, OldState#state{arguments = dict:from_list ([{type, Type}, {configuration, Configuration}, {count, Count}])}};
+								true ->
+									{error, true, {invalid_argument, <<"count">>, {out_of_range, 1, 128}}}
+							end;
+						Error = {error, true, _Reason} ->
+							Error
 					end;
-				Error = {error, _Reason} ->
-					Error
+				'POST' ->
+					case mosaic_webmachine:enforce_post_request ([], json, Request) of
+						{ok, false, Json} ->
+							{ok, false, OldState#state{arguments = Json}};
+						Error = {error, true, _Reason} ->
+							Error
+					end
 			end;
 		{processes, stop} ->
 			case mosaic_webmachine:enforce_get_request (
@@ -71,7 +87,7 @@ malformed_request (Request, OldState = #state{target = Target, arguments = none}
 					Request) of
 				{ok, false, [Key]} ->
 					{ok, false, OldState#state{arguments = dict:from_list ([{key, Key}])}};
-				Error = {error, _Reason} ->
+				Error = {error, true, _Reason} ->
 					Error
 			end;
 		{processes, Action} when ((Action =:= call) orelse (Action =:= cast)) ->
@@ -83,7 +99,7 @@ malformed_request (Request, OldState = #state{target = Target, arguments = none}
 					Request) of
 				{ok, false, [Key, Operation, Inputs]} ->
 					{ok, false, OldState#state{arguments = dict:from_list ([{key, Key}, {operation, Operation}, {inputs, Inputs}])}};
-				Error = {error, _Reason} ->
+				Error = {error, true, _Reason} ->
 					Error
 			end;
 		{ping} ->
@@ -97,9 +113,9 @@ malformed_request (Request, OldState = #state{target = Target, arguments = none}
 						(Count > 0), (Count =< 128) ->
 							{ok, false, OldState#state{arguments = dict:from_list ([{count, Count}])}};
 						true ->
-							{error, {invalid_argument, <<"count">>, {out_of_range, 1, 128}}}
+							{error, true, {invalid_argument, <<"count">>, {out_of_range, 1, 128}}}
 					end;
-				Error = {error, _Reason} ->
+				Error = {error, true, _Reason} ->
 					Error
 			end
 	end,
@@ -287,3 +303,69 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			end
 	end,
 	mosaic_webmachine:respond_with_outcome (Outcome, Request, State).
+
+
+process_post (Request, State = #state{target = Target, arguments = Json}) ->
+	Outcome = case Target of
+		{processes, create} ->
+			try
+				ok = enforce_ok (mosaic_json_coders:validate_json (Json, json_schema (process_specifications))),
+				{struct, ProcessSpecifications} = Json,
+				ProcessOutcomes = lists:map (
+						fun ({ProcessName, {struct, ProcessSpecification}}) ->
+							[
+									{<<"configuration">>, ProcessConfigurationContent},
+									{<<"count">>, Count},
+									{<<"type">>, ProcessType_}
+							] = lists:keysort (1, ProcessSpecification),
+							ProcessOutcome = try
+								ProcessType = case ProcessType_ of
+									<<$#, ProcessType__ / binary>> ->
+										case mosaic_generic_coders:decode_atom (ProcessType__) of
+											{ok, ProcessType___} ->
+												ProcessType___;
+											Error1 = {error, _Reason1} ->
+												throw (Error1)
+										end;
+									ProcessType__ ->
+										throw ({error, {invalid_type, ProcessType__}})
+								end,
+								case mosaic_cluster_processes:define_and_create (ProcessType, json, ProcessConfigurationContent, Count) of
+									{ok, Processes, []} ->
+										{struct, [
+												{ok, true},
+												{keys, [enforce_ok_1 (mosaic_component_coders:encode_component (Key)) || {Key, _Process} <- Processes]}]};
+									{ok, Processes, Reasons} ->
+										{struct, [
+												{ok, true},
+												{keys, [enforce_ok_1 (mosaic_component_coders:encode_component (Key)) || {Key, _Process} <- Processes]},
+												{error, [enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reason)) || Reason <- Reasons]}]};
+									Error2 = {error, _Reason2} ->
+										throw (Error2)
+								end
+							catch
+								throw : {error, Reason3} ->
+									{struct, [
+											{ok, false},
+											{error, enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reason3))}]}
+							end,
+							{ProcessName, ProcessOutcome}
+						end,
+						ProcessSpecifications),
+				{ok, false, json_struct, [{processes, ProcessOutcomes}]}
+			catch throw : {error, Reason} -> {error, false, Reason} end
+	end,
+	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
+
+
+json_schema (process_specifications) ->
+	{is_struct, [{attribute, json_schema (process_specification)}], invalid_process_specifications};
+	
+json_schema (process_specification) ->
+	{is_struct, [{attributes, json_schema (process_specification_attributes)}], invalid_process_specification};
+	
+json_schema (process_specification_attributes) ->
+	[
+		{<<"type">>, {is_string, invalid_type}},
+		{<<"configuration">>, {is_json, invalid_configuration}},
+		{<<"count">>, {is_integer, invalid_count}}].
