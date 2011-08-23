@@ -310,14 +310,21 @@ process_post (Request, State = #state{target = Target, arguments = Json}) ->
 		{processes, create} ->
 			try
 				ok = enforce_ok (mosaic_json_coders:validate_json (Json, json_schema (process_specifications))),
-				{struct, ProcessSpecifications} = Json,
-				ProcessOutcomes = lists:map (
+				{struct, ProcessSpecifications_} = Json,
+				ProcessSpecifications = lists:keysort (5, lists:map (
 						fun ({ProcessName, {struct, ProcessSpecification}}) ->
 							[
-									{<<"configuration">>, ProcessConfigurationContent},
+									{<<"configuration">>, ProcessConfiguration},
 									{<<"count">>, Count},
-									{<<"type">>, ProcessType_}
+									{<<"delay">>, Delay},
+									{<<"order">>, Order},
+									{<<"type">>, ProcessType}
 							] = lists:keysort (1, ProcessSpecification),
+							{ProcessName, ProcessType, ProcessConfiguration, Count, Order, Delay}
+						end,
+						ProcessSpecifications_)),
+				ProcessOutcomes = lists:map (
+						fun ({ProcessName, ProcessType_, ProcessConfigurationContent, Count, _Order, Delay}) ->
 							ProcessOutcome = try
 								ProcessType = case ProcessType_ of
 									<<$#, ProcessType__ / binary>> ->
@@ -332,10 +339,17 @@ process_post (Request, State = #state{target = Target, arguments = Json}) ->
 								end,
 								case mosaic_cluster_processes:define_and_create (ProcessType, json, ProcessConfigurationContent, Count) of
 									{ok, Processes, []} ->
+										ok = timer:sleep (Delay),
 										{struct, [
 												{ok, true},
 												{keys, [enforce_ok_1 (mosaic_component_coders:encode_component (Key)) || {Key, _Process} <- Processes]}]};
+									{ok, [], Reasons} ->
+										{struct, [
+												{ok, true},
+												{keys, []},
+												{error, [enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reasons)) || Reason <- Reasons]}]};
 									{ok, Processes, Reasons} ->
+										ok = timer:sleep (Delay),
 										{struct, [
 												{ok, true},
 												{keys, [enforce_ok_1 (mosaic_component_coders:encode_component (Key)) || {Key, _Process} <- Processes]},
@@ -368,4 +382,6 @@ json_schema (process_specification_attributes) ->
 	[
 		{<<"type">>, {is_string, invalid_type}},
 		{<<"configuration">>, {is_json, invalid_configuration}},
-		{<<"count">>, {is_integer, invalid_count}}].
+		{<<"count">>, {is_integer, invalid_count}},
+		{<<"delay">>, {is_integer, invalid_delay}},
+		{<<"order">>, {is_integer, invalid_order}}].
