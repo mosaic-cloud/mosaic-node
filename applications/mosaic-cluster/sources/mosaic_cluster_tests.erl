@@ -158,6 +158,7 @@ execute ({initialize}) ->
 	
 	_ = mosaic_process_configurator:register ('mosaic-components:java-container', json, {mosaic_component_process_tests, configure, defaults}),
 	_ = mosaic_process_configurator:register ('mosaic-components:java-driver', json, {mosaic_component_process_tests, configure, defaults}),
+	_ = mosaic_process_configurator:register ('mosaic-components:java-cloudlet-container', json, {mosaic_component_process_tests, configure, defaults}),
 	
 	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-examples-realtime-feeds:fetcher">>, <<16#4cb6ba9f09150c29b590b82b02a5a295ffc742d2 : 160>>),
 	_ = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:fetcher', json, {mosaic_component_process_tests, configure, defaults}),

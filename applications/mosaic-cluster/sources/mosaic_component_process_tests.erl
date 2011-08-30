@@ -380,6 +380,22 @@ configure_1 (Type = 'mosaic-components:java-driver', Identifier, {json, Class}, 
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
+configure_1 (Type = 'mosaic-components:java-cloudlet-container', Identifier, {json, [ClassPath, Descriptor]}, ExtraOptions)
+		when is_binary (ClassPath), is_binary (Descriptor), is_list (ExtraOptions) ->
+	try
+		Executable = enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-java-cloudlet-container--run-component">>)),
+		Options = [
+				{harness, [
+					{argument0, <<"[", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
+				{execute, [
+					{executable, Executable},
+					{arguments, [
+						enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
+						ClassPath, Descriptor]}]}
+				| ExtraOptions],
+		{ok, Options}
+	catch throw : Error = {error, _Reason} -> Error end;
+	
 configure_1 (Type = 'mosaic-tests:jetty-hello-world', Identifier, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	try

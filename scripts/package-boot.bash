@@ -113,6 +113,7 @@ cat >"${_outputs}/package-boot/pkg.json" <<EOS
 		"mosaic-components-httpg",
 		"mosaic-components-java-container",
 		"mosaic-components-java-drivers",
+		"mosaic-components-java-cloudlet-container",
 		"mosaic-examples-realtime-feeds"
 	]
 }
