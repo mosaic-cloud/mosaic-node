@@ -12,6 +12,10 @@ fi
 "${_workbench}/../mosaic-components-httpg/scripts/make"
 
 #"${_workbench}/../mosaic-java-components/components-container/scripts/make"
+#"${_workbench}/../mosaic-java-platform/mosaic-mvn/mosaic-cloudlet/scripts/make"
+#"${_workbench}/../mosaic-java-platform/mosaic-mvn/mosaic-driver/scripts/make"
+
 #"${_workbench}/../mosaic-examples-realtime-feeds/frontend/scripts/make"
+#"${_workbench}/../mosaic-examples-realtime-feeds-java/scripts/make"
 
 exit 0

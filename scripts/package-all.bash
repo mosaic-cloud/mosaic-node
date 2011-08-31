@@ -12,7 +12,11 @@ fi
 "${_workbench}/../mosaic-components-httpg/scripts/package"
 
 "${_workbench}/../mosaic-java-components/components-container/scripts/package"
+"${_workbench}/../mosaic-java-platform/mosaic-mvn/mosaic-cloudlet/scripts/package"
+"${_workbench}/../mosaic-java-platform/mosaic-mvn/mosaic-driver/scripts/package"
+
 "${_workbench}/../mosaic-examples-realtime-feeds/backend/scripts/package"
+#"${_workbench}/../mosaic-examples-realtime-feeds-java/scripts/package"
 
 "${_workbench}/scripts/package-boot"
 
