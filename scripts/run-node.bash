@@ -28,6 +28,12 @@ else
 	_riak_handoff_port="$(( _erl_epmd_port + 1 + (_index - 1) * 2 + 1 ))"
 fi
 
+if test -n "${mosaic_node_temporary:-}" ; then
+	_tmp="${mosaic_node_temporary}/cluster/${_index}"
+else
+	_tmp="/tmp/mosaic/cluster/${_index}"
+fi
+
 _erl_args+=(
 		-noinput -noshell
 		-name "${_erl_name}" -setcookie "${_erl_cookie}"
@@ -52,7 +58,7 @@ if test -n "${_workbench:-}" ; then
 		)
 fi
 
-mkdir -p "/tmp/mosaic/cluster/${_index}"
-cd "/tmp/mosaic/cluster/${_index}"
+mkdir -p "${_tmp}"
+cd "${_tmp}"
 
 exec env "${_erl_env[@]}" "${_erl}" "${_erl_args[@]}"

@@ -9,6 +9,12 @@ _module="${1}"
 _webmachine_port="$(( _erl_epmd_port + 1 ))"
 _riak_handoff_port="$(( _erl_epmd_port + 2 ))"
 
+if test -n "${mosaic_node_temporary:-}" ; then
+	_tmp="${mosaic_node_temporary}/cluster/0"
+else
+	_tmp="/tmp/mosaic/cluster/0"
+fi
+
 _erl_args+=(
 		-noinput -noshell
 		-name mosaic-cluster-0@mosaic-0.loopback.vnet
@@ -24,7 +30,7 @@ _erl_env+=(
 		_mosaic_cluster_workbench="${_workbench}"
 )
 
-mkdir -p "/tmp/mosaic/cluster/0"
-cd "/tmp/mosaic/cluster/0"
+mkdir -p "${_tmp}"
+cd "${_tmp}"
 
 exec env "${_erl_env[@]}" "${_erl}" "${_erl_args[@]}"
