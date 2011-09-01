@@ -264,9 +264,9 @@ configure_1 (Type, Identifier, defaults, ExtraOptions)
 		Executable = case Type of
 			'mosaic-tests:rabbitmq' ->
 				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_workbench">>)),
-				<<Workbench / binary, "/../mosaic-components-rabbitmq/scripts/run-node">>;
+				<<Workbench / binary, "/../mosaic-components-rabbitmq/scripts/run-component">>;
 			'mosaic-components:rabbitmq' ->
-				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-rabbitmq--run-node">>))
+				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-rabbitmq--run-component">>))
 		end,
 		Options = [
 				{harness, [
@@ -284,9 +284,9 @@ configure_1 (Type, Identifier, defaults, ExtraOptions)
 		Executable = case Type of
 			'mosaic-tests:riak-kv' ->
 				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_workbench">>)),
-				<<Workbench / binary, "/../mosaic-components-riak-kv/scripts/run-node">>;
+				<<Workbench / binary, "/../mosaic-components-riak-kv/scripts/run-component">>;
 			'mosaic-components:riak-kv' ->
-				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-riak-kv--run-node">>))
+				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-riak-kv--run-component">>))
 		end,
 		Options = [
 				{harness, [
@@ -304,9 +304,9 @@ configure_1 (Type, Identifier, defaults, ExtraOptions)
 		Executable = case Type of
 			'mosaic-tests:httpg' ->
 				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_workbench">>)),
-				<<Workbench / binary, "/../mosaic-components-httpg/scripts/run-node">>;
+				<<Workbench / binary, "/../mosaic-components-httpg/scripts/run-component">>;
 			'mosaic-components:httpg' ->
-				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-httpg--run-node">>))
+				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-httpg--run-component">>))
 		end,
 		Options = [
 				{harness, [

@@ -29,7 +29,9 @@ else
 fi
 
 if test -n "${mosaic_node_temporary:-}" ; then
-	_tmp="${mosaic_node_temporary}/node/${_index}"
+	_tmp="${mosaic_node_temporary}"
+elif test -n "${mosaic_temporary:-}" ; then
+	_tmp="${mosaic_temporary}/node/${_index}"
 else
 	_tmp="/tmp/mosaic/node/${_index}"
 fi

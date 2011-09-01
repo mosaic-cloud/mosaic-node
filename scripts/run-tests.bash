@@ -10,7 +10,9 @@ _webmachine_port="$(( _erl_epmd_port + 1 ))"
 _riak_handoff_port="$(( _erl_epmd_port + 2 ))"
 
 if test -n "${mosaic_node_temporary:-}" ; then
-	_tmp="${mosaic_node_temporary}/node/0"
+	_tmp="${mosaic_node_temporary}"
+elif test -n "${mosaic_temporary:-}" ; then
+	_tmp="${mosaic_temporary}/node/0"
 else
 	_tmp="/tmp/mosaic/node/0"
 fi
