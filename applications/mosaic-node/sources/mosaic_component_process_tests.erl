@@ -49,7 +49,7 @@ test_call ({defaults}) ->
 
 test_cast ({defaults}) ->
 	{ok, Identifier} = mosaic_component_coders:generate_component (),
-	{ok, Configuration} = configure ('mosaic-tests:spython-parrot', create, Identifier),
+	{ok, Configuration} = configure ('mosaic-tests:python-parrot', create, Identifier),
 	{ok, Process} = start_link_process (mosaic_component_process, create, Identifier, Configuration),
 	{ok, InputName1} = mosaic_generic_coders:generate_hex_data (8),
 	{ok, InputValue1} = mosaic_generic_coders:generate_hex_data (8),
@@ -165,7 +165,7 @@ configure (Type, Disposition, Identifier, json, Configuration, ExtraOptions)
 configure_1 (Type = 'mosaic-tests:python-parrot', Identifier, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	try
-		Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
+		Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_workbench">>)),
 		Options = [
 				{harness, [
 					{argument0, <<"[", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
@@ -173,7 +173,7 @@ configure_1 (Type = 'mosaic-tests:python-parrot', Identifier, defaults, ExtraOpt
 					{executable, enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"python2">>))},
 					{arguments, [
 						<<Workbench / binary, "/applications/mosaic-harness/sources/mosaic_harness_tester.py">>,
-						<<"backend">>, <<"python-parrot">>, enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]}]}
+						<<"backend">>, <<"parrot">>, enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]}]}
 				| ExtraOptions],
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
@@ -181,7 +181,7 @@ configure_1 (Type = 'mosaic-tests:python-parrot', Identifier, defaults, ExtraOpt
 configure_1 (Type = 'mosaic-tests:python-abacus', Identifier, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	try
-		Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
+		Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_workbench">>)),
 		Options = [
 				{harness, [
 					{argument0, <<"[", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
@@ -198,7 +198,7 @@ configure_1 (Type = 'mosaic-tests:python-abacus', Identifier, defaults, ExtraOpt
 configure_1 (Type = 'mosaic-tests:node-abacus', Identifier, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	try
-		Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
+		Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_workbench">>)),
 		Options = [
 				{harness, [
 					{argument0, <<"[", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
@@ -214,7 +214,7 @@ configure_1 (Type = 'mosaic-tests:node-abacus', Identifier, defaults, ExtraOptio
 configure_1 (Type = 'mosaic-tests:java-abacus', Identifier, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	try
-		Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
+		Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_workbench">>)),
 		Options = [
 				{harness, [
 					{argument0, <<"[", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
@@ -263,7 +263,7 @@ configure_1 (Type, Identifier, defaults, ExtraOptions)
 	try
 		Executable = case Type of
 			'mosaic-tests:rabbitmq' ->
-				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
+				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_workbench">>)),
 				<<Workbench / binary, "/../mosaic-components-rabbitmq/scripts/run-node">>;
 			'mosaic-components:rabbitmq' ->
 				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-rabbitmq--run-node">>))
@@ -283,7 +283,7 @@ configure_1 (Type, Identifier, defaults, ExtraOptions)
 	try
 		Executable = case Type of
 			'mosaic-tests:riak-kv' ->
-				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
+				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_workbench">>)),
 				<<Workbench / binary, "/../mosaic-components-riak-kv/scripts/run-node">>;
 			'mosaic-components:riak-kv' ->
 				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-riak-kv--run-node">>))
@@ -303,7 +303,7 @@ configure_1 (Type, Identifier, defaults, ExtraOptions)
 	try
 		Executable = case Type of
 			'mosaic-tests:httpg' ->
-				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
+				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_workbench">>)),
 				<<Workbench / binary, "/../mosaic-components-httpg/scripts/run-node">>;
 			'mosaic-components:httpg' ->
 				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-httpg--run-node">>))
@@ -324,7 +324,7 @@ configure_1 (Type, Identifier, {json, [MainClass, ClassPath]}, ExtraOptions)
 	try
 		Executable = case Type of
 			'mosaic-tests:java-container' ->
-				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
+				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_workbench">>)),
 				<<Workbench / binary, "/../mosaic-java-components/components-container/scripts/run-component">>;
 			'mosaic-components:java-container' ->
 				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-java-container--run-component">>))
@@ -347,7 +347,7 @@ configure_1 (Type, Identifier, {json, [MainClass, ClassPath, Logger]}, ExtraOpti
 	try
 		Executable = case Type of
 			'mosaic-tests:java-container' ->
-				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
+				Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_workbench">>)),
 				<<Workbench / binary, "/../mosaic-java-components/components-container/scripts/run-component">>;
 			'mosaic-components:java-container' ->
 				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-java-container--run-component">>))
@@ -399,7 +399,7 @@ configure_1 (Type = 'mosaic-components:java-cloudlet-container', Identifier, {js
 configure_1 (Type = 'mosaic-tests:jetty-hello-world', Identifier, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	try
-		Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_cluster_workbench">>)),
+		Workbench = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_workbench">>)),
 		Options = [
 				{harness, [
 					{argument0, <<"[", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},

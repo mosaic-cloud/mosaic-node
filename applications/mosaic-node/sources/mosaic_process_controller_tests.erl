@@ -24,7 +24,7 @@
 
 
 test_start_stop ({defaults}) ->
-	{ok, Supervisor} = mosaic_cluster_sup:start_link (mosaic_process_sup),
+	{ok, Supervisor} = mosaic_node_sup:start_link (mosaic_process_sup),
 	{ok, Controller} = start_link_process_controller (),
 	ok = stop_and_wait_process_controller (Controller),
 	true = erlang:exit (Supervisor, normal),
@@ -34,7 +34,7 @@ test_start_stop ({defaults}) ->
 
 test_create (Outcome) ->
 	{ok, Identifier} = mosaic_component_coders:generate_component (),
-	{ok, Supervisor} = mosaic_cluster_sup:start_link (mosaic_process_sup),
+	{ok, Supervisor} = mosaic_node_sup:start_link (mosaic_process_sup),
 	{ok, Controller} = mosaic_process_controller:start_link (),
 	ok = case Outcome of
 		{succeed} ->
@@ -57,7 +57,7 @@ test_create (Outcome) ->
 
 test_migrate ({once}) ->
 	{ok, Identifier} = mosaic_component_coders:generate_component (),
-	{ok, Supervisor} = mosaic_cluster_sup:start_link (mosaic_process_sup),
+	{ok, Supervisor} = mosaic_node_sup:start_link (mosaic_process_sup),
 	{ok, SourceController} = start_link_process_controller (),
 	{ok, TargetController} = start_link_process_controller (),
 	{ok, Source} = mosaic_process_controller:create (SourceController, Identifier, mosaic_process_tester, defaults),
@@ -75,7 +75,7 @@ test_migrate ({once}) ->
 	
 test_migrate ({twice}) ->
 	{ok, Identifier} = mosaic_component_coders:generate_component (),
-	{ok, Supervisor} = mosaic_cluster_sup:start_link (mosaic_process_sup),
+	{ok, Supervisor} = mosaic_node_sup:start_link (mosaic_process_sup),
 	{ok, SourceController} = start_link_process_controller (),
 	{ok, TargetController} = start_link_process_controller (),
 	{ok, Source1} = mosaic_process_controller:create (SourceController, Identifier, mosaic_process_tester, defaults),

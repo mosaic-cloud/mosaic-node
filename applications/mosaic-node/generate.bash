@@ -19,6 +19,7 @@ EOS
 			( *.css ) _mime='text/css' ;;
 			( *.js ) _mime='application/javascript' ;;
 			( *.html ) _mime='text/html' ;;
+			( *.png ) _mime='image/png' ;;
 			( * ) _mime='application/octet-stream' ;;
 		esac
 		echo "contents (<<\"${_file#./resources}\">>) ->"

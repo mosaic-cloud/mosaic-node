@@ -13,7 +13,7 @@ if test "${#}" -eq 0 ; then
 	_scenario=boot
 	_fqdn="${_fqdn:-mosaic-1.loopback.vnet}"
 	_ip="${_ip:-127.0.155.1}"
-	_erl_name="mosaic-cluster@${_fqdn}"
+	_erl_name="mosaic-node@${_fqdn}"
 	_webmachine_port="$(( _erl_epmd_port + 1 ))"
 	_riak_handoff_port="$(( _erl_epmd_port + 2 ))"
 else
@@ -23,29 +23,29 @@ else
 	test "${_index}" -le 8
 	_fqdn="${_fqdn:-mosaic-${_index}.loopback.vnet}"
 	_ip="${_ip:-127.0.155.${_index}}"
-	_erl_name="mosaic-cluster-${_index}@${_fqdn}"
+	_erl_name="mosaic-node-${_index}@${_fqdn}"
 	_webmachine_port="$(( _erl_epmd_port + 1 + (_index - 1) * 2 + 0 ))"
 	_riak_handoff_port="$(( _erl_epmd_port + 1 + (_index - 1) * 2 + 1 ))"
 fi
 
 if test -n "${mosaic_node_temporary:-}" ; then
-	_tmp="${mosaic_node_temporary}/cluster/${_index}"
+	_tmp="${mosaic_node_temporary}/node/${_index}"
 else
-	_tmp="/tmp/mosaic/cluster/${_index}"
+	_tmp="/tmp/mosaic/node/${_index}"
 fi
 
 _erl_args+=(
 		-noinput -noshell
 		-name "${_erl_name}" -setcookie "${_erl_cookie}"
 		-boot start_sasl
-		-config "${_erl_libs}/mosaic_cluster/priv/mosaic_cluster.config"
-		-mosaic_cluster tests_scenario "'${_scenario}'"
-		-mosaic_cluster webmachine_listen "{\"${_ip}\", ${_webmachine_port}}"
-		-mosaic_cluster node_fqdn "\"${_fqdn}\""
-		-mosaic_cluster node_ip "\"${_ip}\""
+		-config "${_erl_libs}/mosaic_node/priv/mosaic_node.config"
+		-mosaic_node tests_scenario "'${_scenario}'"
+		-mosaic_node webmachine_listen "{\"${_ip}\", ${_webmachine_port}}"
+		-mosaic_node node_fqdn "\"${_fqdn}\""
+		-mosaic_node node_ip "\"${_ip}\""
 		-riak_core handoff_ip "\"${_ip}\""
 		-riak_core handoff_port "${_riak_handoff_port}"
-		-run mosaic_cluster_tests test
+		-run mosaic_node_tests test
 )
 _erl_env+=(
 		mosaic_node_fqdn="${_fqdn}"
@@ -54,7 +54,7 @@ _erl_env+=(
 
 if test -n "${_workbench:-}" ; then
 		_erl_env+=(
-				_mosaic_cluster_workbench="${_workbench}"
+				_mosaic_workbench="${_workbench}"
 		)
 fi
 

@@ -5,17 +5,23 @@ if ! test "${#}" -eq 0 ; then
 	exit 1
 fi
 
-"${_workbench}/../mosaic-erlang-dependencies/scripts/make"
+# "${_workbench}/../mosaic-erlang-dependencies/scripts/make"
+
 "${_workbench}/scripts/make"
+
 "${_workbench}/../mosaic-components-rabbitmq/scripts/make"
 "${_workbench}/../mosaic-components-riak-kv/scripts/make"
 "${_workbench}/../mosaic-components-httpg/scripts/make"
 
-#"${_workbench}/../mosaic-java-components/components-container/scripts/make"
-#"${_workbench}/../mosaic-java-platform/mosaic-mvn/mosaic-cloudlet/scripts/make"
-#"${_workbench}/../mosaic-java-platform/mosaic-mvn/mosaic-driver/scripts/make"
+if test "${_mosaic_do_all_java:-false}" == true ; then
+	"${_workbench}/../mosaic-java-components/components-container/scripts/make"
+	"${_workbench}/../mosaic-java-platform/mosaic-mvn/mosaic-cloudlet/scripts/make"
+	"${_workbench}/../mosaic-java-platform/mosaic-mvn/mosaic-driver/scripts/make"
+fi
 
-#"${_workbench}/../mosaic-examples-realtime-feeds/frontend/scripts/make"
-#"${_workbench}/../mosaic-examples-realtime-feeds-java/scripts/make"
+if test "${_mosaic_do_all_examples:-false}" == true ; then
+	"${_workbench}/../mosaic-examples-realtime-feeds/frontend/scripts/make"
+	# "${_workbench}/../mosaic-examples-realtime-feeds-java/scripts/make"
+fi
 
 exit 0

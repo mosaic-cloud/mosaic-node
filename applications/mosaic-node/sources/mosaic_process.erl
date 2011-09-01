@@ -38,7 +38,7 @@ start_link (QualifiedName, Module, Disposition, Identifier, Configuration) ->
 
 
 start_supervised (QualifiedName, Module, Disposition, Identifier, Configuration) ->
-	mosaic_cluster_sup:start_child_process (QualifiedName, Module, Disposition, Identifier, Configuration).
+	mosaic_node_sup:start_child_process (QualifiedName, Module, Disposition, Identifier, Configuration).
 
 
 stop (Process) ->

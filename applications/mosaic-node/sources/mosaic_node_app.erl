@@ -1,5 +1,5 @@
 
--module (mosaic_cluster_app).
+-module (mosaic_node_app).
 
 -behaviour (application).
 
@@ -34,7 +34,7 @@ stop (void) ->
 
 
 start_supervisor () ->
-	case mosaic_cluster_sup:start_link () of
+	case mosaic_node_sup:start_link () of
 		Outcome = {ok, _Supervisor} ->
 			Outcome;
 		Error = {error, _Reason} ->
@@ -73,7 +73,7 @@ start_daemons () ->
 start_discovery () ->
 	JoinFunction = fun (Event, void) ->
 			ok = case Event of
-				{mosaic_discovery_events, broadcasted, {mosaic_cluster, node, Node}} when is_atom (Node) ->
+				{mosaic_discovery_events, broadcasted, {mosaic_node, node, Node}} when is_atom (Node) ->
 					ok = case mosaic_cluster_tools:ring_include (Node) of
 						ok ->
 							ok;
@@ -109,7 +109,7 @@ start_discovery () ->
 		Error3 = {error, _Reason3} ->
 			throw (Error3)
 	end,
-	ok = case mosaic_discovery_agent:broadcast ({mosaic_cluster, node, erlang:node ()}) of
+	ok = case mosaic_discovery_agent:broadcast ({mosaic_node, node, erlang:node ()}) of
 		{ok, _Reference} ->
 			ok;
 		Error4 = {error, _Reason4} ->
@@ -120,7 +120,7 @@ start_discovery () ->
 
 report () ->
 	try
-		{WebmachineSocketIp, WebmachineSocketPort} = enforce_ok_1 (mosaic_generic_coders:application_env_get (webmachine_listen, mosaic_cluster,
+		{WebmachineSocketIp, WebmachineSocketPort} = enforce_ok_1 (mosaic_generic_coders:application_env_get (webmachine_listen, mosaic_node,
 				{decode,
 						fun
 							({Ip, Port}) when is_list (Ip), is_integer (Port) -> {ok, {erlang:list_to_binary (Ip), Port}};
@@ -131,7 +131,7 @@ report () ->
 				{decode, fun mosaic_generic_coders:decode_string/1}, {error, missing_webmachine_fqdn})),
 		WebmachineSocketFqdnString = erlang:binary_to_list (WebmachineSocketFqdn),
 		WebmachineSocket = {WebmachineSocketIp, WebmachineSocketPort, WebmachineSocketFqdn},
-		ok = error_logger:info_report (["Configuring mOSAIC cluster manager...",
+		ok = error_logger:info_report (["Configuring mOSAIC node...",
 					{url, erlang:list_to_binary ("http://" ++ WebmachineSocketFqdnString ++ ":" ++ erlang:integer_to_list (WebmachineSocketPort) ++ "/")},
 					{webmachine_endpoint, WebmachineSocket}]),
 		ok
@@ -150,4 +150,4 @@ boot () ->
 				true = erlang:register (riak_core_stop_intercepter, erlang:self ()),
 				RiakCoreStopIntercepterLoop (RiakCoreStopIntercepterLoop)
 			end),
-	mosaic_application_tools:boot (mosaic_cluster).
+	mosaic_application_tools:boot (mosaic_node).

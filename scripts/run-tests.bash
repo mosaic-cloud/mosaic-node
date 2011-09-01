@@ -10,24 +10,24 @@ _webmachine_port="$(( _erl_epmd_port + 1 ))"
 _riak_handoff_port="$(( _erl_epmd_port + 2 ))"
 
 if test -n "${mosaic_node_temporary:-}" ; then
-	_tmp="${mosaic_node_temporary}/cluster/0"
+	_tmp="${mosaic_node_temporary}/node/0"
 else
-	_tmp="/tmp/mosaic/cluster/0"
+	_tmp="/tmp/mosaic/node/0"
 fi
 
 _erl_args+=(
 		-noinput -noshell
-		-name mosaic-cluster-0@mosaic-0.loopback.vnet
+		-name mosaic-node-0@mosaic-0.loopback.vnet
 		-setcookie "${_erl_cookie}"
 		-boot start_sasl
-		-config "${_outputs}/erlang/applications/mosaic_cluster/priv/mosaic_cluster.config"
-		-mosaic_cluster webmachine_listen "{\"127.0.0.1\", ${_webmachine_port}}"
+		-config "${_outputs}/erlang/applications/mosaic_node/priv/mosaic_node.config"
+		-mosaic_node webmachine_listen "{\"127.0.0.1\", ${_webmachine_port}}"
 		-riak_core handoff_ip "\"127.0.0.1\""
 		-riak_core handoff_port "${_riak_handoff_port}"
 		-run "${_module}" test
 )
 _erl_env+=(
-		_mosaic_cluster_workbench="${_workbench}"
+		_mosaic_workbench="${_workbench}"
 )
 
 mkdir -p "${_tmp}"

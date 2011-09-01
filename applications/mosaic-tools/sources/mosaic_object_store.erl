@@ -36,7 +36,7 @@ start_supervised (QualifiedName) ->
 	start_supervised (QualifiedName, defaults).
 
 start_supervised (QualifiedName, Configuration) ->
-	mosaic_cluster_sup:start_child_object_store (QualifiedName, Configuration).
+	mosaic_node_sup:start_child_object_store (QualifiedName, Configuration).
 
 
 stop (Store) ->

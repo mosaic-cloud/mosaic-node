@@ -15,7 +15,7 @@ start_supervised () ->
 	start_supervised (defaults).
 
 start_supervised (Configuration) ->
-	mosaic_cluster_sup:start_child_daemon (mosaic_cluster_component_resources, {local, mosaic_component_resources}, [Configuration], permanent).
+	mosaic_node_sup:start_child_daemon (mosaic_cluster_component_resources, {local, mosaic_component_resources}, [Configuration], permanent).
 
 start_link (QualifiedName, Configuration) ->
 	mosaic_process_tools:start_link (gen_server, mosaic_cluster_component_resources, QualifiedName, Configuration).
@@ -82,9 +82,9 @@ execute_acquire (OwnerIdentifier, OwnerProcess, Specifications, Table) ->
 
 try_acquire (Owner, Specification = {Identifier, Type = <<"socket:ipv4:tcp">>, defaults}) ->
 	try
-		Fqdn = enforce_ok_1 (mosaic_generic_coders:application_env_get (node_fqdn, mosaic_cluster,
+		Fqdn = enforce_ok_1 (mosaic_generic_coders:application_env_get (node_fqdn, mosaic_node,
 				{decode, fun mosaic_generic_coders:decode_string/1}, {error, missing_node_fqdn})),
-		Ip = enforce_ok_1 (mosaic_generic_coders:application_env_get (node_ip, mosaic_cluster,
+		Ip = enforce_ok_1 (mosaic_generic_coders:application_env_get (node_ip, mosaic_node,
 				{decode, fun mosaic_generic_coders:decode_string/1}, {error, missing_node_ip})),
 		Port = crypto:rand_uniform (32769, 49150),
 		Key = {Type, Ip, Port},

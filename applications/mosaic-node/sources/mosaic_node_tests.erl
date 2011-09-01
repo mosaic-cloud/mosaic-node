@@ -1,5 +1,5 @@
 
--module (mosaic_cluster_tests).
+-module (mosaic_node_tests).
 
 
 -export ([test/0, execute/1]).
@@ -7,13 +7,13 @@
 
 test () ->
 	ok = try
-		ok = case application:load (mosaic_cluster) of
+		ok = case application:load (mosaic_node) of
 			ok ->
 				ok;
 			Error1 = {error, _Reason1} ->
 				throw (Error1)
 		end,
-		{ok, Scenario, Actions} = case application:get_env (mosaic_cluster, tests_scenario) of
+		{ok, Scenario, Actions} = case application:get_env (mosaic_node, tests_scenario) of
 			{ok, boot} ->
 				{ok, defaults, [
 						{boot}, {activate}, {initialize}]};
@@ -65,7 +65,7 @@ test () ->
 						{sleep, 1 * 1000}]};
 			{ok, 'test-ring-join-leave'} ->
 				Self = erlang:node (),
-				case application:get_env (mosaic_cluster, tests_nodes) of
+				case application:get_env (mosaic_node, tests_nodes) of
 					{ok, [Self | _Peers]} ->
 						{ok, ring_join_leave_master, [
 								{boot}, {activate}, {ping, 4}, {initialize},
@@ -88,7 +88,7 @@ test () ->
 			undefined ->
 				throw ({error, undefined_scenario})
 		end,
-		Tests = lists:map (fun (Action) -> {mosaic_cluster_tests, execute, [Action], infinity} end, Actions),
+		Tests = lists:map (fun (Action) -> {mosaic_node_tests, execute, [Action], infinity} end, Actions),
 		case mosaic_tests:test_scenario (Scenario, Tests) of
 			ok ->
 				ok;
@@ -106,7 +106,7 @@ test () ->
 
 
 execute ({boot}) ->
-	ok = mosaic_cluster_app:boot (),
+	ok = mosaic_node_app:boot (),
 	ok;
 	
 execute ({activate}) ->

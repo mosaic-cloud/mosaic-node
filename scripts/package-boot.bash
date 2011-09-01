@@ -56,20 +56,20 @@ cat >"${_outputs}/package-boot/bin/upgrade" <<'EOS'
 
 set -e -E -u -o pipefail || exit 1
 
-if test "${0}" != /tmp/mosaic-cluster-boot--upgrade ; then
-	cp "${0}" /tmp/mosaic-cluster-boot--upgrade
-	exec /tmp/mosaic-cluster-boot--upgrade
+if test "${0}" != /tmp/mosaic-node-boot--upgrade ; then
+	cp "${0}" /tmp/mosaic-node-boot--upgrade
+	exec /tmp/mosaic-node-boot--upgrade
 fi
 
 tazpkg recharge mosaic-repository
-tazpkg get-install mosaic-cluster --forced
+tazpkg get-install mosaic-node --forced
 tazpkg get-install mosaic-components-rabbitmq --forced
 tazpkg get-install mosaic-components-riak-kv --forced
 tazpkg get-install mosaic-components-httpg --forced
 tazpkg get-install mosaic-components-java-container --forced
 tazpkg get-install mosaic-components-java-drivers --forced
 tazpkg get-install mosaic-examples-realtime-feeds --forced
-tazpkg get-install mosaic-cluster-boot --forced
+tazpkg get-install mosaic-node-boot --forced
 
 exit 0
 EOS
@@ -107,7 +107,7 @@ cat >"${_outputs}/package-boot/pkg.json" <<EOS
 		"coreutils-path",
 		"coreutils-print",
 		"coreutils-redirection",
-		"mosaic-cluster",
+		"mosaic-node",
 		"mosaic-components-rabbitmq",
 		"mosaic-components-riak-kv",
 		"mosaic-components-httpg",

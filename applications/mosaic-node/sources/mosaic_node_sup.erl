@@ -1,5 +1,5 @@
 
--module (mosaic_cluster_sup).
+-module (mosaic_node_sup).
 
 -behaviour (supervisor).
 
@@ -15,18 +15,18 @@
 
 
 start_link () ->
-	start_link (mosaic_cluster_sup).
+	start_link (mosaic_node_sup).
 
 start_link (Type) ->
 	start_link ({local, Type}, Type).
 
 start_link (QualifiedName = {local, LocalName}, Type)
 		when is_atom (LocalName), is_atom (Type) ->
-	supervisor:start_link (QualifiedName, mosaic_cluster_sup, [{QualifiedName, Type}]);
+	supervisor:start_link (QualifiedName, mosaic_node_sup, [{QualifiedName, Type}]);
 	
 start_link (QualifiedName = noname, Type)
 		when is_atom (Type) ->
-	supervisor:start_link (mosaic_cluster_sup, [{QualifiedName, Type}]).
+	supervisor:start_link (mosaic_node_sup, [{QualifiedName, Type}]).
 
 
 start_child_process (QualifiedName, Module, Disposition, Identifier, Configuration) ->
@@ -108,19 +108,19 @@ init ([{Type}])
 		when is_atom (Type) ->
 	init ([{{local, Type}, Type}]);
 	
-init ([{QualifiedName, mosaic_cluster_sup}]) ->
+init ([{QualifiedName, mosaic_node_sup}]) ->
 	ok = mosaic_process_tools:enforce_registered (QualifiedName),
 	{ok, {{one_for_all, 1, 60}, [
 		child_spec (supervisor, mosaic_process_sup, supervisor, start_link,
-				[{local, mosaic_process_sup}, mosaic_cluster_sup, [{mosaic_process_sup}]]),
+				[{local, mosaic_process_sup}, mosaic_node_sup, [{mosaic_process_sup}]]),
 		child_spec (supervisor, mosaic_process_controller_sup, supervisor, start_link,
-				[{local, mosaic_process_controller_sup}, mosaic_cluster_sup, [{mosaic_process_controller_sup}]]),
+				[{local, mosaic_process_controller_sup}, mosaic_node_sup, [{mosaic_process_controller_sup}]]),
 		child_spec (supervisor, mosaic_object_store_sup, supervisor, start_link,
-				[{local, mosaic_object_store_sup}, mosaic_cluster_sup, [{mosaic_object_store_sup}]]),
+				[{local, mosaic_object_store_sup}, mosaic_node_sup, [{mosaic_object_store_sup}]]),
 		child_spec (supervisor, mosaic_daemon_sup, supervisor, start_link,
-				[{local, mosaic_daemon_sup}, mosaic_cluster_sup, [{mosaic_daemon_sup}]]),
+				[{local, mosaic_daemon_sup}, mosaic_node_sup, [{mosaic_daemon_sup}]]),
 		child_spec (supervisor, mosaic_vnode_master_sup, supervisor, start_link,
-				[{local, mosaic_vnode_master_sup}, mosaic_cluster_sup, [{mosaic_vnode_master_sup}]])]}};
+				[{local, mosaic_vnode_master_sup}, mosaic_node_sup, [{mosaic_vnode_master_sup}]])]}};
 	
 init ([{QualifiedName, mosaic_process_sup}]) ->
 	ok = mosaic_process_tools:enforce_registered (QualifiedName),

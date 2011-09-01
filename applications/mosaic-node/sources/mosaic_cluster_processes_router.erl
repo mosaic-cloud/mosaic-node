@@ -16,7 +16,7 @@ start_supervised () ->
 	start_supervised (defaults).
 
 start_supervised (Configuration) ->
-	mosaic_cluster_sup:start_child_daemon (mosaic_cluster_processes_router, {local, mosaic_process_router}, [Configuration], permanent).
+	mosaic_node_sup:start_child_daemon (mosaic_cluster_processes_router, {local, mosaic_process_router}, [Configuration], permanent).
 
 start_link (QualifiedName, Configuration) ->
 	mosaic_process_tools:start_link (gen_server, mosaic_cluster_processes_router, QualifiedName, Configuration).

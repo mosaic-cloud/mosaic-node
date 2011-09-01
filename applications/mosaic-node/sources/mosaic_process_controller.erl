@@ -36,7 +36,7 @@ start_supervised (QualifiedName) ->
 	start_supervised (QualifiedName, defaults).
 
 start_supervised (QualifiedName, Configuration) ->
-	mosaic_cluster_sup:start_child_process_controller (QualifiedName, Configuration).
+	mosaic_node_sup:start_child_process_controller (QualifiedName, Configuration).
 
 
 stop (Controller) ->
