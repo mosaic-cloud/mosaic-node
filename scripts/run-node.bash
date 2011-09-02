@@ -36,6 +36,12 @@ else
 	_tmp="/tmp/mosaic/node/${_index}"
 fi
 
+if test -n "${mosaic_log:-}" ; then
+	_log="${mosaic_log}"
+else
+	_log=''
+fi
+
 _erl_args+=(
 		-noinput -noshell
 		-name "${_erl_name}" -setcookie "${_erl_cookie}"
@@ -55,9 +61,15 @@ _erl_env+=(
 )
 
 if test -n "${_workbench:-}" ; then
-		_erl_env+=(
-				_mosaic_workbench="${_workbench}"
-		)
+	_erl_env+=(
+			_mosaic_workbench="${_workbench}"
+	)
+fi
+
+if test -n "${_log}" -a -f "${_log}" ; then
+	_erl_env+=(
+			mosaic_node_log="${_log}"
+	)
 fi
 
 mkdir -p "${_tmp}"

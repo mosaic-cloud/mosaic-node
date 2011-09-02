@@ -39,6 +39,14 @@ export PATH="$(
 
 export mosaic_node_fqdn="$( hostname -f | tr ' ' '\n' | head -n 1 || true )"
 export mosaic_node_ip="$( hostname -i | tr ' ' '\n' | head -n 1 || true )"
+export mosaic_temporary=/tmp/mosaic
+export mosaic_log="${mosaic_temporary}/log.txt"
+
+if test ! -e "${mosaic_temporary}" ; then
+	mkdir "${mosaic_temporary}"
+fi
+
+exec </dev/null >/dev/null 2>|"${mosaic_log}" 1>&2
 
 if test "${#}" -eq 0 ; then
 	exec @{_package_name}--run-node
