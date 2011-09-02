@@ -127,7 +127,7 @@ return_with_outcome (Outcome, Request, State) ->
 			{Return, Request, State};
 		{ok, Return, NewState} ->
 			{Return, Request, NewState};
-		{ok, Return, html, Body} when is_binary (Body) ->
+		{ok, Return, html, Body} ->
 			return_with_content (Return, html, Body, Request, State);
 		{ok, Return, json, Object} ->
 			return_with_content (Return, json, Object, Request, State);
@@ -135,15 +135,15 @@ return_with_outcome (Outcome, Request, State) ->
 			return_with_content (Return, json, {struct, [{ok, true} | Attributes]}, Request, State);
 		{ok, Return, {mime, MimeType}, Body} when is_binary (MimeType) ->
 			return_with_content (Return, {mime, MimeType}, Body, Request, State);
-		{error, Return, Reason} ->
-			return_with_content (Return, error, Reason, Request, State)
+		Error = {error, _Reason} ->
+			Error
 	end.
 
 respond_with_outcome (Outcome, Request, State) ->
 	case Outcome of
 		ok ->
 			respond_with_content (json, {struct, [{ok, true}]}, Request, State);
-		{ok, html, Body} when is_binary (Body) ->
+		{ok, html, Body} ->
 			respond_with_content (html, Body, Request, State);
 		{ok, json, Object} ->
 			respond_with_content (json, Object, Request, State);
@@ -179,8 +179,12 @@ encode_content (json, Object) ->
 	end;
 	
 encode_content ({mime, MimeType}, Content)
-		when is_binary (MimeType) ->
+		when is_binary (MimeType), is_binary (Content) ->
 	{ok, erlang:binary_to_list (MimeType), Content};
+	
+encode_content ({mime, MimeType}, {stream, Generator})
+		when is_binary (MimeType), is_function (Generator, 0) ->
+	{ok, erlang:binary_to_list (MimeType), {stream, {<<>>, Generator}}};
 	
 encode_content (error, Reason) ->
 	case mosaic_generic_coders:encode_reason (json, Reason) of
