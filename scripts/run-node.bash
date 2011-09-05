@@ -28,6 +28,13 @@ else
 	_riak_handoff_port="$(( _erl_epmd_port + 1 + (_index - 1) * 2 + 1 ))"
 fi
 
+if test -n "${mosaic_node_management_port:-}" ; then
+	_webmachine_port="${mosaic_node_management_port}"
+fi
+if test -n "${mosaic_node_handoff_port:-}" ; then
+	_riak_handoff_port="${mosaic_node_handoff_port}"
+fi
+
 if test -n "${mosaic_node_temporary:-}" ; then
 	_tmp="${mosaic_node_temporary}"
 elif test -n "${mosaic_temporary:-}" ; then
