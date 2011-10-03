@@ -135,6 +135,8 @@ return_with_outcome (Outcome, Request, State) ->
 			return_with_content (Return, json, {struct, [{ok, true} | Attributes]}, Request, State);
 		{ok, Return, {mime, MimeType}, Body} when is_binary (MimeType) ->
 			return_with_content (Return, {mime, MimeType}, Body, Request, State);
+		{error, Return, Reason} ->
+			return_with_content (Return, error, Reason, Request, State);
 		Error = {error, _Reason} ->
 			Error
 	end.

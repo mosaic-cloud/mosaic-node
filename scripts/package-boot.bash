@@ -76,6 +76,7 @@ tazpkg get-install mosaic-components-riak-kv --forced
 tazpkg get-install mosaic-components-httpg --forced
 tazpkg get-install mosaic-components-java-container --forced
 tazpkg get-install mosaic-components-java-drivers --forced
+tazpkg get-install mosaic-components-java-cloudlet-container --forced
 tazpkg get-install mosaic-examples-realtime-feeds --forced
 tazpkg get-install mosaic-node-boot --forced
 

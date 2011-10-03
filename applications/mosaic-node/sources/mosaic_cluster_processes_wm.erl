@@ -15,6 +15,7 @@
 
 
 -dispatch ({[<<"processes">>], {processes}}).
+-dispatch ({[<<"processes">>, <<"examine">>], {processes, examine}}).
 -dispatch ({[<<"processes">>, <<"create">>], {processes, create}}).
 -dispatch ({[<<"processes">>, <<"stop">>], {processes, stop}}).
 -dispatch ({[<<"processes">>, <<"call">>], {processes, call}}).
@@ -53,6 +54,8 @@ malformed_request (Request, OldState = #state{target = Target, arguments = none}
 		{nodes, self, Operation} when ((Operation =:= activate) orelse (Operation =:= deactivate)) ->
 			mosaic_webmachine:enforce_get_request ([], Request);
 		{processes} ->
+			mosaic_webmachine:enforce_get_request ([], Request);
+		{processes, examine} ->
 			mosaic_webmachine:enforce_get_request ([], Request);
 		{processes, create} ->
 			case wrq:method (Request) of
@@ -160,6 +163,43 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 				{ok, Keys, Reasons} ->
 					{ok, json_struct, [
 							{keys, [enforce_ok_1 (mosaic_component_coders:encode_component (Key)) || Key <- Keys]},
+							{error, [enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reason)) || Reason <- Reasons]}]};
+				Error = {error, _Reason} ->
+					Error
+			end;
+		{processes, examine} ->
+			Examine = fun (Key) ->
+				case mosaic_cluster_storage:select (Key) of
+					{ok, undefined, {mosaic_cluster_processes, definition, ProcessType, json, ProcessConfigurationContent}} ->
+						{struct, [
+							{key, enforce_ok_1 (mosaic_component_coders:encode_component (Key))},
+							{ok, true},
+							{type, <<$#, (enforce_ok_1 (mosaic_generic_coders:encode_atom (ProcessType))) / binary>>},
+							{configuration, ProcessConfigurationContent}]};
+					{ok, undefined, {mosaic_cluster_processes, definition, _, _, _}} ->
+						{struct, [
+							{key, enforce_ok_1 (mosaic_component_coders:encode_component (Key))},
+							{ok, false},
+							{error, enforce_ok_1 (mosaic_generic_coders:encode_reason (json, invalid_configuration))}]};
+					{ok, _, _} ->
+						{struct, [
+							{key, enforce_ok_1 (mosaic_component_coders:encode_component (Key))},
+							{ok, false},
+							{error, enforce_ok_1 (mosaic_generic_coders:encode_reason (json, invalid_storage))}]};
+					{error, Reason} ->
+						{struct, [
+							{key, enforce_ok_1 (mosaic_component_coders:encode_component (Key))},
+							{ok, false},
+							{error, enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reason))}]}
+				end
+			end,
+			case mosaic_cluster_processes:list () of
+				{ok, Keys, []} ->
+					{ok, json_struct, [
+							{processes, [Examine (Key) || Key <- Keys]}]};
+				{ok, Keys, Reasons} ->
+					{ok, json_struct, [
+							{processes, [Examine (Key) || Key <- Keys]},
 							{error, [enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reason)) || Reason <- Reasons]}]};
 				Error = {error, _Reason} ->
 					Error
@@ -347,7 +387,7 @@ process_post (Request, State = #state{target = Target, arguments = Json}) ->
 										{struct, [
 												{ok, true},
 												{keys, []},
-												{error, [enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reasons)) || Reason <- Reasons]}]};
+												{error, [enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reason)) || Reason <- Reasons]}]};
 									{ok, Processes, Reasons} ->
 										ok = timer:sleep (Delay),
 										{struct, [
