@@ -42,7 +42,7 @@ body { overflow: auto; }
 #output .echo span.gutter:before { content: '> '; color: #3583FC; font-size: 18px; font-weight: bold; }
 #output .info span.gutter:before { content: 'i '; color: #27A700; font-size: 18px; font-weight: bold; }
 #output .error span.gutter:before { content: '\0000D7 '; color: #E81D20; font-size: 28px; font-weight: bold; margin-right: -10px; line-height: 24px; }
-#output .response span.gutter:before { content: '« '; color: #BDC3CD; font-size: 18px; font-weight: normal; margin-right: -10px; line-height: 18px; }
+#output .response span.gutter:before { content: '\0000AB '; color: #BDC3CD; font-size: 18px; font-weight: normal; margin-right: -10px; line-height: 18px; }
 
 /* if response is directly next to echo, don't give it a line - only consoles get lines */
 #output li.echo + li.response { border-width: 0px; }
