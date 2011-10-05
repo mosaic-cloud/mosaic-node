@@ -1,9 +1,11 @@
 
 var _info = this.info
 
+var _getUrlPrefix = "";
+
 function _get (_url, _query) {
 	var _settings = {};
-	_settings.url = _url;
+	_settings.url = window._getUrlPrefix + _url;
 	if (_query != undefined)
 		_settings.data = _query;
 	return (_execute_ajax (_settings));
@@ -133,5 +135,3 @@ _mosaic.processes.cast = _wrapped (function (_key, _operation, _inputs) {
 	_inputs = JSON.stringify (_inputs);
 	return (_get ("/processes/cast", {key : _key, operation : _operation, inputs : _inputs}) .ok);
 });
-
-// $("#sandbox")[0].contentWindow.mosaic = _mosaic;
