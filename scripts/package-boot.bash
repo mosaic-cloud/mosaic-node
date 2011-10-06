@@ -71,6 +71,7 @@ fi
 
 tazpkg recharge mosaic-repository
 tazpkg get-install mosaic-node --forced
+tazpkg get-install mosaic-node-wui --forced
 tazpkg get-install mosaic-components-rabbitmq --forced
 tazpkg get-install mosaic-components-riak-kv --forced
 tazpkg get-install mosaic-components-httpg --forced
@@ -117,6 +118,7 @@ cat >"${_outputs}/package-boot/pkg.json" <<EOS
 		"coreutils-print",
 		"coreutils-redirection",
 		"mosaic-node",
+		"mosaic-node-wui",
 		"mosaic-components-rabbitmq",
 		"mosaic-components-riak-kv",
 		"mosaic-components-httpg",

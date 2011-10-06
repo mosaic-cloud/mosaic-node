@@ -16,6 +16,8 @@ if test "${#}" -eq 0 ; then
 	_erl_name="mosaic-node@${_fqdn}"
 	_webmachine_port="$(( _erl_epmd_port + 1 ))"
 	_riak_handoff_port="$(( _erl_epmd_port + 2 ))"
+	_wui_ip="${_ip}"
+	_wui_port="$(( _erl_epmd_port + 3 ))"
 else
 	_index="${1}"
 	_scenario="${2}"
@@ -24,8 +26,10 @@ else
 	_fqdn="${_fqdn:-mosaic-${_index}.loopback.vnet}"
 	_ip="${_ip:-127.0.155.${_index}}"
 	_erl_name="mosaic-node-${_index}@${_fqdn}"
-	_webmachine_port="$(( _erl_epmd_port + 1 + (_index - 1) * 2 + 0 ))"
-	_riak_handoff_port="$(( _erl_epmd_port + 1 + (_index - 1) * 2 + 1 ))"
+	_webmachine_port="$(( _erl_epmd_port + 1 + (_index - 1) * 3 + 0 ))"
+	_riak_handoff_port="$(( _erl_epmd_port + 1 + (_index - 1) * 3 + 1 ))"
+	_wui_ip="${_ip}"
+	_wui_port="$(( _erl_epmd_port + 1 + (_index - 1) * 3 + 2 ))"
 fi
 
 if test -n "${mosaic_node_management_port:-}" ; then
@@ -33,6 +37,13 @@ if test -n "${mosaic_node_management_port:-}" ; then
 fi
 if test -n "${mosaic_node_handoff_port:-}" ; then
 	_riak_handoff_port="${mosaic_node_handoff_port}"
+fi
+
+if test -n "${mosaic_node_wui_ip:-}" ; then
+	_wui_ip="${mosaic_node_wui_ip}"
+fi
+if test -n "${mosaic_node_wui_port:-}" ; then
+	_wui_port="${mosaic_node_wui_port}"
 fi
 
 if test -n "${mosaic_node_temporary:-}" ; then
@@ -56,6 +67,7 @@ _erl_args+=(
 		-config "${_erl_libs}/mosaic_node/priv/mosaic_node.config"
 		-mosaic_node tests_scenario "'${_scenario}'"
 		-mosaic_node webmachine_listen "{\"${_ip}\", ${_webmachine_port}}"
+		-mosaic_node wui_listen "{\"${_wui_ip}\", ${_wui_port}}"
 		-mosaic_node node_fqdn "\"${_fqdn}\""
 		-mosaic_node node_ip "\"${_ip}\""
 		-riak_core handoff_ip "\"${_ip}\""

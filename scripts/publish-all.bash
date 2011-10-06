@@ -8,6 +8,8 @@ fi
 "${_workbench}/scripts/publish"
 "${_workbench}/scripts/publish-boot"
 
+"${_workbench}/../mosaic-node-wui/scripts/publish"
+
 "${_workbench}/../mosaic-components-rabbitmq/scripts/publish"
 "${_workbench}/../mosaic-components-riak-kv/scripts/publish"
 "${_workbench}/../mosaic-components-httpg/scripts/publish"

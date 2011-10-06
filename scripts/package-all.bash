@@ -8,6 +8,8 @@ fi
 "${_workbench}/scripts/package"
 "${_workbench}/scripts/package-boot"
 
+"${_workbench}/../mosaic-node-wui/scripts/package"
+
 "${_workbench}/../mosaic-components-rabbitmq/scripts/package"
 "${_workbench}/../mosaic-components-riak-kv/scripts/package"
 "${_workbench}/../mosaic-components-httpg/scripts/package"

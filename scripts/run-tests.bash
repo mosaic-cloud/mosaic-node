@@ -6,8 +6,10 @@ if ! test "${#}" -eq 1 ; then
 fi
 
 _module="${1}"
+_ip="127.0.0.1"
 _webmachine_port="$(( _erl_epmd_port + 1 ))"
 _riak_handoff_port="$(( _erl_epmd_port + 2 ))"
+_wui_port="$(( _elr_epmd_port + 3 ))"
 
 if test -n "${mosaic_node_temporary:-}" ; then
 	_tmp="${mosaic_node_temporary}"
@@ -23,8 +25,9 @@ _erl_args+=(
 		-setcookie "${_erl_cookie}"
 		-boot start_sasl
 		-config "${_outputs}/erlang/applications/mosaic_node/priv/mosaic_node.config"
-		-mosaic_node webmachine_listen "{\"127.0.0.1\", ${_webmachine_port}}"
-		-riak_core handoff_ip "\"127.0.0.1\""
+		-mosaic_node webmachine_listen "{\"${_ip}\", ${_webmachine_port}}"
+		-mosaic_node wui_listen "{\"${_ip}\", ${_wui_port}}"
+		-riak_core handoff_ip "\"${_ip}\""
 		-riak_core handoff_port "${_riak_handoff_port}"
 		-run "${_module}" test
 )
