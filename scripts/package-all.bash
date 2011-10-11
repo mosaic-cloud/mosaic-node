@@ -15,9 +15,9 @@ fi
 "${_workbench}/../mosaic-components-httpg/scripts/package"
 
 if test "${_mosaic_do_all_java:-${_mosaic_do_all:-false}}" == true ; then
-	"${_workbench}/../mosaic-java-components/components-container/scripts/package"
-	"${_workbench}/../mosaic-java-platform/mosaic-mvn/mosaic-cloudlet/scripts/package"
-	"${_workbench}/../mosaic-java-platform/mosaic-mvn/mosaic-driver/scripts/package"
+	"${_workbench}/../mosaic-java-platform/infrastructure/components-container/scripts/package"
+	"${_workbench}/../mosaic-java-platform/cloudlets/scripts/package"
+	"${_workbench}/../mosaic-java-platform/drivers/scripts/package"
 fi
 
 if test "${_mosaic_do_all_examples:-${_mosaic_do_all:-false}}" == true ; then

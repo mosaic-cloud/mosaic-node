@@ -14,9 +14,9 @@ fi
 "${_workbench}/../mosaic-components-httpg/scripts/make"
 
 if test "${_mosaic_do_all_java:-${_mosaic_do_all:-false}}" == true ; then
-	"${_workbench}/../mosaic-java-components/components-container/scripts/make"
-	"${_workbench}/../mosaic-java-platform/mosaic-mvn/mosaic-cloudlet/scripts/make"
-	"${_workbench}/../mosaic-java-platform/mosaic-mvn/mosaic-driver/scripts/make"
+	"${_workbench}/../mosaic-java-platform/infrastructure/components-container/scripts/make"
+	"${_workbench}/../mosaic-java-platform/cloudlets/scripts/make"
+	"${_workbench}/../mosaic-java-platform/drivers/scripts/make"
 fi
 
 if test "${_mosaic_do_all_examples:-${_mosaic_do_all:-false}}" == true ; then
