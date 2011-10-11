@@ -3,7 +3,5 @@
 !.gitignore
 !.hgignore
 
-/data
-
 *#
 *~
