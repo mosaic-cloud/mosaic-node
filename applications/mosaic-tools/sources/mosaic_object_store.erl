@@ -127,10 +127,19 @@ handle_call ({mosaic_object_store, select, Key}, _Sender, State = #state{table =
 	end;
 	
 handle_call ({mosaic_object_store, include, Key, Revision, Data}, _Sender, State = #state{table = Table}) ->
-	case ets:insert_new (Table, {Key, Revision, Data}) of
-		true ->
+	{ok, OldRecord} = case ets:lookup (Table, Key) of
+		[OldRecord_ = {Key, _OldRevision, _OldData}] ->
+			{ok, OldRecord_};
+		[] ->
+			{ok, {Key}}
+	end,
+	case OldRecord of
+		{Key, Revision, Data} ->
 			{reply, ok, State};
-		false ->
+		{Key} ->
+			true = ets:insert_new (Table, {Key, Revision, Data}),
+			{reply, ok, State};
+		_ ->
 			{reply, {error, already_exists}, State}
 	end;
 	
