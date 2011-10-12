@@ -16,7 +16,7 @@
 -include ("mosaic_component_process.hrl").
 
 
--record (state, {identifier, status, harness, harness_token, execute, resources, router, inbound_pending_calls, outbound_pending_calls}).
+-record (state, {identifier, status, harness, harness_token, harness_status, harness_options, execute, resources, router, inbound_pending_calls, outbound_pending_calls}).
 -record (inbound_pending_call, {correlation, sender}).
 -record (outbound_pending_call, {reference, correlation}).
 
@@ -37,21 +37,21 @@ init (Disposition, Identifier, OriginalConfiguration)
 init (prepare, Identifier, {Status, HarnessOptions, ExecuteSpecification, Resources, Router}) ->
 	true = erlang:process_flag (trap_exit, true),
 	try
-		HarnessToken = erlang:make_ref (),
-		HarnessConfiguration = enforce_ok_1 (mosaic_harness_coders:decode_frontend_configuration (
-					term, [{controller, erlang:self ()}, {controller_token, HarnessToken} | HarnessOptions])),
-		Harness = enforce_ok_1 (mosaic_harness_frontend:start_link (HarnessConfiguration)),
-		ok = if
+		{ok, Harness, HarnessToken, HarnessStatus} = if
 			(ExecuteSpecification =/= migrate) ->
-				ok = enforce_ok (mosaic_harness_frontend:execute (Harness, ExecuteSpecification)),
-				ok;
-			true ->
-				ok
+				HarnessToken_ = erlang:make_ref (),
+				HarnessConfiguration_ = enforce_ok_1 (mosaic_harness_coders:decode_frontend_configuration (
+						term, [{controller, erlang:self ()}, {controller_token, HarnessToken_} | HarnessOptions])),
+				Harness_ = enforce_ok_1 (mosaic_harness_frontend:start_link (HarnessConfiguration_)),
+				ok = enforce_ok (mosaic_harness_frontend:execute (Harness_, ExecuteSpecification)),
+				{ok, Harness_, HarnessToken_, owner};
+			(ExecuteSpecification =:= migrate) ->
+				{ok, none, none, none}
 		end,
 		State = #state{
 				identifier = Identifier,
 				status = Status,
-				harness = Harness, harness_token = HarnessToken,
+				harness = Harness, harness_token = HarnessToken, harness_status = HarnessStatus, harness_options = HarnessOptions,
 				execute = ExecuteSpecification,
 				resources = Resources, router = Router,
 				inbound_pending_calls = orddict:new (), outbound_pending_calls = orddict:new ()},
@@ -59,20 +59,25 @@ init (prepare, Identifier, {Status, HarnessOptions, ExecuteSpecification, Resour
 	catch throw : {error, Reason} -> {stop, Reason} end.
 
 
-terminate (_Reason, _State = #state{harness = none}) ->
+terminate (_Reason, _State = #state{harness = none, harness_status = none}) ->
 	ok;
 	
-terminate (_Reason, _State = #state{harness = Harness})
+terminate (_Reason, _State = #state{harness = Harness, harness_status = HarnessStatus})
 		when is_pid (Harness) ->
-	_ = mosaic_harness_frontend:stop (Harness, normal),
-	ok = case mosaic_process_tools:wait (Harness, 5000) of
-		{ok, _} ->
+	case HarnessStatus of
+		owner ->
+			_ = mosaic_harness_frontend:stop (Harness, normal),
+			ok = case mosaic_process_tools:wait (Harness, 5000) of
+				{ok, _} ->
+					ok;
+				{error, _} ->
+					true = erlang:exit (Harness, kill),
+					ok
+			end,
 			ok;
-		{error, _} ->
-			true = erlang:exit (Harness, kill),
+		handoff ->
 			ok
-	end,
-	ok.
+	end.
 
 
 handle_stop (normal, State = #state{status = executing}) ->
@@ -98,7 +103,8 @@ handle_cast (Operation, Inputs, Data, State) ->
 
 handle_info (
 			{mosaic_harness_frontend, HarnessToken, push_packet, EncodedPacket},
-			State = #state{harness_token = HarnessToken}) ->
+			State = #state{harness = Harness, harness_token = HarnessToken})
+		when is_pid (Harness), is_reference (HarnessToken) ->
 	try enforce_ok_1 (mosaic_component_coders:decode_packet_fully (EncodedPacket)) of
 		{call, Component, Operation, Correlation, Inputs, Data} ->
 			handle_outbound_call (Component, Operation, Correlation, Inputs, Data, State);
@@ -118,8 +124,8 @@ handle_info (
 	
 handle_info (
 			{mosaic_component_process_internals, push_packet, Packet},
-			State = #state{harness = Harness})
-		when is_pid (Harness) ->
+			State = #state{harness = Harness, harness_token = HarnessToken})
+		when is_pid (Harness), is_reference (HarnessToken) ->
 	try
 		EncodedPacket = enforce_ok_1 (mosaic_component_coders:encode_packet_fully (Packet)),
 		ok = enforce_ok (mosaic_harness_frontend:push_packet (Harness, EncodedPacket)),
@@ -128,8 +134,8 @@ handle_info (
 	
 handle_info (
 			{mosaic_harness_frontend, HarnessToken, exit, ExitCode},
-			State = #state{status = executing, harness_token = HarnessToken})
-		when is_integer (ExitCode), (ExitCode >= 0) ->
+			State = #state{status = executing, harness = Harness, harness_token = HarnessToken})
+		when is_integer (ExitCode), (ExitCode >= 0), is_pid (Harness), is_reference (HarnessToken) ->
 	if
 		(ExitCode =:= 0) ->
 			{stop, normal, State};
@@ -139,17 +145,18 @@ handle_info (
 	
 handle_info (
 			{mosaic_harness_frontend, HarnessToken, exit, ExitCode},
-			State = #state{status = Status, harness_token = HarnessToken})
-		when is_integer (ExitCode), (ExitCode >= 0), ((Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)) ->
+			State = #state{status = Status, harness = Harness, harness_token = HarnessToken})
+		when is_integer (ExitCode), (ExitCode >= 0), ((Status =:= migrating_as_source) orelse (Status =:= migrating_as_target)),
+			is_pid (Harness), is_reference (HarnessToken) ->
 	{noreply, State};
 	
 handle_info ({Reference, Outcome}, State)
 		when is_reference (Reference) ->
 	handle_outbound_call_return (Reference, Outcome, State);
 	
-handle_info ({'EXIT', Harness, HarnessExitReason}, OldState = #state{harness = Harness})
-		when is_pid (Harness) ->
-	NewState = OldState#state{harness = none, harness_token = none},
+handle_info ({'EXIT', Harness, HarnessExitReason}, OldState = #state{harness = Harness, harness_token = HarnessToken})
+		when is_pid (Harness), is_reference (HarnessToken) ->
+	NewState = OldState#state{harness = none, harness_token = none, harness_status = none},
 	case HarnessExitReason of
 		normal ->
 			{noreply, NewState};
@@ -271,9 +278,14 @@ handle_acquire (Specification, Correlation, State = #state{identifier = Identifi
 	handle_info ({mosaic_component_process_internals, push_packet, Packet}, State).
 
 
-begin_migration (source, Configuration, CompletionFun, OldState = #state{status = executing, harness = Harness, execute = ExecuteSpecification}) ->
+begin_migration (source, Configuration_, CompletionFun, OldState = #state{status = executing, harness = Harness, harness_token = HarnessToken, harness_status = owner, execute = ExecuteSpecification})
+		when is_pid (Harness), is_reference (HarnessToken) ->
+	Configuration = case Configuration_ of
+		defaults -> handoff;
+		_ -> Configuration_
+	end,
 	case Configuration of
-		defaults ->
+		execute ->
 			case mosaic_harness_frontend:stop (Harness, normal) of
 				ok ->
 					Self = erlang:self (),
@@ -290,43 +302,72 @@ begin_migration (source, Configuration, CompletionFun, OldState = #state{status 
 				{error, Reason} ->
 					{terminate, Reason, OldState#state{status = migrating_as_source_failed}}
 			end;
+		handoff ->
+			ok = CompletionFun ({prepared, [{handoff, Harness, HarnessToken, ExecuteSpecification}]}),
+			ok = CompletionFun (completed),
+			NewState = OldState#state{status = migrating_as_source, harness_status = handoff},
+			{continue, NewState};
 		_ ->
 			{reject, {invalid_configuration, Configuration}, OldState}
 	end;
 	
-begin_migration (target, Configuration, CompletionFun, OldState = #state{status = pre_migrating_as_target}) ->
+begin_migration (target, [{execute, ExecuteSpecification}], CompletionFun, OldState = #state{status = pre_migrating_as_target, harness = none, harness_token = none, harness_status = none, harness_options = HarnessOptions, execute = migrate}) ->
 	try
-		{ok, ExecuteSpecification} = case Configuration of
-			[{execute, ExecuteSpecification_}] ->
-				{ok, ExecuteSpecification_};
-			_ ->
-				throw ({invalid_configuration, Configuration})
-		end,
 		ok = case mosaic_harness_coders:validate_frontend_execute_specification (ExecuteSpecification) of
 			ok ->
 				ok;
-			Error1 = {error, _Reason1} ->
-				throw (Error1)
+			Error = {error, _Reason} ->
+				throw (Error)
 		end,
+		HarnessToken = erlang:make_ref (),
+		HarnessConfiguration = enforce_ok_1 (mosaic_harness_coders:decode_frontend_configuration (
+				term, [{controller, erlang:self ()}, {controller_token, HarnessToken} | HarnessOptions])),
+		Harness = enforce_ok_1 (mosaic_harness_frontend:start_link (HarnessConfiguration)),
 		ok = CompletionFun (completed),
-		NewState = OldState#state{status = migrating_as_target, execute = ExecuteSpecification},
+		NewState = OldState#state{status = migrating_as_target, harness = Harness, harness_token = HarnessToken, harness_status = owner, execute = {execute, ExecuteSpecification}},
 		{continue, NewState}
 	catch
 		throw : {error, Reason} ->
 			{terminate, Reason, OldState#state{status = migration_failed}}
-	end.
+	end;
+	
+begin_migration (target, [{handoff, Harness, HarnessToken, ExecuteSpecification}], CompletionFun, OldState = #state{status = pre_migrating_as_target, harness = none, harness_token = none, harness_status = none, execute = migrate})
+		when is_pid (Harness), is_reference (HarnessToken) ->
+	true = erlang:link (Harness),
+	ok = CompletionFun (completed),
+	NewState = OldState#state{status = migrating_as_target, harness = Harness, harness_token = HarnessToken, harness_status = handoff, execute = {handoff, ExecuteSpecification}},
+	{continue, NewState};
+	
+begin_migration (target, Configuration, _CompletionFun, OldState = #state{status = pre_migrating_as_target}) ->
+	{terminate, {invalid_configuration, Configuration}, OldState#state{status = migration_failed}}.
 
 
-commit_migration (OldState = #state{status = migrating_as_source}) ->
+commit_migration (OldState = #state{status = migrating_as_source, harness = none, harness_token = none, harness_status = none}) ->
 	{continue, OldState#state{status = migrating_as_source_succeeded}};
 	
-commit_migration (OldState = #state{status = migrating_as_target, harness = Harness, execute = ExecuteSpecification}) ->
-	case mosaic_harness_frontend:execute (Harness, ExecuteSpecification) of
-		ok ->
-			{continue, OldState#state{status = executing}};
-		{error, Reason} ->
-			{terminate, Reason, OldState#state{status = migrating_as_target_failed}}
-	end.
+commit_migration (OldState = #state{status = migrating_as_source, harness = Harness, harness_token = HarnessToken, harness_status = owner})
+		when is_pid (Harness), is_reference (HarnessToken) ->
+	{continue, OldState#state{status = migrating_as_source_succeeded}};
+	
+commit_migration (OldState = #state{status = migrating_as_source, harness = Harness, harness_token = HarnessToken, harness_status = handoff})
+		when is_pid (Harness), is_reference (HarnessToken) ->
+	true = erlang:unlink (Harness),
+	{continue, OldState#state{status = migrating_as_source_succeeded, harness = none, harness_token = none, harness_status = none}};
+	
+commit_migration (OldState = #state{status = migrating_as_target, harness = Harness, harness_token = HarnessToken, harness_status = owner, execute = {execute, ExecuteSpecification}})
+		when is_pid (Harness), is_reference (HarnessToken) ->
+	try
+		ok = enforce_ok (mosaic_harness_frontend:execute (Harness, ExecuteSpecification)),
+		{continue, OldState#state{status = executing, execute = ExecuteSpecification}}
+	catch
+		throw : {error, Reason} ->
+			{terminate, Reason, OldState#state{status = migration_as_target_failed}}
+	end;
+	
+commit_migration (OldState = #state{status = migrating_as_target, harness = Harness, harness_token = HarnessToken, harness_status = handoff, execute = {handoff, ExecuteSpecification}})
+		when is_pid (Harness), is_reference (HarnessToken) ->
+	mosaic_harness_frontend:handoff (Harness, erlang:self (), HarnessToken),
+	{continue, OldState#state{status = executing, harness_status = owner, execute = ExecuteSpecification}}.
 
 
 rollback_migration (OldState = #state{status = migrating_as_source}) ->

@@ -9,9 +9,9 @@
 select (Key)
 		when is_binary (Key), (bit_size (Key) =:= 160) ->
 	case select ([Key]) of
-		{ok, [{Key, Revision, Data}], []} ->
+		{ok, [{Key, Revision, Data} | _Outcomes], _Reasons} ->
 			{ok, Revision, Data};
-		{ok, [], [{_Target, Key, Reason}]} ->
+		{ok, [], [{_Target, Key, Reason} | _Reasons]} ->
 			{error, Reason};
 		{ok, [], []} ->
 			{error, unreachable_vnode}
@@ -31,7 +31,7 @@ select (Keys)
 						{error, {invalid_reply, Reply}}
 				end
 			end,
-			Keys, mosaic_cluster_storage, mosaic_cluster_storage_vnode, 1).
+			Keys, mosaic_cluster_storage, mosaic_cluster_storage_vnode, 4).
 
 
 include (Key, Revision, Data)
@@ -48,11 +48,11 @@ include (Key, Revision, Data)
 						{error, {invalid_reply, Reply}}
 				end
 			end,
-			[Key], mosaic_cluster_storage, mosaic_cluster_storage_vnode, 1),
+			[Key], mosaic_cluster_storage, mosaic_cluster_storage_vnode, 4),
 	case Outcome of
-		{ok, [Key], []} ->
+		{ok, _Keys, []} ->
 			ok;
-		{ok, [], [{_Target, Key, Reason}]} ->
+		{ok, [], [{_Target, Key, Reason} | _Reasons]} ->
 			{error, Reason};
 		{ok, [], []} ->
 			{error, unreachable_vnode}
@@ -73,11 +73,11 @@ exclude (Key, Revision)
 						{error, {invalid_reply, Reply}}
 				end
 			end,
-			[Key], mosaic_cluster_storage, mosaic_cluster_storage_vnode, 1),
+			[Key], mosaic_cluster_storage, mosaic_cluster_storage_vnode, 4),
 	case Outcome of
-		{ok, [Key], []} ->
+		{ok, _Keys, []} ->
 			ok;
-		{ok, [], [{_Target, Key, Reason}]} ->
+		{ok, _Keys, [{_Target, Key, Reason} | _Reasons]} ->
 			{error, Reason};
 		{ok, [], []} ->
 			{error, unreachable_vnode}
@@ -98,11 +98,11 @@ update (Key, OldRevision, NewRevision, NewData)
 						{error, {invalid_reply, Reply}}
 				end
 			end,
-			[Key], mosaic_cluster_storage, mosaic_cluster_storage_vnode, 1),
+			[Key], mosaic_cluster_storage, mosaic_cluster_storage_vnode, 4),
 	case Outcome of
-		{ok, [Key], []} ->
+		{ok, _Keys, []} ->
 			ok;
-		{ok, [], [{_Target, Key, Reason}]} ->
+		{ok, _Keys, [{_Target, Key, Reason} | _Reasons]} ->
 			{error, Reason};
 		{ok, [], []} ->
 			{error, unreachable_vnode}
@@ -123,11 +123,11 @@ update (Key, Mutator)
 						{error, {invalid_reply, Reply}}
 				end
 			end,
-			[Key], mosaic_cluster_storage, mosaic_cluster_storage_vnode, 1),
+			[Key], mosaic_cluster_storage, mosaic_cluster_storage_vnode, 4),
 	case Outcome of
-		{ok, [Key], []} ->
+		{ok, _Keys, []} ->
 			ok;
-		{ok, [], [{_Target, Key, Reason}]} ->
+		{ok, _Keys, [{_Target, Key, Reason} | _Reasons]} ->
 			{error, Reason};
 		{ok, [], []} ->
 			{error, unreachable_vnode}

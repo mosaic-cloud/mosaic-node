@@ -6,7 +6,7 @@
 
 -export ([start/1, start/2, start_link/1, start_link/2]).
 -export ([stop/1, stop/2]).
--export ([execute/2, signal/2, push_packet/2]).
+-export ([execute/2, signal/2, push_packet/2, handoff/3]).
 -export ([init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2, handle_info/2]).
 
 
@@ -49,6 +49,10 @@ push_packet (Harness, Packet)
 		when (is_pid (Harness) orelse is_atom (Harness)) ->
 	gen_server:call (Harness, {mosaic_harness_frontend, push_packet, Packet}).
 
+
+handoff (Harness, Controller, ControllerToken)
+		when (is_pid (Harness) orelse is_atom (Harness)), is_pid (Controller) ->
+	gen_server:call (Harness, {mosaic_harness_frontend, handoff, Controller, ControllerToken}).
 
 -include ("mosaic_harness.hrl").
 
@@ -147,6 +151,13 @@ handle_call (
 		ok = enforce_ok (push_packet_internal (Port, enforce_ok_1 (mosaic_harness_coders:encode_packet_fully (Packet)))),
 		{reply, ok, State}
 	catch throw : Error = {error, _Reason} -> {stop, Error, Error, State} end;
+	
+handle_call (
+			{mosaic_harness_frontend, handoff, Controller, ControllerToken}, _Sender,
+			OldState = #state{controller_token = ControllerToken})
+		when is_pid (Controller) ->
+	NewState = OldState#state{controller = Controller},
+	{reply, ok, NewState};
 	
 handle_call (Request, _Sender, State) ->
 	Error = {error, {invalid_request, Request}},

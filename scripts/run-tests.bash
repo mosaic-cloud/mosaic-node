@@ -9,7 +9,7 @@ _module="${1}"
 _ip="127.0.0.1"
 _webmachine_port="$(( _erl_epmd_port + 1 ))"
 _riak_handoff_port="$(( _erl_epmd_port + 2 ))"
-_wui_port="$(( _elr_epmd_port + 3 ))"
+_wui_port="$(( _erl_epmd_port + 3 ))"
 
 if test -n "${mosaic_node_temporary:-}" ; then
 	_tmp="${mosaic_node_temporary}"
