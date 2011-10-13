@@ -53,9 +53,15 @@ test () ->
 						{sleep, 1 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:fetcher', json, null, 1},
 						{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer', json, null, 1},
-						{sleep, 1 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:scavanger', json, null, 1},
+						{sleep, 1 * 1000},
+						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer', json, null, 1},
+						%{sleep, 1 * 1000},
+						{define_and_create_processes, 'mosaic-components:java-driver', json, <<"amqp">>, 1},
+						{sleep, 1 * 1000},
+						{define_and_create_processes, 'mosaic-components:java-driver', json, <<"kv">>, 1},
+						{sleep, 1 * 1000},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:java-indexer', json, null, 1},
 						{sleep, 1 * 1000},
 						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:leacher', json, null, 1},
 						%{sleep, 1 * 1000},
@@ -201,6 +207,9 @@ execute ({initialize}) ->
 	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-examples-realtime-feeds:frontend">>, <<16#a2e40f0b2c041bc694ace68ace08420d40f9cbc0 : 160>>),
 	_ = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:frontend', term, {mosaic_component_process_tests, configure, defaults}),
 	_ = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:frontend', json, {mosaic_component_process_tests, configure, defaults}),
+	
+	_ = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:java-indexer', term, {mosaic_component_process_tests, configure, defaults}),
+	_ = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:java-indexer', json, {mosaic_component_process_tests, configure, defaults}),
 	
 	ok;
 	
