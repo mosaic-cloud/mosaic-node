@@ -79,6 +79,7 @@ tazpkg get-install mosaic-components-java-container --forced
 tazpkg get-install mosaic-components-java-drivers --forced
 tazpkg get-install mosaic-components-java-cloudlet-container --forced
 tazpkg get-install mosaic-examples-realtime-feeds --forced
+tazpkg get-install mosaic-examples-realtime-feeds-java --forced
 tazpkg get-install mosaic-node-boot --forced
 
 exit 0
@@ -125,7 +126,8 @@ cat >"${_outputs}/package-boot/pkg.json" <<EOS
 		"mosaic-components-java-container",
 		"mosaic-components-java-drivers",
 		"mosaic-components-java-cloudlet-container",
-		"mosaic-examples-realtime-feeds"
+		"mosaic-examples-realtime-feeds",
+		"mosaic-examples-realtime-feeds-java"
 	]
 }
 EOS
