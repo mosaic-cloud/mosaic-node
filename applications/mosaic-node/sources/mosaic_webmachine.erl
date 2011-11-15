@@ -49,7 +49,7 @@ start_supervised () ->
 	start_supervised (defaults).
 
 start_supervised (Configuration) ->
-	mosaic_node_sup:start_child_daemon (mosaic_webmachine, {local, mosaic_webmachine}, [Configuration], permanent).
+	mosaic_node_sup:start_child_daemon ({local, mosaic_webmachine}, mosaic_webmachine, Configuration).
 
 
 options (defaults) ->

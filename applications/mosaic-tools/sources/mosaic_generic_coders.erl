@@ -513,6 +513,21 @@ validate_term_ok (Term, {equals, Expected, Reason}) ->
 	if
 		(Term =:= Expected) -> ok;
 		true -> throw ({error, {Reason, Term, {expected_value, Expected}}})
+	end;
+	
+validate_term_ok (Term, {member, Expected})
+		when is_list (Expected) ->
+	Member = lists:member (Term, Expected),
+	if
+		Member -> ok;
+		true -> throw ({error, {unexpected_value, Term}})
+	end;
+	
+validate_term_ok (Term, {member, Expected, Reason}) ->
+	Member = lists:member (Term, Expected),
+	if
+		Member -> ok;
+		true -> throw ({error, {Reason, Term, {expected_value, Expected}}})
 	end.
 
 

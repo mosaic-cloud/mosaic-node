@@ -3,7 +3,7 @@
 
 
 -export ([behaviour_info/1]).
--export ([start/4, start/5, start_link/4, start_link/5]).
+-export ([start/1, start/2, start/4, start/5, start_link/1, start_link/2, start_link/4, start_link/5]).
 -export ([start_supervised/5]).
 -export ([stop/1, stop/2]).
 -export ([call/3, call/4, call/5, cast/3, cast/4]).
@@ -23,18 +23,30 @@ behaviour_info (callbacks) ->
 		{rollback_migration, 1}].
 
 
+start (Configuration) ->
+	start (noname, Configuration).
+
+start (QualifiedName, Configuration) ->
+	mosaic_process_tools:start (gen_server, mosaic_process_internals, QualifiedName, Configuration).
+
 start (Module, Disposition, Identifier, Configuration) ->
 	start (noname, Module, Disposition, Identifier, Configuration).
 
 start (QualifiedName, Module, Disposition, Identifier, Configuration) ->
-	mosaic_process_tools:start (gen_server, mosaic_process_internals, QualifiedName, {Module, Disposition, Identifier, Configuration}).
+	start (QualifiedName, {Module, Disposition, Identifier, Configuration}).
 
+
+start_link (Configuration) ->
+	start_link (noname, Configuration).
+
+start_link (QualifiedName, Configuration) ->
+	mosaic_process_tools:start_link (gen_server, mosaic_process_internals, QualifiedName, Configuration).
 
 start_link (Module, Disposition, Identifier, Configuration) ->
 	start_link (noname, Module, Disposition, Identifier, Configuration).
 
 start_link (QualifiedName, Module, Disposition, Identifier, Configuration) ->
-	mosaic_process_tools:start_link (gen_server, mosaic_process_internals, QualifiedName, {Module, Disposition, Identifier, Configuration}).
+	start_link (QualifiedName, {Module, Disposition, Identifier, Configuration}).
 
 
 start_supervised (QualifiedName, Module, Disposition, Identifier, Configuration) ->

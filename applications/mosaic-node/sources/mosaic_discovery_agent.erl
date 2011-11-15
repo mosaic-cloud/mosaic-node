@@ -35,7 +35,7 @@ start_supervised () ->
 	start_supervised (defaults).
 
 start_supervised (Configuration) ->
-	mosaic_node_sup:start_child_daemon (mosaic_discovery_agent, {local, mosaic_discovery_agent}, [Configuration], permanent).
+	mosaic_node_sup:start_child_daemon ({local, mosaic_discovery_agent}, mosaic_discovery_agent, Configuration).
 
 
 stop () ->

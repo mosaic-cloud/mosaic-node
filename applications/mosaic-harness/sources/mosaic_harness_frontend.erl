@@ -54,6 +54,7 @@ handoff (Harness, Controller, ControllerToken)
 		when (is_pid (Harness) orelse is_atom (Harness)), is_pid (Controller) ->
 	gen_server:call (Harness, {mosaic_harness_frontend, handoff, Controller, ControllerToken}).
 
+
 -include ("mosaic_harness.hrl").
 
 

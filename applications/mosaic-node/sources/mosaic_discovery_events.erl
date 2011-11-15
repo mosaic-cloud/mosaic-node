@@ -30,7 +30,7 @@ start_link (QualifiedName, void) ->
 
 
 start_supervised () ->
-	mosaic_node_sup:start_child_daemon (mosaic_discovery_events, {local, mosaic_discovery_events}, [void], permanent).
+	mosaic_node_sup:start_child_daemon ({local, mosaic_discovery_events}, mosaic_discovery_events, void).
 
 
 stop () ->
