@@ -327,6 +327,12 @@ validate_term_ok (Term, {is_float, {Min, Max}, Reason})
 		true -> throw ({error, {Reason, Term, expected_float}})
 	end;
 	
+validate_term_ok (Term, is_function) ->
+	if
+		is_function (Term) -> ok;
+		true -> throw ({error, {expected_function, Term}})
+	end;
+	
 validate_term_ok (Term, {is_function, Reason}) ->
 	if
 		is_function (Term) -> ok;
@@ -528,6 +534,34 @@ validate_term_ok (Term, {member, Expected, Reason}) ->
 	if
 		Member -> ok;
 		true -> throw ({error, {Reason, Term, {expected_value, Expected}}})
+	end;
+	
+validate_term_ok (Term, is_module) ->
+	if
+		is_atom (Term) ->
+			case erlang:module_loaded (Term) of
+				true -> ok;
+				false ->
+					case code:ensure_loaded (Term) of
+						{module, Term} -> ok;
+						{error, Reason} -> throw ({error, {invalid_module, Term, Reason}})
+					end
+			end;
+		true -> throw ({error, {expected_module, Term}})
+	end;
+	
+validate_term_ok (Term, {module, Reason}) ->
+	if
+		is_atom (Term) ->
+			case erlang:module_loaded (Term) of
+				true -> ok;
+				false ->
+					case code:ensure_loaded (Term) of
+						{module, Term} -> ok;
+						{error, Reason} -> throw ({error, {Reason, Term, {invalid_module, Reason}}})
+					end
+			end;
+		true -> throw ({error, {Reason, Term, expected_module}})
 	end.
 
 
