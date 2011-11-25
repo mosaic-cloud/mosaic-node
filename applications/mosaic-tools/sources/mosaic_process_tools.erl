@@ -2,11 +2,13 @@
 -module (mosaic_process_tools).
 
 
+-export ([start/4, start_link/4]).
+-export ([monitor/1, demonitor/1]).
+-export ([wait/1, wait/2]).
+
 -export ([resolve_registered/1]).
 -export ([ensure_registered/1, ensure_registered/2]).
 -export ([enforce_registered/1, enforce_registered/2]).
--export ([start/4, start_link/4]).
--export ([wait/1, wait/2]).
 
 
 start (Type, Module, QualifiedName, Configuration)
@@ -79,6 +81,37 @@ start_link (Type, Module, QualifiedName, Configuration)
 	end.
 
 
+resolve (Process)
+		when is_pid (Process) orelse is_port (Process) ->
+	{ok, Process};
+	
+resolve (QualifiedName) ->
+	resolve_registered (QualifiedName).
+
+
+monitor (Process) ->
+	case resolve (Process) of
+		{ok, RealProcess} ->
+			try erlang:monitor (Process, RealProcess) of Monitor ->
+				receive
+					{'DOWN', Monitor, process, RealProcess, Reason} ->
+						{error, Reason}
+				after 0 ->
+					{ok, Monitor}
+				end
+			catch error : badarg ->
+				{error, {nodedown, erlang:node (RealProcess)}}
+			end;
+		Error = {error, _Reason} ->
+			Error
+	end.
+
+
+demonitor (Monitor)
+		when is_reference (Monitor) ->
+	true = erlang:demonitor (Monitor, [flush]).
+
+
 wait (Process) ->
 	wait (Process, infinity).
 
@@ -117,6 +150,15 @@ wait (Process, Timeout)
 	end.
 
 
+resolve_registered (LocalName)
+		when is_atom (LocalName) ->
+	case erlang:whereis (LocalName) of
+		Process when (is_pid (Process) orelse is_port (Process)) ->
+			{ok, Process};
+		undefined ->
+			{error, {unregistered_process, LocalName}}
+	end;
+	
 resolve_registered (QualifiedName = {local, LocalName})
 		when is_atom (LocalName) ->
 	case erlang:whereis (LocalName) of
@@ -124,6 +166,34 @@ resolve_registered (QualifiedName = {local, LocalName})
 			{ok, Process};
 		undefined ->
 			{error, {unregistered_process, QualifiedName}}
+	end;
+	
+resolve_registered (QualifiedName = {global, GlobalName}) ->
+	case global:whereis (GlobalName) of
+		Process when (is_pid (Process) orelse is_port (Process)) ->
+			{ok, Process};
+		undefined ->
+			{error, {unregistered_process, QualifiedName}}
+	end;
+	
+resolve_registered (QualifiedName = {Node, LocalName})
+		when (Node =:= node ()), is_atom (LocalName) ->
+	case erlang:whereis (LocalName) of
+		Process when (is_pid (Process) orelse is_port (Process)) ->
+			{ok, Process};
+		undefined ->
+			{error, {unregistered_process, QualifiedName}}
+	end;
+	
+resolve_registered (QualifiedName = {Node, LocalName})
+		when is_atom (Node), is_atom (LocalName) ->
+	case rpc:call (Node, erlang, whereis, [LocalName]) of
+		Process when (is_pid (Process) orelse is_port (Process)) ->
+			{ok, Process};
+		undefined ->
+			{error, {unregistered_process, QualifiedName}};
+		{badrpc, Reason} ->
+			{error, {nodedown, Node}}
 	end.
 
 
