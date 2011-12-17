@@ -396,6 +396,20 @@ configure_1 (Type = 'mosaic-components:java-cloudlet-container', Identifier, {js
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
+configure_1 (Type = 'mosaic-tests:socat', Identifier, {json, [Token, Endpoint]}, ExtraOptions)
+			when is_binary (Token), is_binary (Endpoint), is_list (ExtraOptions) ->
+	try
+		Executable = enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"socat">>)),
+		Options = [
+				{harness, [
+					{argument0, <<"[", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
+				{execute, [
+					{executable, Executable},
+					{arguments, [<<"stdio">>, Endpoint]}]}
+				| ExtraOptions],
+		{ok, Options}
+	catch throw : Error = {error, _Reason} -> Error end;
+	
 configure_1 (Type = 'mosaic-tests:jetty-hello-world', Identifier, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	try
@@ -434,7 +448,7 @@ configure_1 (Type, Identifier, defaults, ExtraOptions)
 configure_1 (Type = 'mosaic-examples-realtime-feeds:java-indexer', Identifier, defaults, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	try
-		<<"mosaic-examples-realtime-feeds:", TypeSuffix / binary>> = erlang:atom_to_binary (Type, utf8),
+		<<"mosaic-examples-realtime-feeds:", _TypeSuffix / binary>> = erlang:atom_to_binary (Type, utf8),
 		Executable = enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-examples-realtime-feeds-java--run-component">>)),
 		Options = [
 				{harness, [

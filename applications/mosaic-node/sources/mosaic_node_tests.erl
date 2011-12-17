@@ -159,6 +159,9 @@ execute ({initialize}) ->
 	_ = mosaic_process_configurator:register ('mosaic-tests:java-container', term, {mosaic_component_process_tests, configure, defaults}),
 	_ = mosaic_process_configurator:register ('mosaic-tests:java-container', json, {mosaic_component_process_tests, configure, defaults}),
 	
+	_ = mosaic_process_configurator:register ('mosaic-tests:socat', term, {mosaic_component_process_tests, configure, defaults}),
+	_ = mosaic_process_configurator:register ('mosaic-tests:socat', json, {mosaic_component_process_tests, configure, defaults}),
+	
 	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-tests:httpc">>, <<16#a2e40f0b2c041bc694ace68ace08420d40f9cbc0 : 160>>),
 	_ = mosaic_process_configurator:register ('mosaic-tests:jetty-hello-world', term, {mosaic_component_process_tests, configure, defaults}),
 	_ = mosaic_process_configurator:register ('mosaic-tests:jetty-hello-world', json, {mosaic_component_process_tests, configure, defaults}),
