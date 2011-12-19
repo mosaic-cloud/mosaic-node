@@ -14,6 +14,8 @@ fi
 "${_workbench}/../mosaic-components-riak-kv/scripts/package"
 "${_workbench}/../mosaic-components-httpg/scripts/package"
 
+"${_workbench}/../mosaic-erlang-drivers/scripts/package"
+
 if test "${_mosaic_do_all_java:-${_mosaic_do_all:-false}}" == true ; then
 	"${_workbench}/../mosaic-java-platform/infrastructure/components-container/scripts/package"
 	"${_workbench}/../mosaic-java-platform/cloudlets/scripts/package"
@@ -22,7 +24,7 @@ fi
 
 if test "${_mosaic_do_all_examples:-${_mosaic_do_all:-false}}" == true ; then
 	"${_workbench}/../mosaic-examples-realtime-feeds/backend/scripts/package"
-	# "${_workbench}/../mosaic-examples-realtime-feeds-java/scripts/package"
+	"${_workbench}/../mosaic-examples-realtime-feeds-java/scripts/package"
 fi
 
 exit 0

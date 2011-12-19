@@ -5,8 +5,6 @@ if ! test "${#}" -eq 0 ; then
 	exit 1
 fi
 
-echo "[ii] packaging ${_package_name}-boot..." >&2
-
 if test -e "${_outputs}/package-boot" ; then
 	rm -R "${_outputs}/package-boot"
 fi
@@ -90,7 +88,7 @@ chmod +x -- "${_outputs}/package-boot/bin/upgrade"
 cat >"${_outputs}/package-boot/pkg.json" <<EOS
 {
 	"package" : "${_package_name}-boot",
-	"version" : "${_package_version}.$( date '+%Y%m%d.%H%M%S' )",
+	"version" : "${_package_version}",
 	"maintainer" : "mosaic-developers@lists.info.uvt.ro",
 	"description" : "mOSAIC Component: ${_package_name}-boot",
 	"directories" : [ "bin" ],
