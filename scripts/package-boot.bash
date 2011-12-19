@@ -118,6 +118,7 @@ cat >"${_outputs}/package-boot/pkg.json" <<EOS
 		"coreutils-path",
 		"coreutils-print",
 		"coreutils-redirection",
+		"socat",
 		"mosaic-node",
 		"mosaic-node-wui",
 		"mosaic-components-rabbitmq",
