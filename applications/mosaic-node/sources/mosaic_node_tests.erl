@@ -17,10 +17,6 @@ test () ->
 			{ok, boot} ->
 				{ok, defaults, [
 						{boot}, {activate}, {initialize}]};
-			{ok, 'test-dummy'} ->
-				{ok, defaults, [
-						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, 'mosaic-tests:dummy', json, null, 4}]};
 			{ok, 'test-rabbitmq'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
@@ -33,15 +29,6 @@ test () ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
 						{define_and_create_processes, 'mosaic-tests:riak-kv', json, null, 4}]};
-			{ok, 'test-http-hello-world-4'} ->
-				{ok, defaults, [
-						{boot}, {activate}, {ping, default}, {initialize},
-						{define_and_create_processes, 'mosaic-tests:rabbitmq', json, null, 1},
-						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-tests:httpg', json, null, 1},
-						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-tests:jetty-hello-world', json, null, 4},
-						{sleep, 2 * 1000}]};
 			{ok, 'examples-realtime-feeds'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
@@ -57,25 +44,27 @@ test () ->
 						{sleep, 1 * 1000},
 						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer', json, null, 1},
 						%{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-components:java-driver', json, <<"amqp">>, 1},
-						{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-components:java-driver', json, <<"kv">>, 1},
-						{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:java-indexer', json, null, 1},
-						{sleep, 1 * 1000},
 						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:leacher', json, null, 1},
 						%{sleep, 1 * 1000},
 						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:pusher', json, null, 1},
 						%{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend', json, null, 1},
+						{define_and_create_processes, 'mosaic-components:java-driver-container', json, <<"amqp">>, 1},
+						{sleep, 1 * 1000},
+						{define_and_create_processes, 'mosaic-components:java-driver-container', json, <<"kv">>, 1},
+						{sleep, 1 * 1000},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer-java', json, null, 1},
+						{sleep, 1 * 1000},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend-java', json, null, 1},
 						{sleep, 1 * 1000}]};
 			{ok, 'test-ring-join-leave'} ->
 				Self = erlang:node (),
 				case application:get_env (mosaic_node, tests_nodes) of
 					{ok, [Self | _Peers]} ->
 						{ok, ring_join_leave_master, [
-								{boot}, {activate}, {ping, 4}, {initialize},
-								{define_and_create_processes, dummy, term, defaults, 4}]};
+								{boot},
+								{activate},
+								{ping, 4},
+								{initialize}]};
 					{ok, Nodes} ->
 						Peers = lists:delete (Self, Nodes),
 						{ok, ring_join_leave_slaves, [

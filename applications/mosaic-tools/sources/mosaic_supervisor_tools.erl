@@ -207,7 +207,7 @@ coerce_child_specification (OriginalSpecification = {process, QualifiedName, Mod
 			is_list (Options) -> ok;
 			true -> throw ({error, {invalid_options, Options, invalid_term}})
 		end,
-		DefaultOptions = [{identifier, undefined}, {restart, permanent}, {shutdown, 12 * 1000}],
+		DefaultOptions = [{identifier, undefined}, {restart, temporary}, {shutdown, 12 * 1000}],
 		FinalOptions = Options ++ DefaultOptions,
 		{Identifier1, Restart, Shutdown} = case lists:sort (proplists:get_keys (FinalOptions)) of
 			[identifier, restart, shutdown] ->
@@ -229,7 +229,8 @@ coerce_child_specification (OriginalSpecification = {process, QualifiedName, Mod
 					{local, LocalName} -> LocalName;
 					{global, GlobalName} -> GlobalName
 				end;
-			true -> Identifier1
+			true ->
+				erlang:make_ref ()
 		end,
 		CoercedSpecification = {Identifier2, {Module, start_link, StartLinkArguments}, Restart, Shutdown, worker, dynamic},
 		{ok, CoercedSpecification}
@@ -269,7 +270,8 @@ coerce_child_specification (OriginalSpecification = {supervisor, QualifiedName, 
 					{local, LocalName} -> LocalName;
 					{global, GlobalName} -> GlobalName
 				end;
-			true -> Identifier1
+			true ->
+				erlang:make_ref ()
 		end,
 		CoercedSpecification = {Identifier2, {mosaic_supervisor_tools, start_link, StartLinkArguments}, Restart, Shutdown, supervisor, dynamic},
 		{ok, CoercedSpecification}

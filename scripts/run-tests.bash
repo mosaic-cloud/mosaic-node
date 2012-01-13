@@ -35,7 +35,7 @@ _erl_env+=(
 		_mosaic_repositories="${_repositories}"
 )
 
-mkdir -p "${_tmp}"
-cd "${_tmp}"
+mkdir -- -p "${_tmp}"
+cd -- "${_tmp}"
 
 exec env "${_erl_env[@]}" "${_erl_bin}" "${_erl_args[@]}"

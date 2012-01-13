@@ -82,6 +82,7 @@ _erl_env+=(
 if test -n "${_repositories:-}" ; then
 	_erl_env+=(
 			_mosaic_repositories="${_repositories}"
+			PATH="$( find "${_repositories}"/*/ -path "${_repositories}"'/mosaic-*/.outputs/package/bin' -exec readlink -e {} \; | tr '\n' ':' ):${_outputs}/gcc/applications-elf:${_PATH}"
 	)
 fi
 
@@ -91,7 +92,7 @@ if test -n "${_log}" -a -f "${_log}" ; then
 	)
 fi
 
-mkdir -p "${_tmp}"
-cd "${_tmp}"
+mkdir -p -- "${_tmp}"
+cd -- "${_tmp}"
 
 exec env "${_erl_env[@]}" "${_erl_bin}" "${_erl_args[@]}"
