@@ -79,9 +79,9 @@ _erl_env+=(
 		mosaic_node_ip="${_ip}"
 )
 
-if test -n "${_workbench:-}" ; then
+if test -n "${_repositories:-}" ; then
 	_erl_env+=(
-			_mosaic_workbench="${_workbench}"
+			_mosaic_repositories="${_repositories}"
 	)
 fi
 
@@ -94,4 +94,4 @@ fi
 mkdir -p "${_tmp}"
 cd "${_tmp}"
 
-exec env "${_erl_env[@]}" "${_erl}" "${_erl_args[@]}"
+exec env "${_erl_env[@]}" "${_erl_bin}" "${_erl_args[@]}"

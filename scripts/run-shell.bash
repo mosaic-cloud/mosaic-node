@@ -16,4 +16,4 @@ _erl_args+=(
 		-setcookie "${_erl_cookie}"
 )
 
-exec env "${_erl_env[@]}" "${_erl}" "${_erl_args[@]}"
+exec env "${_erl_env[@]}" "${_erl_bin}" "${_erl_args[@]}"
