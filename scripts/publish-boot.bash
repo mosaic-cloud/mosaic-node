@@ -5,11 +5,9 @@ if ! test "${#}" -eq 0 ; then
 	exit 1
 fi
 
-test -e "${_outputs}/package-boot.tar.gz"
-
-if test -e "${_package_afs}" ; then
-	cp -T "${_outputs}/package-boot.tar.gz" "${_package_afs}/${_package_name}-boot-${_package_version}.tar.gz"
+if test "${_mosaic_publish_cook:-true}" == true ; then
+	test -e "${_outputs}/package.tar.gz"
+	ssh -T "${_package_cook}" <"${_outputs}/package-boot.tar.gz"
 fi
 
-exec ssh -T cook@agent1.builder.mosaic.ieat.ro. <"${_outputs}/package-boot.tar.gz"
-exit 1
+exit 0
