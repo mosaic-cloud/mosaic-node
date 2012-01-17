@@ -73,7 +73,7 @@ if test "${0}" != /tmp/@{_package_name}--upgrade ; then
 	exec /tmp/@{_package_name}--upgrade
 fi
 
-tazpkg recharge mosaic-repository
+tazpkg recharge mosaic-mshell
 tazpkg get-install mosaic-node-@{_package_version} --forced
 tazpkg get-install mosaic-node-wui-@{_package_version} --forced
 tazpkg get-install mosaic-components-rabbitmq-@{_package_version} --forced
