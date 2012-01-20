@@ -15,8 +15,9 @@ fi
 mkdir "${_outputs}/package-boot"
 mkdir "${_outputs}/package-boot/bin"
 
-sed \
-		-r -e 's|@\{_package_name\}|'"${_package_name}"'|g' \
+sed -r \
+		-e 's|@\{_package_name\}|'"${_package_name}"'|g' \
+		-e 's|@\{_package_version\}|'"${_package_version}"'|g' \
 	>"${_outputs}/package-boot/bin/run" <<'EOS'
 #!/bin/bash
 
@@ -57,7 +58,10 @@ EOS
 
 chmod +x -- "${_outputs}/package-boot/bin/run"
 
-cat >"${_outputs}/package-boot/bin/upgrade" <<'EOS'
+sed -r \
+		-e 's|@\{_package_name\}|'"${_package_name}"'|g' \
+		-e 's|@\{_package_version\}|'"${_package_version}"'|g' \
+	>"${_outputs}/package-boot/bin/upgrade" <<'EOS'
 #!/bin/bash
 
 set -e -E -u -o pipefail || exit 1
@@ -67,18 +71,18 @@ if test "${0}" != /tmp/mosaic-node-boot--upgrade ; then
 	exec /tmp/mosaic-node-boot--upgrade
 fi
 
-tazpkg recharge mosaic-repository
-tazpkg get-install mosaic-node --forced
-tazpkg get-install mosaic-node-wui --forced
-tazpkg get-install mosaic-components-rabbitmq --forced
-tazpkg get-install mosaic-components-riak-kv --forced
-tazpkg get-install mosaic-components-httpg --forced
-tazpkg get-install mosaic-components-java-container --forced
-tazpkg get-install mosaic-components-java-drivers --forced
-tazpkg get-install mosaic-components-java-cloudlet-container --forced
-tazpkg get-install mosaic-examples-realtime-feeds --forced
-tazpkg get-install mosaic-examples-realtime-feeds-java --forced
-tazpkg get-install mosaic-node-boot --forced
+tazpkg recharge mosaic-mshell
+tazpkg get-install mosaic-node-@{_package_version} --forced
+tazpkg get-install mosaic-node-wui-@{_package_version} --forced
+tazpkg get-install mosaic-components-rabbitmq-@{_package_version} --forced
+tazpkg get-install mosaic-components-riak-kv-@{_package_version} --forced
+tazpkg get-install mosaic-components-httpg-@{_package_version} --forced
+tazpkg get-install mosaic-components-java-container-@{_package_version} --forced
+tazpkg get-install mosaic-components-java-drivers-@{_package_version} --forced
+tazpkg get-install mosaic-components-java-cloudlet-container-@{_package_version} --forced
+tazpkg get-install mosaic-examples-realtime-feeds-@{_package_version} --forced
+tazpkg get-install mosaic-examples-realtime-feeds-java-@{_package_version} --forced
+tazpkg get-install mosaic-node-boot-@{_package_version} --forced
 
 exit 0
 EOS
@@ -117,16 +121,16 @@ cat >"${_outputs}/package-boot/pkg.json" <<EOS
 		"coreutils-print",
 		"coreutils-redirection",
 		"socat",
-		"mosaic-node",
-		"mosaic-node-wui",
-		"mosaic-components-rabbitmq",
-		"mosaic-components-riak-kv",
-		"mosaic-components-httpg",
-		"mosaic-components-java-container",
-		"mosaic-components-java-drivers",
-		"mosaic-components-java-cloudlet-container",
-		"mosaic-examples-realtime-feeds",
-		"mosaic-examples-realtime-feeds-java"
+		"mosaic-node-${_package_version}",
+		"mosaic-node-wui-${_package_version}",
+		"mosaic-components-rabbitmq-${_package_version}",
+		"mosaic-components-riak-kv-${_package_version}",
+		"mosaic-components-httpg-${_package_version}",
+		"mosaic-components-java-container-${_package_version}",
+		"mosaic-components-java-drivers-${_package_version}",
+		"mosaic-components-java-cloudlet-container-${_package_version}",
+		"mosaic-examples-realtime-feeds-${_package_version}",
+		"mosaic-examples-realtime-feeds-java-${_package_version}"
 	]
 }
 EOS
