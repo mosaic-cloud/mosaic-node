@@ -48,13 +48,13 @@ test () ->
 						%{sleep, 1 * 1000},
 						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:pusher', json, null, 1},
 						%{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-components:java-driver-container', json, <<"amqp">>, 1},
+						{define_and_create_processes, 'mosaic-components:java-driver-container', json, [<<"amqp">>, null, []], 1},
 						{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-components:java-driver-container', json, <<"kv">>, 1},
+						{define_and_create_processes, 'mosaic-components:java-driver-container', json, [<<"kv">>, null, []], 1},
 						{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer-java', json, null, 1},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer-java', json, [null], 1},
 						{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend-java', json, null, 1},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend-java', json, [null], 1},
 						{sleep, 1 * 1000}]};
 			{ok, 'test-ring-join-leave'} ->
 				Self = erlang:node (),

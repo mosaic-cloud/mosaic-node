@@ -222,9 +222,9 @@ configure_1 (Type, Identifier, defaults, ExtraOptions)
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-configure_1 (Type, Identifier, {json, [MainClass, ClassPath]}, ExtraOptions)
+configure_1 (Type, Identifier, {json, [Class, Configuration, ClassPath]}, ExtraOptions)
 		when ((Type =:= 'mosaic-tests:java-component-container') orelse (Type =:= 'mosaic-components:java-component-container')),
-			is_binary (MainClass), is_binary (ClassPath), is_list (ExtraOptions) ->
+			is_binary (Class), is_list (ClassPath), is_list (ExtraOptions) ->
 	try
 		Executable = case Type of
 			'mosaic-tests:java-component-container' ->
@@ -239,15 +239,17 @@ configure_1 (Type, Identifier, {json, [MainClass, ClassPath]}, ExtraOptions)
 				{execute, [
 					{executable, Executable},
 					{arguments, [
-						enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
-						MainClass, ClassPath]}]}
+						<<"--component-identifier">>, enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
+						<<"--component-callbacks-class">>, Class,
+						<<"--component-callbacks-configuration">>, enforce_ok_1 (mosaic_json_coders:encode_json (Configuration)),
+						<<"--component-classpath">>, erlang:list_to_binary (string:join (lists:map (fun erlang:binary_to_list/1, ClassPath), "|"))]}]}
 				| ExtraOptions],
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-configure_1 (Type, Identifier, {json, Class}, ExtraOptions)
+configure_1 (Type, Identifier, {json, [Resource, Configuration, ClassPath]}, ExtraOptions)
 		when ((Type =:= 'mosaic-tests:java-driver-container') orelse (Type =:= 'mosaic-components:java-driver-container')),
-				is_binary (Class), is_list (ExtraOptions) ->
+				is_binary (Resource), is_list (ClassPath), is_list (ExtraOptions) ->
 	try
 		Executable = case Type of
 			'mosaic-tests:java-driver-container' ->
@@ -262,15 +264,17 @@ configure_1 (Type, Identifier, {json, Class}, ExtraOptions)
 				{execute, [
 					{executable, Executable},
 					{arguments, [
-						enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
-						Class]}]}
+						Resource,
+						<<"--component-identifier">>, enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
+						<<"--component-callbacks-configuration">>, enforce_ok_1 (mosaic_json_coders:encode_json (Configuration)),
+						<<"--component-classpath">>, erlang:list_to_binary (string:join (lists:map (fun erlang:binary_to_list/1, ClassPath), "|"))]}]}
 				| ExtraOptions],
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-configure_1 (Type, Identifier, {json, [ClassPath, Descriptor]}, ExtraOptions)
+configure_1 (Type, Identifier, {json, [Configuration, ClassPath]}, ExtraOptions)
 		when ((Type =:= 'mosaic-tests:java-cloudlet-container') orelse (Type =:= 'mosaic-components:java-cloudlet-container')),
-				is_binary (ClassPath), is_binary (Descriptor), is_list (ExtraOptions) ->
+				is_list (ClassPath), is_list (ExtraOptions) ->
 	try
 		Executable = case Type of
 			'mosaic-tests:java-cloudlet-container' ->
@@ -285,8 +289,9 @@ configure_1 (Type, Identifier, {json, [ClassPath, Descriptor]}, ExtraOptions)
 				{execute, [
 					{executable, Executable},
 					{arguments, [
-						enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
-						ClassPath, Descriptor]}]}
+						<<"--component-identifier">>, enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
+						<<"--component-callbacks-configuration">>, enforce_ok_1 (mosaic_json_coders:encode_json (Configuration)),
+						<<"--component-classpath">>, erlang:list_to_binary (string:join (lists:map (fun erlang:binary_to_list/1, ClassPath), "|"))]}]}
 				| ExtraOptions],
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
@@ -308,7 +313,7 @@ configure_1 (Type, Identifier, defaults, ExtraOptions)
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-configure_1 (Type = 'mosaic-examples-realtime-feeds:frontend-java', Identifier, defaults, ExtraOptions)
+configure_1 (Type = 'mosaic-examples-realtime-feeds:frontend-java', Identifier, {json, [Configuration]}, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	try
 		Executable = enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-examples-realtime-feeds-frontend-java--run-component">>)),
@@ -317,12 +322,14 @@ configure_1 (Type = 'mosaic-examples-realtime-feeds:frontend-java', Identifier, 
 					{argument0, <<"[", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
 				{execute, [
 					{executable, Executable},
-					{arguments, [enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]}]}
+					{arguments, [
+						<<"--component-identifier">>, enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
+						<<"--component-callbacks-configuration">>, enforce_ok_1 (mosaic_json_coders:encode_json (Configuration))]}]}
 				| ExtraOptions],
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-configure_1 (Type = 'mosaic-examples-realtime-feeds:indexer-java', Identifier, defaults, ExtraOptions)
+configure_1 (Type = 'mosaic-examples-realtime-feeds:indexer-java', Identifier, {json, [Configuration]}, ExtraOptions)
 		when is_list (ExtraOptions) ->
 	try
 		Executable = enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-examples-realtime-feeds-indexer-java--run-component">>)),
@@ -331,7 +338,9 @@ configure_1 (Type = 'mosaic-examples-realtime-feeds:indexer-java', Identifier, d
 					{argument0, <<"[", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
 				{execute, [
 					{executable, Executable},
-					{arguments, [enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]}]}
+					{arguments, [
+						<<"--component-identifier">>, enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
+						<<"--component-callbacks-configuration">>, enforce_ok_1 (mosaic_json_coders:encode_json (Configuration))]}]}
 				| ExtraOptions],
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
