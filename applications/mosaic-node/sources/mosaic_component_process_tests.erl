@@ -247,16 +247,16 @@ configure_1 (Type, Identifier, {json, [Class, Configuration, ClassPath]}, ExtraO
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-configure_1 (Type, Identifier, {json, [Resource, Configuration, ClassPath]}, ExtraOptions)
-		when ((Type =:= 'mosaic-tests:java-driver-container') orelse (Type =:= 'mosaic-components:java-driver-container')),
-				is_binary (Resource), is_list (ClassPath), is_list (ExtraOptions) ->
+configure_1 (Type, Identifier, {json, [Class, Configuration, ClassPath, Logger]}, ExtraOptions)
+		when ((Type =:= 'mosaic-tests:java-component-container') orelse (Type =:= 'mosaic-components:java-component-container')),
+			is_binary (Class), is_list (ClassPath), is_binary (Logger), is_list (ExtraOptions) ->
 	try
 		Executable = case Type of
-			'mosaic-tests:java-driver-container' ->
+			'mosaic-tests:java-component-container' ->
 				Repositories = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_repositories">>)),
-				<<Repositories / binary, "/mosaic-java-platform/drivers/scripts/run-component">>;
-			'mosaic-components:java-driver-container' ->
-				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-java-driver-container--run-component">>))
+				<<Repositories / binary, "/mosaic-java-platform/components-container/scripts/run-component">>;
+			'mosaic-components:java-component-container' ->
+				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-java-component-container--run-component">>))
 		end,
 		Options = [
 				{harness, [
@@ -264,10 +264,11 @@ configure_1 (Type, Identifier, {json, [Resource, Configuration, ClassPath]}, Ext
 				{execute, [
 					{executable, Executable},
 					{arguments, [
-						Resource,
 						<<"--component-identifier">>, enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
+						<<"--component-callbacks-class">>, Class,
 						<<"--component-callbacks-configuration">>, enforce_ok_1 (mosaic_json_coders:encode_json (Configuration)),
-						<<"--component-classpath">>, erlang:list_to_binary (string:join (lists:map (fun erlang:binary_to_list/1, ClassPath), "|"))]}]}
+						<<"--component-classpath">>, erlang:list_to_binary (string:join (lists:map (fun erlang:binary_to_list/1, ClassPath), "|")),
+						<<"--component-logging-endpoint">>, Logger]}]}
 				| ExtraOptions],
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
@@ -289,6 +290,31 @@ configure_1 (Type, Identifier, {json, [Configuration, ClassPath]}, ExtraOptions)
 				{execute, [
 					{executable, Executable},
 					{arguments, [
+						<<"--component-identifier">>, enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
+						<<"--component-callbacks-configuration">>, enforce_ok_1 (mosaic_json_coders:encode_json (Configuration)),
+						<<"--component-classpath">>, erlang:list_to_binary (string:join (lists:map (fun erlang:binary_to_list/1, ClassPath), "|"))]}]}
+				| ExtraOptions],
+		{ok, Options}
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+configure_1 (Type, Identifier, {json, [Resource, Configuration, ClassPath]}, ExtraOptions)
+		when ((Type =:= 'mosaic-tests:java-driver-container') orelse (Type =:= 'mosaic-components:java-driver-container')),
+				is_binary (Resource), is_list (ClassPath), is_list (ExtraOptions) ->
+	try
+		Executable = case Type of
+			'mosaic-tests:java-driver-container' ->
+				Repositories = enforce_ok_1 (mosaic_generic_coders:os_env_get (<<"_mosaic_repositories">>)),
+				<<Repositories / binary, "/mosaic-java-platform/drivers/scripts/run-component">>;
+			'mosaic-components:java-driver-container' ->
+				enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-java-driver-container--run-component">>))
+		end,
+		Options = [
+				{harness, [
+					{argument0, <<"[", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
+				{execute, [
+					{executable, Executable},
+					{arguments, [
+						Resource,
 						<<"--component-identifier">>, enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
 						<<"--component-callbacks-configuration">>, enforce_ok_1 (mosaic_json_coders:encode_json (Configuration)),
 						<<"--component-classpath">>, erlang:list_to_binary (string:join (lists:map (fun erlang:binary_to_list/1, ClassPath), "|"))]}]}
@@ -386,6 +412,19 @@ configure_1 (Type = 'mosaic-tests:socat', Identifier, {json, [Token, Endpoint]},
 				{execute, [
 					{executable, Executable},
 					{arguments, [<<"stdio">>, Endpoint]}]}
+				| ExtraOptions],
+		{ok, Options}
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+configure_1 (Type = 'mosaic-tests:exec', Identifier, {json, [Executable, Arguments]}, ExtraOptions)
+			when is_list (ExtraOptions) ->
+	try
+		Options = [
+				{harness, [
+					{argument0, <<"[", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
+				{execute, [
+					{executable, Executable},
+					{arguments, Arguments}]}
 				| ExtraOptions],
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
