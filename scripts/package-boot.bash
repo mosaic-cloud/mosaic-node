@@ -130,8 +130,9 @@ cat >"${_outputs}/package-boot/pkg.json" <<EOS
 		"mosaic-components-riak-kv-${_package_version}",
 		"mosaic-components-httpg-${_package_version}",
 		"mosaic-components-java-component-container-${_package_version}",
-		"mosaic-components-java-driver-container-${_package_version}",
 		"mosaic-components-java-cloudlet-container-${_package_version}",
+		"mosaic-components-java-driver-amqp-${_package_version}",
+		"mosaic-components-java-driver-riak-${_package_version}",
 		"mosaic-examples-realtime-feeds-backend-${_package_version}",
 		"mosaic-examples-realtime-feeds-frontend-java-${_package_version}",
 		"mosaic-examples-realtime-feeds-indexer-java-${_package_version}"

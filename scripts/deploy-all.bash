@@ -21,7 +21,8 @@ fi
 if test "${_mosaic_do_all_java:-${_mosaic_do_all:-false}}" == true ; then
 	"${_repositories}/mosaic-java-platform/components-container/scripts/deploy"
 	"${_repositories}/mosaic-java-platform/cloudlets/scripts/deploy"
-	"${_repositories}/mosaic-java-platform/drivers/scripts/deploy"
+	"${_repositories}/mosaic-java-platform/drivers-stubs/amqp/scripts/deploy"
+	"${_repositories}/mosaic-java-platform/drivers-stubs/riak/scripts/deploy"
 fi
 
 if test "${_mosaic_do_all_examples:-${_mosaic_do_all:-false}}" == true ; then
