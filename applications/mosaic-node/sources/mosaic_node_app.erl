@@ -98,7 +98,7 @@ start_discovery () ->
 		Error1 = {error, _Reason1} ->
 			throw (Error1)
 	end,
-	ok = case mosaic_discovery_agent:start_supervised () of
+	ok = case mosaic_discovery_agent_udp:start_supervised () of
 		{ok, _Agent} ->
 			ok;
 		Error2 = {error, _Reason2} ->
@@ -110,7 +110,7 @@ start_discovery () ->
 		Error3 = {error, _Reason3} ->
 			throw (Error3)
 	end,
-	ok = case mosaic_discovery_agent:broadcast ({mosaic_node, node, erlang:node ()}) of
+	ok = case mosaic_discovery_agent_udp:broadcast ({mosaic_node, node, erlang:node ()}) of
 		{ok, _Reference} ->
 			ok;
 		Error4 = {error, _Reason4} ->

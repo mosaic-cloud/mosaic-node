@@ -1,5 +1,5 @@
 
--module (mosaic_discovery_agent).
+-module (mosaic_discovery_agent_udp).
 
 -behaviour (gen_server).
 
@@ -18,7 +18,7 @@ start (Configuration) ->
 	start (noname, Configuration).
 
 start (QualifiedName, Configuration) ->
-	mosaic_process_tools:start (gen_server, mosaic_discovery_agent, QualifiedName, Configuration).
+	mosaic_process_tools:start (gen_server, mosaic_discovery_agent_udp, QualifiedName, Configuration).
 
 
 start_link () ->
@@ -28,32 +28,32 @@ start_link (Configuration) ->
 	start_link (noname, Configuration).
 
 start_link (QualifiedName, Configuration) ->
-	mosaic_process_tools:start_link (gen_server, mosaic_discovery_agent, QualifiedName, Configuration).
+	mosaic_process_tools:start_link (gen_server, mosaic_discovery_agent_udp, QualifiedName, Configuration).
 
 
 start_supervised () ->
 	start_supervised (defaults).
 
 start_supervised (Configuration) ->
-	mosaic_node_sup:start_child_daemon ({local, mosaic_discovery_agent}, mosaic_discovery_agent, Configuration).
+	mosaic_node_sup:start_child_daemon ({local, mosaic_discovery_agent_udp}, mosaic_discovery_agent_udp, Configuration).
 
 
 stop () ->
-	stop (mosaic_discovery_agent).
+	stop (mosaic_discovery_agent_udp).
 
 stop (Agent) ->
 	stop (Agent, normal).
 
 stop (Agent, Signal)
 		when (is_atom (Agent) orelse is_pid (Agent)) ->
-	gen_server:call (Agent, {mosaic_discovery_agent, stop, Signal}).
+	gen_server:call (Agent, {mosaic_discovery_agent_udp, stop, Signal}).
 
 
 broadcast (Message) ->
-	broadcast (mosaic_discovery_agent, Message).
+	broadcast (mosaic_discovery_agent_udp, Message).
 
 broadcast (Message, Count, Delay) ->
-	broadcast (mosaic_discovery_agent, Message, Count, Delay).
+	broadcast (mosaic_discovery_agent_udp, Message, Count, Delay).
 
 broadcast (Agent, Message) ->
 	broadcast (Agent, Message, infinity, 6000).
@@ -61,7 +61,7 @@ broadcast (Agent, Message) ->
 broadcast (Agent, Message, Count, Delay)
 		when (is_atom (Agent) orelse is_pid (Agent)),
 				((Count =:= infinity) orelse (is_integer (Count) andalso (Count > 0))), is_integer (Delay), (Delay > 0) ->
-	gen_server:call (Agent, {mosaic_discovery_agent, broadcast, Message, Count, Delay}).
+	gen_server:call (Agent, {mosaic_discovery_agent_udp, broadcast, Message, Count, Delay}).
 
 
 -record (state, {qualified_name, configuration, socket, socket_ip, socket_port, broadcasts}).
@@ -105,7 +105,7 @@ code_change (_OldVsn, State, _Arguments) ->
 	{ok, State}.
 
 
-handle_call ({mosaic_discovery_agent, stop, Signal}, _Sender, State) ->
+handle_call ({mosaic_discovery_agent_udp, stop, Signal}, _Sender, State) ->
 	case Signal of
 		normal ->
 			{stop, normal, ok, State};
@@ -113,10 +113,10 @@ handle_call ({mosaic_discovery_agent, stop, Signal}, _Sender, State) ->
 			{reply, {error, {invalid_signal, Signal}}, State}
 	end;
 	
-handle_call ({mosaic_discovery_agent, broadcast, Message, Count, Delay}, _Sender, OldState = #state{broadcasts = OldBroadcasts})
+handle_call ({mosaic_discovery_agent_udp, broadcast, Message, Count, Delay}, _Sender, OldState = #state{broadcasts = OldBroadcasts})
 		when ((Count =:= infinity) orelse (is_integer (Count) andalso (Count > 0))), is_integer (Delay), (Delay > 0) ->
 	Reference = erlang:make_ref (),
-	case timer:send_interval (Delay, {mosaic_discovery_agent_internals, broadcast, Reference}) of
+	case timer:send_interval (Delay, {mosaic_discovery_agent_udp_internals, broadcast, Reference}) of
 		{ok, Timer} ->
 			NewBroadcast = #broadcast{reference = Reference, message = Message, count = Count, delay = Delay, timer = Timer},
 			NewBroadcasts = orddict:store (Reference, NewBroadcast, OldBroadcasts),
@@ -135,7 +135,7 @@ handle_cast (Request, State) ->
 
 
 handle_info (
-			{mosaic_discovery_agent_internals, broadcast, Reference},
+			{mosaic_discovery_agent_udp_internals, broadcast, Reference},
 			OldState = #state{
 					configuration = #configuration{identity = Identity, shared_secret = SharedSecret},
 					socket = Socket, socket_ip = SocketIp, socket_port = SocketPort,
