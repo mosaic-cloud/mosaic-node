@@ -99,22 +99,34 @@ start_discovery () ->
 			throw (Error1)
 	end,
 	ok = case mosaic_discovery_agent_udp:start_supervised () of
-		{ok, _Agent} ->
+		{ok, _Agent1} ->
 			ok;
 		Error2 = {error, _Reason2} ->
 			throw (Error2)
 	end,
-	ok = case mosaic_discovery_events:register_handler (mosaic_discovery_events, {JoinFunction, void}) of
-		ok ->
+	ok = case mosaic_discovery_agent_tcp:start_supervised () of
+		{ok, _Agent2} ->
 			ok;
 		Error3 = {error, _Reason3} ->
 			throw (Error3)
 	end,
-	ok = case mosaic_discovery_agent_udp:broadcast ({mosaic_node, node, erlang:node ()}) of
-		{ok, _Reference} ->
+	ok = case mosaic_discovery_events:register_handler (mosaic_discovery_events, {JoinFunction, void}) of
+		ok ->
 			ok;
 		Error4 = {error, _Reason4} ->
 			throw (Error4)
+	end,
+	ok = case mosaic_discovery_agent_udp:broadcast ({mosaic_node, node, erlang:node ()}) of
+		{ok, _Reference1} ->
+			ok;
+		Error5 = {error, _Reason5} ->
+			throw (Error5)
+	end,
+	ok = case mosaic_discovery_agent_tcp:broadcast ({mosaic_node, node, erlang:node ()}) of
+		{ok, _Reference2} ->
+			ok;
+		Error6 = {error, _Reason6} ->
+			throw (Error6)
 	end,
 	ok.
 
