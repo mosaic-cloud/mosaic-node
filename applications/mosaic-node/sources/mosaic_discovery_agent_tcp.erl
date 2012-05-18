@@ -148,7 +148,12 @@ handle_info (
 	case orddict:find (Reference, OldBroadcasts) of
 		{ok, OldBroadcast = #broadcast{reference = Reference, message = Message, count = OldCount, timer = Timer}} ->
 			{ok, Payload} = encode_payload (Identity, SharedSecret, Message),
-			{ok, _Sender} = send (Domain, SocketPort, Payload),
+			ok = case send (Domain, SocketPort, Payload) of
+				ok ->
+					ok;
+				{ok, _Sende} ->
+					ok
+			end,
 			case OldCount of
 				infinity ->
 					{noreply, OldState};
@@ -197,6 +202,9 @@ handle_info (Message, State) ->
 	{stop, {error, {invalid_message, Message}}, State}.
 
 
+send ("", _SocketPort, _Payload) ->
+	ok;
+	
 send (Domain, SocketPort, Payload) ->
 	Self = erlang:self (),
 	Sender = proc_lib:spawn_link (

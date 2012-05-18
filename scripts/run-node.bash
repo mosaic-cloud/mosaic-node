@@ -5,8 +5,8 @@ if ! test "${#}" -eq 2 -o "${#}" -eq 0 ; then
 	exit 1
 fi
 
-_fqdn_app="${mosaic_app_fqdn:-}"
 _fqdn="${mosaic_node_fqdn:-}"
+_fqdn_app="${mosaic_application_fqdn:-}"
 _ip="${mosaic_node_ip:-}"
 
 if test "${#}" -eq 0 ; then
@@ -19,7 +19,7 @@ if test "${#}" -eq 0 ; then
 	_riak_handoff_port="$(( _erl_epmd_port + 2 ))"
 	_discovery_port="$(( _erl_epmd_port - 1 ))"
 	_discovery_mcast_ip="224.0.0.1"
-	_discovery_domain="${_fqdn_app:-mosaic-app.loopback}"
+	_discovery_domain="${_fqdn_app:-}"
 	_wui_ip="${_ip}"
 	_wui_port="$(( _erl_epmd_port + 4 ))"
 else
@@ -34,7 +34,7 @@ else
 	_riak_handoff_port="$(( _erl_epmd_port + 1 + (_index - 1) * 10 + 1 ))"
 	_discovery_port="$(( _erl_epmd_port - 1 ))"
 	_discovery_mcast_ip="224.0.0.1"
-	_discovery_domain="${_fqdn_app:-mosaic-app.loopback}"
+	_discovery_domain="${_fqdn_app:-}"
 	_wui_ip="${_ip}"
 	_wui_port="$(( _erl_epmd_port + 1 + (_index - 1) * 10 + 3 ))"
 fi
