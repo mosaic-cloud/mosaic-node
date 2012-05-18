@@ -64,6 +64,9 @@ broadcast (Agent, Message, Count, Delay)
 	gen_server:call (Agent, {mosaic_discovery_agent_udp, broadcast, Message, Count, Delay}).
 
 
+-include_lib ("kernel/include/inet.hrl").
+
+
 -record (state, {qualified_name, configuration, socket, socket_ip, socket_port, broadcasts}).
 -record (configuration, {identity, shared_secret, socket_ip, socket_port, events}).
 -record (broadcast, {reference, message, count, delay, timer}).
@@ -233,13 +236,23 @@ configure (defaults) ->
 		Cookie ->
 			crypto:md5 (erlang:atom_to_binary (Cookie, utf8))
 	end,
-	SocketIp = {224, 0, 0, 1},
-	SocketPort = 5555,
-	{ok, Events} = mosaic_process_tools:resolve_registered ({local, mosaic_discovery_events}),
-	Configuration = #configuration{
-			identity = Identity,
-			shared_secret = SharedSecret,
-			socket_ip = SocketIp,
-			socket_port = SocketPort,
-			events = Events},
-	{ok, Configuration}.
+	case application:get_env (mosaic_node, discovery_agent_udp_address) of
+		{ok, {SocketAddress, SocketPort}} when is_list (SocketAddress), is_integer (SocketPort), (SocketPort >= 0), (SocketPort < 65536) ->
+			case inet:gethostbyname (SocketAddress, inet) of
+				{ok, #hostent{h_addrtype = inet, h_addr_list = [SocketIp | _]}} ->
+					{ok, Events} = mosaic_process_tools:resolve_registered ({local, mosaic_discovery_events}),
+					Configuration = #configuration{
+							identity = Identity,
+							shared_secret = SharedSecret,
+							socket_ip = SocketIp,
+							socket_port = SocketPort,
+							events = Events},
+					{ok, Configuration};
+				Error = {error, _Reason} ->
+					Error
+			end;
+		{ok, Configuration} ->
+			{error, {invalid_configuration, Configuration}};
+		undefined ->
+			{error, unconfigured}
+	end.

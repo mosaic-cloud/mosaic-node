@@ -64,8 +64,11 @@ broadcast (Agent, Message, Count, Delay)
 	gen_server:call (Agent, {mosaic_discovery_agent_tcp, broadcast, Message, Count, Delay}).
 
 
+-include_lib ("kernel/include/inet.hrl").
+
+
 -record (state, {qualified_name, configuration, socket, socket_ip, socket_port, broadcasts}).
--record (configuration, {identity, shared_secret, socket_ip, socket_port, events}).
+-record (configuration, {domain, identity, shared_secret, socket_ip, socket_port, events}).
 -record (broadcast, {reference, message, count, delay, timer}).
 
 
@@ -74,18 +77,19 @@ init ({QualifiedName, OriginalConfiguration}) ->
 		{ok, Configuration = #configuration{events = Events, socket_ip = SocketIp, socket_port = SocketPort}} ->
 			SocketOptions = [
 					inet, {ip, SocketIp}, {reuseaddr, true},
-					{add_membership, {SocketIp, {0, 0, 0, 0}}}, {multicast_loop, true},
-					binary, {active, true}],
-			case gen_udp:open (SocketPort, SocketOptions) of
+					binary, {packet, 2}, {active, false}],
+			case gen_tcp:listen (SocketPort, SocketOptions) of
 				{ok, Socket} ->
 					true = erlang:link (Events),
+					Self = erlang:self (),
+					_Acceptor = proc_lib:spawn_link (fun () -> acceptor_init (Self, Socket) end),
 					State = #state{
 							qualified_name = QualifiedName, configuration = Configuration,
 							socket = Socket, socket_ip = SocketIp, socket_port = SocketPort,
 							broadcasts = orddict:new ()},
 					{ok, State};
 				{error, Reason} ->
-					{stop, Reason}
+					{stop, {failed_socket, Reason}}
 			end;
 		{error, Reason} ->
 			{stop, Reason}
@@ -137,14 +141,14 @@ handle_cast (Request, State) ->
 handle_info (
 			{mosaic_discovery_agent_tcp_internals, broadcast, Reference},
 			OldState = #state{
-					configuration = #configuration{identity = Identity, shared_secret = SharedSecret},
-					socket = Socket, socket_ip = SocketIp, socket_port = SocketPort,
+					configuration = #configuration{domain = Domain, identity = Identity, shared_secret = SharedSecret},
+					socket_port = SocketPort,
 					broadcasts = OldBroadcasts})
 		when is_reference (Reference) ->
 	case orddict:find (Reference, OldBroadcasts) of
 		{ok, OldBroadcast = #broadcast{reference = Reference, message = Message, count = OldCount, timer = Timer}} ->
 			{ok, Payload} = encode_payload (Identity, SharedSecret, Message),
-			ok = gen_udp:send (Socket, SocketIp, SocketPort, Payload),
+			{ok, _Sender} = send (Domain, SocketPort, Payload),
 			case OldCount of
 				infinity ->
 					{noreply, OldState};
@@ -162,10 +166,22 @@ handle_info (
 	end;
 	
 handle_info (
-			{udp, Socket, SourceIp, SourcePort, Payload},
+			{tcp_accept, Socket, ConnectionSocket},
+			State = #state{socket = Socket}) ->
+	Self = erlang:self (),
+	Inputer = proc_lib:spawn_link (fun () -> inputer_init (Self, ConnectionSocket) end),
+	case gen_tcp:controlling_process (ConnectionSocket, Inputer) of
+		ok ->
+			Inputer ! {tcp_connect, ConnectionSocket},
+			{noreply, State};
+		{error, Reason} ->
+			{stop, {error, {failed_socket, ConnectionSocket, Reason}}}
+	end;
+	
+handle_info (
+			{tcp, _Socket, SourceIp, SourcePort, Payload},
 			State = #state{
-					configuration = #configuration{identity = Identity, shared_secret = SharedSecret, events = Events},
-					socket = Socket}) ->
+					configuration = #configuration{identity = Identity, shared_secret = SharedSecret, events = Events}}) ->
 	case decode_payload (Identity, SharedSecret, Payload) of
 		ok ->
 			{noreply, State};
@@ -179,6 +195,167 @@ handle_info (
 	
 handle_info (Message, State) ->
 	{stop, {error, {invalid_message, Message}}, State}.
+
+
+send (Domain, SocketPort, Payload) ->
+	Self = erlang:self (),
+	Sender = proc_lib:spawn_link (
+			fun () ->
+				case inet:getaddrs (Domain, inet) of
+					{ok, SocketIps} ->
+						_Outputers = lists:map (
+								fun (SocketIp) ->
+									SocketOptions = [
+											inet, {ip, SocketIp},
+											binary, {packet, 2}, {active, false}],
+									Outputer = proc_lib:spawn_link (
+											fun () ->
+												case gen_tcp:connect (SocketIp, SocketPort, SocketOptions) of
+													{ok, Socket} ->
+														erlang:self () ! {tcp_connect, Socket},
+														erlang:self () ! {tcp, Socket, Payload},
+														erlang:self () ! {tcp_close, Socket},
+														outputer_init (Self, Socket);
+													{error, Reason} ->
+														% ok = mosaic_transcript:trace_warning ("connecting failed; ignoring!", [{target, {SocketIp, SocketPort}}, {reason, Reason}]),
+														erlang:exit (normal)
+												end
+											end),
+									Outputer
+								end,
+								SocketIps),
+						erlang:exit (normal);
+					{error, Reason} ->
+						% ok = mosaic_transcript:trace_warning ("connecting failed; ignoring!", [{domain, Domain}, {reason, Reason}]),
+						erlang:exit (normal)
+				end
+			end),
+	{ok, Sender}.
+
+
+acceptor_init (Agent, Socket) ->
+	acceptor_loop (Agent, Socket).
+
+acceptor_loop (Agent, Socket) ->
+	ok = receive
+		{tcp_close, Socket} ->
+			case gen_tcp:close (Socket) of
+				ok ->
+					erlang:exit (normal);
+				{error, Reason1} ->
+					erlang:exit ({error, {failed_socket, Socket, Reason1}})
+			end;
+		Message = {system, Sender, Request} ->
+			ok = mosaic_transcript:trace_error ("received unexpected system request; aborting!", [{sender, Sender}, {request, Request}]),
+			erlang:exit ({error, {invalid_message, Message}});
+		Message ->
+			ok = mosaic_transcript:trace_error ("received invalid message; aborting!", [{message, Message}]),
+			erlang:exit ({error, {invalid_message, Message}})
+	after 0 ->
+		ok
+	end,
+	case gen_tcp:accept (Socket, 250) of
+		{ok, ConnectionSocket} ->
+			case gen_tcp:controlling_process (ConnectionSocket, Agent) of
+				ok ->
+					Agent ! {tcp_accept, Socket, ConnectionSocket},
+					acceptor_loop (Agent, Socket);
+				{error, Reason2} ->
+					erlang:exit ({error, {failed_socket, ConnectionSocket, Reason2}})
+			end;
+		{error, timeout} ->
+			acceptor_loop (Agent, Socket);
+		{error, Reason2} ->
+			erlang:exit ({error, {failed_socket, Socket, Reason2}})
+	end.
+
+
+inputer_init (Agent, Socket) ->
+	ok = receive
+		{tcp_connect, Socket} ->
+			ok
+	end,
+	{SourceIp, SourcePort} = case inet:peername (Socket) of
+		{ok, {SourceIp_, SourcePort_}} ->
+			{SourceIp_, SourcePort_};
+		{error, Reason1} ->
+			erlang:exit ({error, {failed_socket, Socket, Reason1}})
+	end,
+	case gen_tcp:shutdown (Socket, write) of
+		ok ->
+			inputer_loop (Agent, Socket, SourceIp, SourcePort);
+		{error, Reason2} ->
+			erlang:exit ({error, {failed_socket, Socket, Reason2}})
+	end.
+
+inputer_loop (Agent, Socket, SourceIp, SourcePort) ->
+	ok = receive
+		{tcp_close, Socket} ->
+			case gen_tcp:close (Socket) of
+				ok ->
+					erlang:exit (normal);
+				{error, Reason1} ->
+					erlang:exit ({error, {failed_socket, Socket, Reason1}})
+			end;
+		Message = {system, Sender, Request} ->
+			ok = mosaic_transcript:trace_error ("received unexpected system request; aborting!", [{sender, Sender}, {request, Request}]),
+			erlang:exit ({error, {invalid_message, Message}});
+		Message ->
+			ok = mosaic_transcript:trace_error ("received invalid message; aborting!", [{message, Message}]),
+			erlang:exit ({error, {invalid_message, Message}})
+	after 0 ->
+		ok
+	end,
+	case gen_tcp:recv (Socket, 0, 250) of
+		{ok, Payload} ->
+			Agent ! {tcp, Socket, SourceIp, SourcePort, Payload},
+			inputer_loop (Agent, Socket, SourceIp, SourcePort);
+		{error, timeout} ->
+			inputer_loop (Agent, Socket, SourceIp, SourcePort);
+		{error, closed} ->
+			erlang:exit (normal);
+		{error, Reason2} ->
+			erlang:exit ({error, {failed_socket, Socket, Reason2}})
+	end.
+
+
+outputer_init (Agent, Socket) ->
+	ok = receive
+		{tcp_connect, Socket} ->
+			ok
+	end,
+	case gen_tcp:shutdown (Socket, read) of
+		ok ->
+			outputer_loop (Agent, Socket);
+		{error, Reason} ->
+			erlang:exit ({error, {failed_socket, Socket, Reason}})
+	end.
+
+outputer_loop (Agent, Socket) ->
+	receive
+		{tcp, Socket, Payload} when is_binary (Payload) ->
+			case gen_tcp:send (Socket, Payload) of
+				ok ->
+					outputer_loop (Agent, Socket);
+				{error, closed} ->
+					erlang:exit (normal);
+				{error, Reason} ->
+					erlang:exit ({error, {failed_socket, Socket, Reason}})
+			end;
+		{tcp_close, Socket} ->
+			case gen_tcp:close (Socket) of
+				ok ->
+					erlang:exit (normal);
+				{error, Reason} ->
+					erlang:exit ({error, {failed_socket, Socket, Reason}})
+			end;
+		Message = {system, Sender, Request} ->
+			ok = mosaic_transcript:trace_error ("received unexpected system request; aborting!", [{sender, Sender}, {request, Request}]),
+			erlang:exit ({error, {invalid_message, Message}});
+		Message ->
+			ok = mosaic_transcript:trace_error ("received invalid message; aborting!", [{message, Message}]),
+			erlang:exit ({error, {invalid_message, Message}})
+	end.
 
 
 encode_payload (Identity, SharedSecret, Message)
@@ -233,13 +410,24 @@ configure (defaults) ->
 		Cookie ->
 			crypto:md5 (erlang:atom_to_binary (Cookie, utf8))
 	end,
-	SocketIp = {224, 0, 0, 1},
-	SocketPort = 5556,
-	{ok, Events} = mosaic_process_tools:resolve_registered ({local, mosaic_discovery_events}),
-	Configuration = #configuration{
-			identity = Identity,
-			shared_secret = SharedSecret,
-			socket_ip = SocketIp,
-			socket_port = SocketPort,
-			events = Events},
-	{ok, Configuration}.
+	case application:get_env (mosaic_node, discovery_agent_tcp_address) of
+		{ok, {Domain, SocketAddress, SocketPort}} when is_list (Domain), is_list (SocketAddress), is_integer (SocketPort), (SocketPort >= 0), (SocketPort < 65536) ->
+			case inet:gethostbyname (SocketAddress, inet) of
+				{ok, #hostent{h_addrtype = inet, h_addr_list = [SocketIp | _]}} ->
+					{ok, Events} = mosaic_process_tools:resolve_registered ({local, mosaic_discovery_events}),
+					Configuration = #configuration{
+							domain = Domain,
+							identity = Identity,
+							shared_secret = SharedSecret,
+							socket_ip = SocketIp,
+							socket_port = SocketPort,
+							events = Events},
+					{ok, Configuration};
+				Error = {error, _Reason} ->
+					Error
+			end;
+		{ok, Configuration} ->
+			{error, {invalid_configuration, Configuration}};
+		undefined ->
+			{error, unconfigured}
+	end.

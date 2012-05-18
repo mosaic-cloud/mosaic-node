@@ -75,6 +75,7 @@ start_discovery () ->
 	JoinFunction = fun (Event, void) ->
 			ok = case Event of
 				{mosaic_discovery_events, broadcasted, {mosaic_node, node, Node}} when is_atom (Node) ->
+					% ok = mosaic_transcript:trace_information ("joining node...", [{node, Node}]),
 					ok = case mosaic_cluster_tools:ring_include (Node) of
 						ok ->
 							ok;
@@ -136,14 +137,14 @@ start_wui () ->
 		WuiExecutable = try
 			enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-node-wui--run-node-wui">>))
 		catch throw : _Error1 = {error, _Reason1} -> throw (ok) end,
-		{WebmachineSocketIp, WebmachineSocketPort} = enforce_ok_1 (mosaic_generic_coders:application_env_get (webmachine_listen, mosaic_node,
+		{WebmachineSocketIp, WebmachineSocketPort} = enforce_ok_1 (mosaic_generic_coders:application_env_get (webmachine_address, mosaic_node,
 				{decode,
 						fun
 							({Ip, Port}) when is_list (Ip), is_integer (Port) -> {ok, {erlang:list_to_binary (Ip), Port}};
 							(Descriptor) -> {error, {invalid_socket_descriptor, Descriptor}}
 						end},
 				{error, missing_webmachine_socket})),
-		{WuiSocketIp, WuiSocketPort} = enforce_ok_1 (mosaic_generic_coders:application_env_get (wui_listen, mosaic_node,
+		{WuiSocketIp, WuiSocketPort} = enforce_ok_1 (mosaic_generic_coders:application_env_get (wui_address, mosaic_node,
 				{decode,
 						fun
 							({Ip, Port}) when is_list (Ip), is_integer (Port) -> {ok, {erlang:list_to_binary (Ip), Port}};
@@ -166,7 +167,7 @@ start_wui () ->
 
 report () ->
 	try
-		{WebmachineSocketIp, WebmachineSocketPort} = enforce_ok_1 (mosaic_generic_coders:application_env_get (webmachine_listen, mosaic_node,
+		{WebmachineSocketIp, WebmachineSocketPort} = enforce_ok_1 (mosaic_generic_coders:application_env_get (webmachine_address, mosaic_node,
 				{decode,
 						fun
 							({Ip, Port}) when is_list (Ip), is_integer (Port) -> {ok, {erlang:list_to_binary (Ip), Port}};
@@ -183,7 +184,7 @@ report () ->
 		WuiExecutable = try
 			enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-node-wui--run-node-wui">>))
 		catch throw : _Error1 = {error, _Reason1} -> undefined end,
-		{WuiSocketIp, WuiSocketPort} = enforce_ok_1 (mosaic_generic_coders:application_env_get (wui_listen, mosaic_node,
+		{WuiSocketIp, WuiSocketPort} = enforce_ok_1 (mosaic_generic_coders:application_env_get (wui_address, mosaic_node,
 				{decode,
 						fun
 							({Ip, Port}) when is_list (Ip), is_integer (Port) -> {ok, {erlang:list_to_binary (Ip), Port}};

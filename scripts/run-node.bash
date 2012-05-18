@@ -5,31 +5,38 @@ if ! test "${#}" -eq 2 -o "${#}" -eq 0 ; then
 	exit 1
 fi
 
+_fqdn_app="${mosaic_app_fqdn:-}"
 _fqdn="${mosaic_node_fqdn:-}"
 _ip="${mosaic_node_ip:-}"
 
 if test "${#}" -eq 0 ; then
 	_index=0
 	_scenario=boot
-	_fqdn="${_fqdn:-mosaic-1.loopback.vnet}"
+	_fqdn="${_fqdn:-mosaic-1.loopback}"
 	_ip="${_ip:-127.0.155.1}"
 	_erl_name="mosaic-node@${_fqdn}"
 	_webmachine_port="$(( _erl_epmd_port + 1 ))"
 	_riak_handoff_port="$(( _erl_epmd_port + 2 ))"
+	_discovery_port="$(( _erl_epmd_port - 1 ))"
+	_discovery_mcast_ip="224.0.0.1"
+	_discovery_domain="${_fqdn_app:-mosaic-app.loopback}"
 	_wui_ip="${_ip}"
-	_wui_port="$(( _erl_epmd_port + 3 ))"
+	_wui_port="$(( _erl_epmd_port + 4 ))"
 else
 	_index="${1}"
 	_scenario="${2}"
 	test "${_index}" -ge 1
 	test "${_index}" -le 8
-	_fqdn="${_fqdn:-mosaic-${_index}.loopback.vnet}"
+	_fqdn="${_fqdn:-mosaic-${_index}.loopback}"
 	_ip="${_ip:-127.0.155.${_index}}"
 	_erl_name="mosaic-node-${_index}@${_fqdn}"
-	_webmachine_port="$(( _erl_epmd_port + 1 + (_index - 1) * 3 + 0 ))"
-	_riak_handoff_port="$(( _erl_epmd_port + 1 + (_index - 1) * 3 + 1 ))"
+	_webmachine_port="$(( _erl_epmd_port + 1 + (_index - 1) * 10 + 0 ))"
+	_riak_handoff_port="$(( _erl_epmd_port + 1 + (_index - 1) * 10 + 1 ))"
+	_discovery_port="$(( _erl_epmd_port - 1 ))"
+	_discovery_mcast_ip="224.0.0.1"
+	_discovery_domain="${_fqdn_app:-mosaic-app.loopback}"
 	_wui_ip="${_ip}"
-	_wui_port="$(( _erl_epmd_port + 1 + (_index - 1) * 3 + 2 ))"
+	_wui_port="$(( _erl_epmd_port + 1 + (_index - 1) * 10 + 3 ))"
 fi
 
 if test -n "${mosaic_node_management_port:-}" ; then
@@ -68,8 +75,10 @@ _erl_args+=(
 		-boot start_sasl
 		-config "${_erl_libs}/mosaic_node/priv/mosaic_node.config"
 		-mosaic_node tests_scenario "'${_scenario}'"
-		-mosaic_node webmachine_listen "{\"${_ip}\", ${_webmachine_port}}"
-		-mosaic_node wui_listen "{\"${_wui_ip}\", ${_wui_port}}"
+		-mosaic_node webmachine_address "{\"${_ip}\", ${_webmachine_port}}"
+		-mosaic_node discovery_agent_udp_address "{\"${_discovery_mcast_ip}\", ${_discovery_port}}"
+		-mosaic_node discovery_agent_tcp_address "{\"${_discovery_domain}\", \"${_ip}\", ${_discovery_port}}"
+		-mosaic_node wui_address "{\"${_wui_ip}\", ${_wui_port}}"
 		-mosaic_node node_fqdn "\"${_fqdn}\""
 		-mosaic_node node_ip "\"${_ip}\""
 		-riak_core handoff_ip "\"${_ip}\""
