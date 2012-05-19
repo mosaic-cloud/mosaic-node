@@ -214,10 +214,11 @@ send (Domain, SocketPort, Payload) ->
 						_Outputers = lists:map (
 								fun (SocketIp) ->
 									SocketOptions = [
-											inet, {ip, SocketIp},
+											inet,
 											binary, {packet, 2}, {active, false}],
 									Outputer = proc_lib:spawn_link (
 											fun () ->
+												% ok = mosaic_transcript:trace_information ("broadcasting...", [{target, {SocketIp, SocketPort}}]),
 												case gen_tcp:connect (SocketIp, SocketPort, SocketOptions) of
 													{ok, Socket} ->
 														erlang:self () ! {tcp_connect, Socket},
@@ -225,7 +226,7 @@ send (Domain, SocketPort, Payload) ->
 														erlang:self () ! {tcp_close, Socket},
 														outputer_init (Self, Socket);
 													{error, Reason} ->
-														% ok = mosaic_transcript:trace_warning ("connecting failed; ignoring!", [{target, {SocketIp, SocketPort}}, {reason, Reason}]),
+														ok = mosaic_transcript:trace_warning ("connecting failed; ignoring!", [{target, {SocketIp, SocketPort}}, {reason, Reason}]),
 														erlang:exit (normal)
 												end
 											end),
@@ -234,7 +235,7 @@ send (Domain, SocketPort, Payload) ->
 								SocketIps),
 						erlang:exit (normal);
 					{error, Reason} ->
-						% ok = mosaic_transcript:trace_warning ("connecting failed; ignoring!", [{domain, Domain}, {reason, Reason}]),
+						ok = mosaic_transcript:trace_warning ("resolving failed; ignoring!", [{domain, Domain}, {reason, Reason}]),
 						erlang:exit (normal)
 				end
 			end),
@@ -316,6 +317,7 @@ inputer_loop (Agent, Socket, SourceIp, SourcePort) ->
 	end,
 	case gen_tcp:recv (Socket, 0, 250) of
 		{ok, Payload} ->
+			% ok = mosaic_transcript:trace_information ("broadcasted...", [{source, {SourceIp, SourcePort}}]),
 			Agent ! {tcp, Socket, SourceIp, SourcePort, Payload},
 			inputer_loop (Agent, Socket, SourceIp, SourcePort);
 		{error, timeout} ->
@@ -332,20 +334,27 @@ outputer_init (Agent, Socket) ->
 		{tcp_connect, Socket} ->
 			ok
 	end,
+	{TargetIp, TargetPort} = case inet:peername (Socket) of
+		{ok, {TargetIp_, TargetPort_}} ->
+			{TargetIp_, TargetPort_};
+		{error, Reason1} ->
+			erlang:exit ({error, {failed_socket, Socket, Reason1}})
+	end,
 	case gen_tcp:shutdown (Socket, read) of
 		ok ->
-			outputer_loop (Agent, Socket);
+			outputer_loop (Agent, Socket, TargetIp, TargetPort);
 		{error, Reason} ->
 			erlang:exit ({error, {failed_socket, Socket, Reason}})
 	end.
 
-outputer_loop (Agent, Socket) ->
+outputer_loop (Agent, Socket, TargetIp, TargetPort) ->
 	receive
 		{tcp, Socket, Payload} when is_binary (Payload) ->
 			case gen_tcp:send (Socket, Payload) of
 				ok ->
-					outputer_loop (Agent, Socket);
+					outputer_loop (Agent, Socket, TargetIp, TargetPort);
 				{error, closed} ->
+					ok = mosaic_transcript:trace_warning ("connection closed; ignoring!", [{target, {TargetIp, TargetPort}}]),
 					erlang:exit (normal);
 				{error, Reason} ->
 					erlang:exit ({error, {failed_socket, Socket, Reason}})
