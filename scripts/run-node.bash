@@ -21,7 +21,7 @@ if test "${#}" -eq 0 ; then
 	_discovery_mcast_ip="224.0.0.1"
 	_discovery_domain="${_fqdn_app:-}"
 	_wui_ip="${_ip}"
-	_wui_port="$(( _erl_epmd_port + 4 ))"
+	_wui_port="$(( _erl_epmd_port + 3 ))"
 else
 	_index="${1}"
 	_scenario="${2}"
@@ -36,7 +36,7 @@ else
 	_discovery_mcast_ip="224.0.0.1"
 	_discovery_domain="${_fqdn_app:-}"
 	_wui_ip="${_ip}"
-	_wui_port="$(( _erl_epmd_port + 1 + (_index - 1) * 10 + 3 ))"
+	_wui_port="$(( _erl_epmd_port + 1 + (_index - 1) * 10 + 2 ))"
 fi
 
 if test -n "${mosaic_node_management_port:-}" ; then
