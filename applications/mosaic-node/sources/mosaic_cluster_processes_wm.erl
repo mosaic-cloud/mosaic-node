@@ -406,7 +406,7 @@ process_post (Request, State = #state{target = Target, arguments = Json}) ->
 							{ProcessName, ProcessOutcome}
 						end,
 						ProcessSpecifications),
-				{ok, false, json_struct, [{processes, ProcessOutcomes}]}
+				{ok, true, json_struct, [{processes, ProcessOutcomes}]}
 			catch throw : {error, Reason} -> {error, false, Reason} end
 	end,
 	mosaic_webmachine:return_with_outcome (Outcome, Request, State).
