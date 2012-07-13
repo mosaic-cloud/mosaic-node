@@ -130,7 +130,7 @@ execute ({initialize}) ->
 	_ = mosaic_process_configurator:register ('mosaic-components:riak-kv', term, {mosaic_component_process_tests, configure, defaults}),
 	_ = mosaic_process_configurator:register ('mosaic-components:riak-kv', json, {mosaic_component_process_tests, configure, defaults}),
 	
-	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-components:couchdb">>, <<16#f867c1725a2845f4a68a1165f430fdaa10b8aa162a5a4 : 160>>),
+	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-components:couchdb">>, <<16#f867c1725a2845f4a68a1165f430fdaa10b8aa16 : 160>>),
 	_ = mosaic_process_configurator:register ('mosaic-components:couchdb', term, {mosaic_component_process_tests, configure, defaults}),
 	_ = mosaic_process_configurator:register ('mosaic-components:couchdb', json, {mosaic_component_process_tests, configure, defaults}),
 	
