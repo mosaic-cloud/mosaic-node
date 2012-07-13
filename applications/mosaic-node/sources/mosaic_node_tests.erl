@@ -25,6 +25,10 @@ test () ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
 						{define_and_create_processes, 'mosaic-components:riak-kv', json, null, 1}]};
+			{ok, 'test-couchdb'} ->
+				{ok, defaults, [
+						{boot}, {activate}, {ping, default}, {initialize},
+						{define_and_create_processes, 'mosaic-components:couchdb', json, null, 1}]};
 			{ok, 'test-riak-kv-4'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {ping, default}, {initialize},
@@ -125,6 +129,10 @@ execute ({initialize}) ->
 	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-components:riak-kv">>, <<16#9cdce23e78027ef6a52636da7db820c47e695d11 : 160>>),
 	_ = mosaic_process_configurator:register ('mosaic-components:riak-kv', term, {mosaic_component_process_tests, configure, defaults}),
 	_ = mosaic_process_configurator:register ('mosaic-components:riak-kv', json, {mosaic_component_process_tests, configure, defaults}),
+	
+	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-components:couchdb">>, <<16#f867c1725a2845f4a68a1165f430fdaa10b8aa162a5a4 : 160>>),
+	_ = mosaic_process_configurator:register ('mosaic-components:couchdb', term, {mosaic_component_process_tests, configure, defaults}),
+	_ = mosaic_process_configurator:register ('mosaic-components:couchdb', json, {mosaic_component_process_tests, configure, defaults}),
 	
 	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-components:httpg">>, <<16#0891f3a4b73a16cc5ac6947c56924d3e1dd2395e : 160>>),
 	_ = mosaic_process_configurator:register ('mosaic-components:httpg', term, {mosaic_component_process_tests, configure, defaults}),

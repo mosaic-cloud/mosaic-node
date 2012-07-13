@@ -191,6 +191,20 @@ configure_1 (Type, Identifier, defaults, ExtraOptions)
 	catch throw : Error = {error, _Reason} -> Error end;
 	
 configure_1 (Type, Identifier, defaults, ExtraOptions)
+		when (Type =:= 'mosaic-components:couchdb'), is_list (ExtraOptions) ->
+	try
+		Executable = enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-couchdb--run-component">>)),
+		Options = [
+				{harness, [
+					{argument0, <<"[", (erlang:atom_to_binary (Type, utf8)) / binary, "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
+				{execute, [
+					{executable, Executable},
+					{arguments, [enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))]}]}
+				| ExtraOptions],
+		{ok, Options}
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+configure_1 (Type, Identifier, defaults, ExtraOptions)
 		when (Type =:= 'mosaic-components:httpg'), is_list (ExtraOptions) ->
 	try
 		Executable = enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-httpg--run-component">>)),
