@@ -89,7 +89,7 @@ try_acquire (Owner, Specification = {Identifier, Type = <<"socket:ipv4:tcp">>, d
 		Port = crypto:rand_uniform (32769, 49150),
 		Key = {Type, Ip, Port},
 		Data = {Identifier, Type, Owner, {Ip, Port, Fqdn}},
-		Descriptor = {Identifier, [{<<"ip">>, Ip}, {<<"port">>, Port}, {<<"fqdn">>, Fqdn}]},
+		Descriptor = {Identifier, [{<<"type">>, Type}, {<<"ip">>, Ip}, {<<"port">>, Port}, {<<"fqdn">>, Fqdn}]},
 		{ok, {Key, Data, Descriptor, Specification}}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
