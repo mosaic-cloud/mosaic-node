@@ -273,7 +273,8 @@ configure_1 (Type, Identifier, {json, [Configuration, ClassPath]}, ExtraOptions)
 	catch throw : Error = {error, _Reason} -> Error end;
 	
 configure_1 (Type, Identifier, {json, [Configuration]}, ExtraOptions)
-		when ((Type =:= 'mosaic-components:java-driver-amqp') orelse (Type =:= 'mosaic-components:java-driver-riak')),
+		when ((Type =:= 'mosaic-components:java-driver-amqp') orelse (Type =:= 'mosaic-components:java-driver-riak')
+				orelse (Type =:= 'mosaic-components:java-driver-hdfs')),
 				is_list (ExtraOptions) ->
 	try
 		<<"mosaic-components:java-driver-", TypeSuffix / binary>> = erlang:atom_to_binary (Type, utf8),

@@ -52,9 +52,9 @@ test () ->
 						%{sleep, 1 * 1000},
 						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:pusher', json, null, 1},
 						%{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-components:java-driver-container', json, [<<"amqp">>, null, []], 1},
+						{define_and_create_processes, 'mosaic-components:java-driver-amqp', json, [null], 1},
 						{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-components:java-driver-container', json, [<<"kv">>, null, []], 1},
+						{define_and_create_processes, 'mosaic-components:java-driver-riak', json, [null], 1},
 						{sleep, 1 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer-java', json, [null], 1},
 						{sleep, 1 * 1000},
@@ -149,6 +149,9 @@ execute ({initialize}) ->
 	
 	_ = mosaic_process_configurator:register ('mosaic-components:java-driver-riak', term, {mosaic_component_process_tests, configure, defaults}),
 	_ = mosaic_process_configurator:register ('mosaic-components:java-driver-riak', json, {mosaic_component_process_tests, configure, defaults}),
+	
+	_ = mosaic_process_configurator:register ('mosaic-components:java-driver-hdfs', term, {mosaic_component_process_tests, configure, defaults}),
+	_ = mosaic_process_configurator:register ('mosaic-components:java-driver-hdfs', json, {mosaic_component_process_tests, configure, defaults}),
 	
 	_ = mosaic_cluster_processes_router:register_alias (<<"mosaic-examples-realtime-feeds:fetcher">>, <<16#4cb6ba9f09150c29b590b82b02a5a295ffc742d2 : 160>>),
 	_ = mosaic_process_configurator:register ('mosaic-examples-realtime-feeds:fetcher', term, {mosaic_component_process_tests, configure, defaults}),
