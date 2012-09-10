@@ -11,13 +11,15 @@
 		handle_static/2,
 		handle_file_content/2,
 		handle_file_stream/2,
+		handle_unknown/2,
 		handle_error/2]).
 
 
--dispatch ({[], {root}}).
 -dispatch ({[<<"static">>, '*'], {static}}).
 -dispatch ({[<<"v1">>, <<"log">>, <<"content">>], {log, content}}).
 -dispatch ({[<<"v1">>, <<"log">>, <<"stream">>], {log, stream}}).
+-dispatch ({[], {root}}).
+-dispatch ({['*'], {none}}).
 
 
 -record (state, {target, resource}).
@@ -27,7 +29,7 @@ init (Target) ->
 	{ok, #state{target = Target, resource = none}}.
 
 
-ping(Request, State = #state{}) ->
+ping (Request, State = #state{}) ->
     {pong, Request, State}.
 
 
@@ -40,6 +42,8 @@ resource_exists (Request, State = #state{target = Target}) ->
 	Outcome = case Target of
 		{root} ->
 			{ok, false};
+		{none} ->
+			{ok, true};
 		_ ->
 			{ok, true}
 	end,
@@ -49,6 +53,8 @@ resource_exists (Request, State = #state{target = Target}) ->
 previously_existed (Request, State = #state{target = Target}) ->
 	Outcome = case Target of
 		{root} ->
+			{ok, true};
+		{none} ->
 			{ok, true};
 		_ ->
 			{ok, true}
@@ -60,6 +66,8 @@ moved_temporarily (Request, State = #state{target = Target}) ->
 	Outcome = case Target of
 		{root} ->
 			{ok, {true, "/static/console.html"}};
+		{none} ->
+			{ok, false};
 		_ ->
 			{ok, false}
 	end,
@@ -69,6 +77,8 @@ moved_temporarily (Request, State = #state{target = Target}) ->
 malformed_request (Request, State = #state{target = Target}) ->
 	Outcome = case Target of
 		{root} ->
+			mosaic_webmachine:enforce_get_request ([], Request);
+		{none} ->
 			mosaic_webmachine:enforce_get_request ([], Request);
 		{log, content} ->
 			mosaic_webmachine:enforce_get_request ([], Request);
@@ -81,7 +91,11 @@ malformed_request (Request, State = #state{target = Target}) ->
 
 
 content_types_provided (Request, State = #state{target = {root}}) ->
-	Outcome = {ok, [{"application/octet-stream", handle_empty}]},
+	Outcome = {ok, [{"application/octet-stream", handle_unknown}]},
+	mosaic_webmachine:return_with_outcome (Outcome, Request, State);
+	
+content_types_provided (Request, State = #state{target = {none}}) ->
+	Outcome = {ok, [{"application/octet-stream", handle_unknown}]},
 	mosaic_webmachine:return_with_outcome (Outcome, Request, State);
 	
 content_types_provided (Request, OldState = #state{target = {log, content}}) ->
@@ -132,6 +146,10 @@ handle_file_stream (Request, State = #state{resource = {Path, MimeType}}) ->
 	Path_ = erlang:binary_to_list (Path),
 	Outcome = {ok, {mime, MimeType}, {stream, fun () -> send_file_stream (Path_, 0, false) end}},
 	mosaic_webmachine:respond_with_outcome (Outcome, Request, State).
+
+
+handle_unknown (Request, State) ->
+	mosaic_webmachine:respond_with_outcome ({error, unknown}, Request, State).
 
 
 handle_error (Request, State = #state{resource = Error = {error, _Reason}}) ->

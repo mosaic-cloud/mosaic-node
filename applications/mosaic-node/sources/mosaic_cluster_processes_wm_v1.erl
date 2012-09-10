@@ -1,5 +1,5 @@
 
--module (mosaic_cluster_processes_wm).
+-module (mosaic_cluster_processes_wm_v1).
 
 
 -export ([
@@ -33,7 +33,7 @@ init (Target) ->
 	{ok, #state{target = Target, arguments = none}}.
 
 
-ping(Request, State = #state{}) ->
+ping (Request, State = #state{}) ->
     {pong, Request, State}.
 
 
