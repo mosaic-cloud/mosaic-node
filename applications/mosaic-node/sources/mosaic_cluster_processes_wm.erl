@@ -14,16 +14,16 @@
 -import (mosaic_enforcements, [enforce_ok/1, enforce_ok_1/1]).
 
 
--dispatch ({[<<"processes">>], {processes}}).
--dispatch ({[<<"processes">>, <<"examine">>], {processes, examine}}).
--dispatch ({[<<"processes">>, <<"create">>], {processes, create}}).
--dispatch ({[<<"processes">>, <<"stop">>], {processes, stop}}).
--dispatch ({[<<"processes">>, <<"call">>], {processes, call}}).
--dispatch ({[<<"processes">>, <<"cast">>], {processes, cast}}).
--dispatch ({[<<"processes">>, <<"ping">>], {ping}}).
--dispatch ({[<<"processes">>, <<"nodes">>], {nodes}}).
--dispatch ({[<<"processes">>, <<"nodes">>, <<"self">>, <<"activate">>], {nodes, self, activate}}).
--dispatch ({[<<"processes">>, <<"nodes">>, <<"self">>, <<"deactivate">>], {nodes, self, deactivate}}).
+-dispatch ({[<<"v1">>, <<"processes">>], {processes}}).
+-dispatch ({[<<"v1">>, <<"processes">>, <<"examine">>], {processes, examine}}).
+-dispatch ({[<<"v1">>, <<"processes">>, <<"create">>], {processes, create}}).
+-dispatch ({[<<"v1">>, <<"processes">>, <<"stop">>], {processes, stop}}).
+-dispatch ({[<<"v1">>, <<"processes">>, <<"call">>], {processes, call}}).
+-dispatch ({[<<"v1">>, <<"processes">>, <<"cast">>], {processes, cast}}).
+-dispatch ({[<<"v1">>, <<"processes">>, <<"ping">>], {ping}}).
+-dispatch ({[<<"v1">>, <<"processes">>, <<"nodes">>], {nodes}}).
+-dispatch ({[<<"v1">>, <<"processes">>, <<"nodes">>, <<"self">>, <<"activate">>], {nodes, self, activate}}).
+-dispatch ({[<<"v1">>, <<"processes">>, <<"nodes">>, <<"self">>, <<"deactivate">>], {nodes, self, deactivate}}).
 
 
 -record (state, {target, arguments}).

@@ -13,13 +13,13 @@
 -import (mosaic_enforcements, [enforce_ok_1/1]).
 
 
--dispatch ({[<<"cluster">>, <<"nodes">>], {nodes}}).
--dispatch ({[<<"cluster">>, <<"nodes">>, <<"self">>, <<"activate">>], {nodes, self, activate}}).
--dispatch ({[<<"cluster">>, <<"nodes">>, <<"self">>, <<"deactivate">>], {nodes, self, deactivate}}).
--dispatch ({[<<"cluster">>, <<"ring">>], {ring}}).
--dispatch ({[<<"cluster">>, <<"ring">>, <<"include">>], {ring, include}}).
--dispatch ({[<<"cluster">>, <<"ring">>, <<"exclude">>], {ring, exclude}}).
--dispatch ({[<<"cluster">>, <<"ring">>, <<"reboot">>], {ring, reboot}}).
+-dispatch ({[<<"v1">>, <<"cluster">>, <<"nodes">>], {nodes}}).
+-dispatch ({[<<"v1">>, <<"cluster">>, <<"nodes">>, <<"self">>, <<"activate">>], {nodes, self, activate}}).
+-dispatch ({[<<"v1">>, <<"cluster">>, <<"nodes">>, <<"self">>, <<"deactivate">>], {nodes, self, deactivate}}).
+-dispatch ({[<<"v1">>, <<"cluster">>, <<"ring">>], {ring}}).
+-dispatch ({[<<"v1">>, <<"cluster">>, <<"ring">>, <<"include">>], {ring, include}}).
+-dispatch ({[<<"v1">>, <<"cluster">>, <<"ring">>, <<"exclude">>], {ring, exclude}}).
+-dispatch ({[<<"v1">>, <<"cluster">>, <<"ring">>, <<"reboot">>], {ring, reboot}}).
 
 
 -record (state, {target, arguments}).

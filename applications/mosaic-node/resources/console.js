@@ -51,61 +51,61 @@ var _mosaic = _wrapped (function () {});
 
 _mosaic.cluster = _wrapped (function () {});
 _mosaic.cluster.nodes = _wrapped (function () {
-	return (_get ("/cluster/nodes") .nodes);
+	return (_get ("/v1/cluster/nodes") .nodes);
 });
 _mosaic.cluster.nodes.self = _wrapped (function () {
-	return (_get ("/cluster/nodes") .self);
+	return (_get ("/v1/cluster/nodes") .self);
 });
 _mosaic.cluster.nodes.self.peers = _wrapped (function () {
-	return (_get ("/cluster/nodes") .peers);
+	return (_get ("/v1/cluster/nodes") .peers);
 });
 _mosaic.cluster.nodes.self.activate = _wrapped (function () {
-	return (_get ("/cluster/nodes/self/activate") .ok);
+	return (_get ("/v1/cluster/nodes/self/activate") .ok);
 });
 _mosaic.cluster.nodes.self.deactivate = _wrapped (function () {
-	return (_get ("/cluster/nodes/self/deactivate") .ok);
+	return (_get ("/v1/cluster/nodes/self/deactivate") .ok);
 });
 _mosaic.cluster.ring = _wrapped (function () {
-	var _outcome = _get ("/cluster/ring");
+	var _outcome = _get ("/v1/cluster/ring");
 	return ({nodes : _outcome.nodes, partitions : _outcome.partitions});
 });
 _mosaic.cluster.ring.nodes = _wrapped (function () {
-	return (_get ("/cluster/ring") .nodes);
+	return (_get ("/v1/cluster/ring") .nodes);
 });
 _mosaic.cluster.ring.nodes.include = _wrapped (function (_node) {
-	return (_get ("/cluster/ring/include", {node : _node}) .ok);
+	return (_get ("/v1/cluster/ring/include", {node : _node}) .ok);
 });
 _mosaic.cluster.ring.nodes.exclude = _wrapped (function (_node) {
 	if (_node == undefined)
-		_node = _get ("/cluster/nodes") .self;
-	return (_get ("/cluster/ring/exclude", {node : _node}) .ok);
+		_node = _get ("/v1/cluster/nodes") .self;
+	return (_get ("/v1/cluster/ring/exclude", {node : _node}) .ok);
 });
 _mosaic.cluster.ring.partitions = _wrapped (function () {
-	return (_get ("/cluster/ring") .partitions);
+	return (_get ("/v1/cluster/ring") .partitions);
 });
 _mosaic.cluster.ring.reboot = _wrapped (function () {
-	return (_get ("/cluster/ring/reboot") .ok);
+	return (_get ("/v1/cluster/ring/reboot") .ok);
 });
 
 _mosaic.processes = _wrapped (function () {
-	return (_get ("/processes") .keys);
+	return (_get ("/v1/processes") .keys);
 });
 _mosaic.processes.nodes = _wrapped (function () {
-	return (_get ("/processes/nodes") .nodes);
+	return (_get ("/v1/processes/nodes") .nodes);
 });
 _mosaic.processes.nodes.self = _wrapped (function () {
-	return (_get ("/processes/nodes") .self);
+	return (_get ("/v1/processes/nodes") .self);
 });
 _mosaic.processes.nodes.self.activate = _wrapped (function () {
-	return (_get ("/processes/nodes/self/activate") .ok);
+	return (_get ("/v1/processes/nodes/self/activate") .ok);
 });
 _mosaic.processes.nodes.self.deactivate = _wrapped (function () {
-	return (_get ("/processes/nodes/self/deactivate") .ok);
+	return (_get ("/v1/processes/nodes/self/deactivate") .ok);
 });
 _mosaic.processes.ping = _wrapped (function (_count) {
 	if (_count == undefined)
 		_count = 0;
-		var _outcome = _get ("/processes/ping", {count : _count});
+		var _outcome = _get ("/v1/processes/ping", {count : _count});
 	return ({pongs : _outcome.pongs, pangs : _outcome.pangs});
 });
 _mosaic.processes.create = _wrapped (function (_type, _configuration, _count) {
@@ -114,24 +114,24 @@ _mosaic.processes.create = _wrapped (function (_type, _configuration, _count) {
 	if (_count == undefined)
 		_count = 1;
 	_configuration = JSON.stringify (_configuration);
-	var _outcome = _get ("/processes/create", {type : _type, configuration : _configuration, count : _count});
+	var _outcome = _get ("/v1/processes/create", {type : _type, configuration : _configuration, count : _count});
 	if (_count == 1)
 		return (_outcome.keys[0]);
 	else
 		return (_outcome.keys);
 });
 _mosaic.processes.stop = _wrapped (function (_key) {
-	return (_get ("/processes/stop", {key : _key}) .ok);
+	return (_get ("/v1/processes/stop", {key : _key}) .ok);
 });
 _mosaic.processes.call = _wrapped (function (_key, _operation, _inputs) {
 	if (_inputs == undefined)
 		_inputs = null;
 	_inputs = JSON.stringify (_inputs);
-	return (_get ("/processes/call", {key : _key, operation : _operation, inputs : _inputs}) .outputs);
+	return (_get ("/v1/processes/call", {key : _key, operation : _operation, inputs : _inputs}) .outputs);
 });
 _mosaic.processes.cast = _wrapped (function (_key, _operation, _inputs) {
 	if (_inputs == undefined)
 		_inputs = null;
 	_inputs = JSON.stringify (_inputs);
-	return (_get ("/processes/cast", {key : _key, operation : _operation, inputs : _inputs}) .ok);
+	return (_get ("/v1/processes/cast", {key : _key, operation : _operation, inputs : _inputs}) .ok);
 });

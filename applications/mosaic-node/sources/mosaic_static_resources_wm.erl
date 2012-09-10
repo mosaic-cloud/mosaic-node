@@ -16,9 +16,8 @@
 
 -dispatch ({[], {root}}).
 -dispatch ({[<<"static">>, '*'], {static}}).
--dispatch ({[<<"log">>], {log, html}}).
--dispatch ({[<<"log">>, <<"content">>], {log, content}}).
--dispatch ({[<<"log">>, <<"stream">>], {log, stream}}).
+-dispatch ({[<<"v1">>, <<"log">>, <<"content">>], {log, content}}).
+-dispatch ({[<<"v1">>, <<"log">>, <<"stream">>], {log, stream}}).
 
 
 -record (state, {target, resource}).
@@ -41,8 +40,6 @@ resource_exists (Request, State = #state{target = Target}) ->
 	Outcome = case Target of
 		{root} ->
 			{ok, false};
-		{log, html} ->
-			{ok, false};
 		_ ->
 			{ok, true}
 	end,
@@ -52,8 +49,6 @@ resource_exists (Request, State = #state{target = Target}) ->
 previously_existed (Request, State = #state{target = Target}) ->
 	Outcome = case Target of
 		{root} ->
-			{ok, true};
-		{log, html} ->
 			{ok, true};
 		_ ->
 			{ok, true}
@@ -65,8 +60,6 @@ moved_temporarily (Request, State = #state{target = Target}) ->
 	Outcome = case Target of
 		{root} ->
 			{ok, {true, "/static/console.html"}};
-		{log, html} ->
-			{ok, {true, "/static/log.html"}};
 		_ ->
 			{ok, false}
 	end,
