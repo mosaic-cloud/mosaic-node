@@ -249,7 +249,7 @@ service_list_sync_command (Service, VnodeModule)
 						{error, {invalid_reply, Reply}}
 				end
 			end,
-			TargetKeys, mosaic_cluster_processes, mosaic_cluster_processes_vnode, 1),
+			TargetKeys, Service, VnodeModule, 1),
 	{ok, lists:usort (lists:flatten (Keys)), Reasons}.
 
 
