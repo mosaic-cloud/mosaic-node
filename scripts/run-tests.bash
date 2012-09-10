@@ -24,7 +24,7 @@ fi
 
 _erl_args+=(
 		-noinput -noshell
-		-name mosaic-node-0@mosaic-0.loopback
+		-name mosaic-node-tests@mosaic.loopback
 		-setcookie "${_erl_cookie}"
 		-boot start_sasl
 		-config "${_outputs}/erlang/applications/mosaic_node/priv/mosaic_node.config"

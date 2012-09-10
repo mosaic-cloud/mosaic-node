@@ -12,7 +12,7 @@ _ip="${mosaic_node_ip:-}"
 if test "${#}" -eq 0 ; then
 	_index=0
 	_scenario=boot
-	_fqdn="${_fqdn:-mosaic-1.loopback}"
+	_fqdn="${_fqdn:-mosaic.loopback}"
 	_ip="${_ip:-127.0.155.1}"
 	_erl_name="mosaic-node@${_fqdn}"
 	_webmachine_port="$(( _erl_epmd_port + 1 ))"
