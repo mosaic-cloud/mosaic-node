@@ -1,29 +1,42 @@
 #!/dev/null
 
-if ! test "${#}" -eq 1 ; then
+if ! test "${#}" -eq 2 ; then
 	echo "[ee] invalid arguments; aborting!" >&2
 	exit 1
 fi
 
-_scenario="${1}"
-_fqdn="${_fqdn:-mosaic.loopback}"
-_ip="${_ip:-127.0.155.0}"
-_erl_name="mosaic-node@${_fqdn}"
-_webmachine_port="$(( _erl_epmd_port + 1 ))"
-_riak_handoff_port="$(( _erl_epmd_port + 2 ))"
+_fqdn="${mosaic_node_fqdn:-}"
+_fqdn_app="${mosaic_application_fqdn:-}"
+_ip="${mosaic_node_ip:-}"
+
+_index="${1}"
+_scenario="${2}"
+
+test "${_index}" -ge 0 -a "${_index}" -le 8
+
+if test "${_index}" -ge 1 ; then
+	_suffix="-${_index}"
+else
+	_suffix=''
+fi
+
+_fqdn="${_fqdn:-mosaic${_suffix}.loopback}"
+_ip="${_ip:-127.0.155.${_index}}"
+_erl_name="mosaic-node${_suffix}@${_fqdn}"
+_webmachine_port="$(( _erl_epmd_port + 1 + _index * 10 + 0 ))"
+_riak_handoff_port="$(( _erl_epmd_port + 1 + _index * 10 + 1 ))"
 _discovery_port="$(( _erl_epmd_port - 1 ))"
 _discovery_mcast_ip="224.0.0.1"
 _discovery_domain="${_fqdn_app:-}"
 _wui_ip="${_ip}"
-_wui_port="$(( _erl_epmd_port + 3 ))"
-
+_wui_port="$(( _erl_epmd_port + 1 + _index * 10 + 2 ))"
 
 if test -n "${mosaic_node_temporary:-}" ; then
 	_tmp="${mosaic_node_temporary}"
 elif test -n "${mosaic_temporary:-}" ; then
-	_tmp="${mosaic_temporary}/node/0"
+	_tmp="${mosaic_temporary}/node/${_index}"
 else
-	_tmp="/tmp/mosaic/node/0"
+	_tmp="/tmp/mosaic/node/${_index}"
 fi
 
 _erl_args+=(
