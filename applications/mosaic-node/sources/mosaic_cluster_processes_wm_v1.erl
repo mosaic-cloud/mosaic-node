@@ -235,7 +235,7 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			try
 				Key = case dict:fetch (key, Arguments) of
 					<<$#, Alias_ / binary>> ->
-						case mosaic_cluster_processes_router:resolve_alias (Alias_) of
+						case mosaic_process_router:resolve_alias (Alias_) of
 							{ok, Key_} ->
 								Key_;
 							{error, _Reason1} ->
@@ -267,7 +267,7 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			try
 				Key = case dict:fetch (key, Arguments) of
 					<<$#, Alias_ / binary>> ->
-						case mosaic_cluster_processes_router:resolve_alias (Alias_) of
+						case mosaic_process_router:resolve_alias (Alias_) of
 							{ok, Key_} ->
 								Key_;
 							{error, _Reason1} ->

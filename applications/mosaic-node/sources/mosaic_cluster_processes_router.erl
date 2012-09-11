@@ -5,7 +5,6 @@
 
 
 -export ([start_supervised/0, start_supervised/1, start_link/2]).
--export ([resolve_alias/1, register_alias/2, unregister_alias/1]).
 -export ([init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2, handle_info/2]).
 
 
@@ -20,19 +19,6 @@ start_supervised (Configuration) ->
 
 start_link (QualifiedName, Configuration) ->
 	mosaic_process_tools:start_link (gen_server, mosaic_cluster_processes_router, QualifiedName, Configuration).
-
-
-resolve_alias (Alias)
-		when is_binary (Alias), (byte_size (Alias) > 0) ->
-	gen_server:call (mosaic_process_router, {mosaic_cluster_processes_router, resolve_alias, Alias}).
-
-register_alias (Alias, Identifier)
-		when is_binary (Alias), (byte_size (Alias) > 0), is_binary (Identifier), (bit_size (Identifier) =:= 160) ->
-	gen_server:call (mosaic_process_router, {mosaic_cluster_processes_router, register_alias, Alias, Identifier}).
-
-unregister_alias (Alias)
-		when is_binary (Alias), (byte_size (Alias) > 0) ->
-	gen_server:call (mosaic_process_router, {mosaic_cluster_processes_router, unregister_alias, Alias}).
 
 
 -record (state, {qualified_name, aliases}).
@@ -87,7 +73,7 @@ handle_call ({mosaic_process_router, unregister, Identifier, Process}, _Sender, 
 		when is_binary (Identifier), (bit_size (Identifier) =:= 160), is_pid (Process) ->
 	{reply, {error, unsupported_request}, State};
 	
-handle_call ({mosaic_cluster_processes_router, resolve_alias, Alias}, _Sender, State = #state{aliases = Aliases})
+handle_call ({mosaic_process_router, resolve_alias, Alias}, _Sender, State = #state{aliases = Aliases})
 		when  is_binary (Alias), (byte_size (Alias) > 0) ->
 	case orddict:find (Alias, Aliases) of
 		{ok, Identifier} ->
@@ -96,7 +82,7 @@ handle_call ({mosaic_cluster_processes_router, resolve_alias, Alias}, _Sender, S
 			{reply, {error, does_not_exist}, State}
 	end;
 	
-handle_call ({mosaic_cluster_processes_router, register_alias, Alias, Identifier}, _Sender, OldState = #state{aliases = OldAliases})
+handle_call ({mosaic_process_router, register_alias, Alias, Identifier}, _Sender, OldState = #state{aliases = OldAliases})
 		when is_binary (Alias), (byte_size (Alias) > 0), is_binary (Identifier), (bit_size (Identifier) =:= 160) ->
 	try
 		Registered = orddict:is_key (Alias, OldAliases),
@@ -109,7 +95,7 @@ handle_call ({mosaic_cluster_processes_router, register_alias, Alias, Identifier
 		{reply, ok, NewState}
 	catch throw : Error = {error, _Reason} -> {reply, Error, OldState} end;
 	
-handle_call ({mosaic_cluster_processes_router, unregister_alias, Alias}, _Sender, State = #state{})
+handle_call ({mosaic_process_router, unregister_alias, Alias}, _Sender, State = #state{})
 		when  is_binary (Alias), (byte_size (Alias) > 0) ->
 	{reply, {error, unsupported_request}, State};
 	
