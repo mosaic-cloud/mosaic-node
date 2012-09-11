@@ -19,6 +19,8 @@
 		application_env_get/4,
 		os_env_get/3, os_env_get/1,
 		os_bin_get/2, os_bin_get/1]).
+-export ([
+		parse_terms/1]).
 
 
 -import (mosaic_enforcements, [enforce_ok/1, enforce_ok_1/1]).
@@ -668,4 +670,41 @@ apply_enforce_get (EncodedTerm, {EnforceAction, EnforceValue}) ->
 			Term = EncodedTerm,
 			ok = enforce_ok (EnforceValue (Term)),
 			{ok, Term}
+	end.
+
+
+parse_terms (Binary)
+		when is_binary (Binary) ->
+	parse_terms (erlang:binary_to_list (Binary));
+	
+parse_terms (String)
+		when is_list (String) ->
+	parse_terms (String, []).
+
+parse_terms (eof, Terms) ->
+	{ok, lists:reverse (Terms)};
+	
+parse_terms (String, Terms) ->
+	case erl_scan:tokens ([], String, 1) of
+		{done, Result, NewString} ->
+			case Result of
+				{ok, Tokens, _} ->
+					case erl_parse:parse_term (Tokens) of
+						{ok, Term} ->
+							parse_terms (NewString, [Term | Terms]);
+						Error = {error, _Reason} ->
+							Error
+					end;
+				{eof, _} ->
+					parse_terms (eof, Terms);
+				{error, Reason, _} ->
+					{error, Reason}
+			end;
+		{more, Continuation} ->
+			case erl_scan:tokens (Continuation, eof, 1) of
+				{done, {eof, _}, _} ->
+					parse_terms (eof, Terms);
+				{done, {error, Reason, _}, _} ->
+					{error, Reason}
+			end
 	end.
