@@ -1,9 +1,0 @@
-{
-	"dummy-1" : {
-		"type" : "#mosaic-tests:dummy",
-		"configuration" : null,
-		"count" : 1,
-		"order" : 0,
-		"delay" : 1000
-	}
-}
