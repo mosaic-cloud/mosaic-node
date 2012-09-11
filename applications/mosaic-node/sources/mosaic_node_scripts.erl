@@ -101,21 +101,25 @@ execute ({start, System}) ->
 execute ({initialize}) ->
 	execute ({define, defaults});
 	
+execute ({define, {process_alias, Alias, Identifier}}) ->
+	ok = mosaic_cluster_processes_router:register_alias (Alias, Identifier);
+	
+execute ({define, {process_configurator, Type, ConfigurationEncoding, Function}}) ->
+	ok = mosaic_process_configurator:register (Type, ConfigurationEncoding, Function);
+	
 execute ({define, defaults}) ->
-	{ok, _, Data} = mosaic_static_resources:contents (<<"/definitions.term">>),
-	{ok, Definitions} = mosaic_generic_coders:parse_terms (Data),
+	{ok, _, DefinitionsData} = mosaic_static_resources:contents (<<"/definitions.term">>),
+	execute ({define, DefinitionsData});
+	
+execute ({define, DefinitionsData})
+		when is_binary (DefinitionsData) ->
+	{ok, Definitions} = mosaic_generic_coders:parse_terms (DefinitionsData),
 	ok = lists:foreach (
 			fun (Definition) ->
 				ok = execute ({define, Definition})
 			end,
 			Definitions),
 	ok;
-	
-execute ({define, {process_alias, Alias, Identifier}}) ->
-	ok = mosaic_cluster_processes_router:register_alias (Alias, Identifier);
-	
-execute ({define, {process_configurator, Type, ConfigurationEncoding, Function}}) ->
-	ok = mosaic_process_configurator:register (Type, ConfigurationEncoding, Function);
 	
 execute ({ring, include, Node})
 		when is_atom (Node) ->
