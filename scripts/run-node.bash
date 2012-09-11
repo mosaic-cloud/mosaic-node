@@ -11,9 +11,9 @@ _ip="${mosaic_node_ip:-}"
 
 if test "${#}" -eq 0 ; then
 	_index=0
-	_scenario=boot
+	_script=boot
 	_fqdn="${_fqdn:-mosaic.loopback}"
-	_ip="${_ip:-127.0.155.1}"
+	_ip="${_ip:-127.0.155.0}"
 	_erl_name="mosaic-node@${_fqdn}"
 	_webmachine_port="$(( _erl_epmd_port + 1 ))"
 	_riak_handoff_port="$(( _erl_epmd_port + 2 ))"
@@ -24,7 +24,7 @@ if test "${#}" -eq 0 ; then
 	_wui_port="$(( _erl_epmd_port + 3 ))"
 else
 	_index="${1}"
-	_scenario="${2}"
+	_script="${2}"
 	test "${_index}" -ge 1
 	test "${_index}" -le 8
 	_fqdn="${_fqdn:-mosaic-${_index}.loopback}"
@@ -74,7 +74,7 @@ _erl_args+=(
 		-name "${_erl_name}" -setcookie "${_erl_cookie}"
 		-boot start_sasl
 		-config "${_erl_libs}/mosaic_node/priv/mosaic_node.config"
-		-mosaic_node tests_scenario "'${_scenario}'"
+		-mosaic_node script "'${_script}'"
 		-mosaic_node webmachine_address "{\"${_ip}\", ${_webmachine_port}}"
 		-mosaic_node discovery_agent_udp_address "{\"${_discovery_mcast_ip}\", ${_discovery_port}}"
 		-mosaic_node discovery_agent_tcp_address "{\"${_discovery_domain}\", \"${_ip}\", ${_discovery_port}}"
@@ -83,7 +83,7 @@ _erl_args+=(
 		-mosaic_node node_ip "\"${_ip}\""
 		-riak_core handoff_ip "\"${_ip}\""
 		-riak_core handoff_port "${_riak_handoff_port}"
-		-run mosaic_node_tests test
+		-run mosaic_node_scripts start
 )
 _erl_env+=(
 		mosaic_node_fqdn="${_fqdn}"
