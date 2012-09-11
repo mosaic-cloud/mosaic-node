@@ -685,7 +685,14 @@ parse_terms (eof, Terms) ->
 	{ok, lists:reverse (Terms)};
 	
 parse_terms (String, Terms) ->
-	case erl_scan:tokens ([], String, 1) of
+	case
+		case erl_scan:tokens ([], String, 1) of
+			{more, Continuation} ->
+				erl_scan:tokens (Continuation, eof, 1);
+			Outcome ->
+				Outcome
+		end
+	of
 		{done, Result, NewString} ->
 			case Result of
 				{ok, Tokens, _} ->
@@ -700,11 +707,6 @@ parse_terms (String, Terms) ->
 				{error, Reason, _} ->
 					{error, Reason}
 			end;
-		{more, Continuation} ->
-			case erl_scan:tokens (Continuation, eof, 1) of
-				{done, {eof, _}, _} ->
-					parse_terms (eof, Terms);
-				{done, {error, Reason, _}, _} ->
-					{error, Reason}
-			end
+		{more, _} ->
+			{error, eof}
 	end.
