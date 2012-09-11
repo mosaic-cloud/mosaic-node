@@ -9,6 +9,9 @@
 		start_child_process/3, start_child_process/4, start_child_process/5,
 		start_link_child_process/3, start_link_child_process/4, start_link_child_process/5]).
 -export ([
+		start_child_port/3, start_child_port/4,
+		start_link_child_port/3, start_link_child_port/4]).
+-export ([
 		start_child/2,
 		start_link_child/2]).
 
@@ -108,6 +111,36 @@ start_link_child_process (Supervisor, QualifiedName, Module, Configuration) ->
 start_link_child_process (Supervisor, QualifiedName, Module, Configuration, Options)
 		when is_list (Options) ->
 	start_child_process (Supervisor, QualifiedName, Module, Configuration, [{link, true} | Options]).
+
+
+start_child_port (Supervisor, PortName, PortSettings) ->
+	start_child_port (Supervisor, PortName, PortSettings, []).
+
+start_child_port (Supervisor, PortName, PortSettings, Options)
+		when (is_pid (Supervisor) orelse is_atom (Supervisor)), is_list (Options),
+				is_tuple (PortName), is_list (PortSettings) ->
+	try
+		Link_ = case proplists:lookup (link, Options) of
+			{link, true} -> true;
+			{link, false} -> false;
+			none -> false;
+			LinkOption when is_tuple (LinkOption) -> throw ({error, {invalid_options, Options, {invalid_option, LinkOption, invalid_term}}})
+		end,
+		Specification_ = enforce_ok_1 (coerce_child_specification ({port, PortName, PortSettings, Options})),
+		{Link_, Specification_}
+	of
+		{false, Specification} ->
+			start_child (Supervisor, Specification);
+		{true, Specification} ->
+			start_link_child (Supervisor, Specification)
+	catch throw : Error = {error, _Reason} -> Error end.
+
+
+start_link_child_port (Supervisor, PortName, PortSettings) ->
+	start_link_child_port (Supervisor, PortName, PortSettings, []).
+
+start_link_child_port (Supervisor, PortName, PortSettings, Options) ->
+	start_child_port (Supervisor, PortName, PortSettings, [{link, true} | Options]).
 
 
 start_child (Supervisor, OriginalChildSpecification)
@@ -236,6 +269,35 @@ coerce_child_specification (OriginalSpecification = {process, QualifiedName, Mod
 		{ok, CoercedSpecification}
 	catch throw : {error, Reason} -> {error, {invalid_child_specification, OriginalSpecification, Reason}} end;
 	
+coerce_child_specification ({port, PortName, PortSettings}) ->
+	coerce_child_specification ({port, PortName, PortSettings, []});
+	
+coerce_child_specification (OriginalSpecification = {port, PortName, PortSettings, Options}) ->
+	try
+		ok = if
+			is_list (Options) -> ok;
+			true -> throw ({error, {invalid_options, Options, invalid_term}})
+		end,
+		DefaultOptions = [{identifier, undefined}, {restart, temporary}, {shutdown, 12 * 1000}],
+		FinalOptions = Options ++ DefaultOptions,
+		{Identifier1, Restart, Shutdown} = case lists:sort (proplists:get_keys (FinalOptions)) of
+			[identifier, restart, shutdown] ->
+				{
+					proplists:get_value (identifier, FinalOptions),
+					proplists:get_value (restart, FinalOptions),
+					proplists:get_value (shutdown, FinalOptions)};
+			OptionKeys ->
+				throw ({error, {invalid_options, Options, {invalid_option_keys, lists:subtract (OptionKeys, proplists:get_keys (DefaultOptions))}}})
+		end,
+		Identifier2 = if
+			(Identifier1 =/= undefined) -> Identifier1;
+			true ->
+				erlang:make_ref ()
+		end,
+		CoercedSpecification = {Identifier2, {mosaic_supervisor_tools_proxy, start_link_port, [PortName, PortSettings]}, Restart, Shutdown, worker, dynamic},
+		{ok, CoercedSpecification}
+	catch throw : {error, Reason} -> {error, {invalid_child_specification, OriginalSpecification, Reason}} end;
+	
 coerce_child_specification ({supervisor, Configuration}) ->
 	coerce_child_specification ({supervisor, noname, Configuration});
 	
@@ -334,8 +396,10 @@ coerce_start_specification (Specification = {Module, Function, Arguments}) ->
 				end
 		end,
 		FunctionExported = erlang:function_exported (Module, Function, erlang:length (Arguments)),
+		FunctionBuiltin = erlang:is_builtin (Module, Function, erlang:length (Arguments)),
 		ok = if
 			FunctionExported -> ok;
+			FunctionBuiltin -> ok;
 			true -> throw ({error, {invalid_function, Function, not_exported}})
 		end,
 		{ok, Specification}

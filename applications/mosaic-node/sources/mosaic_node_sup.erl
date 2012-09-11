@@ -8,6 +8,7 @@
 		start_child_process_controller/2, start_child_process_controller/3,
 		start_child_object_store/2, start_child_object_store/3,
 		start_child_daemon/2, start_child_daemon/3, start_child_daemon/4, start_child_daemon/5,
+		start_child_daemon_port/2, start_child_daemon_port/3, start_child_daemon_port/4,
 		start_child_vnode_master/1]).
 
 
@@ -68,15 +69,27 @@ start_child_daemon (Module, Configuration) ->
 	start_child_daemon (noname, Module, Configuration).
 
 start_child_daemon (QualifiedName, Module, Configuration) ->
-	start_child_daemon (mosaic_daemon_sup, QualifiedName, Module, Configuration).
+	start_child_daemon (QualifiedName, Module, Configuration, []).
 
-start_child_daemon (Supervisor, QualifiedName, Module, Configuration) ->
-	start_child_daemon (Supervisor, QualifiedName, Module, Configuration, []).
+start_child_daemon (QualifiedName, Module, Configuration, Options) ->
+	start_child_daemon (mosaic_daemon_sup, QualifiedName, Module, Configuration, Options).
 
 start_child_daemon (Supervisor, QualifiedName, Module, Configuration, Options)
 		when (is_pid (Supervisor) orelse is_atom (Supervisor)), is_atom (Module), is_list (Options),
 				((QualifiedName =:= noname) orelse (is_record (QualifiedName, local, 2) andalso is_atom (element (2, QualifiedName)))) ->
 	mosaic_supervisor_tools:start_child_process (Supervisor, QualifiedName, Module, Configuration, Options).
+
+
+start_child_daemon_port (PortName, PortSettings) ->
+	start_child_daemon_port (PortName, PortSettings, []).
+
+start_child_daemon_port (PortName, PortSettings, Options) ->
+	start_child_daemon_port (mosaic_daemon_sup, PortName, PortSettings, Options).
+
+start_child_daemon_port (Supervisor, PortName, PortSettings, Options)
+		when (is_pid (Supervisor) orelse is_atom (Supervisor)), is_list (Options),
+				is_tuple (PortName), is_list (PortSettings) ->
+	mosaic_supervisor_tools:start_child_port (Supervisor, PortName, PortSettings, Options).
 
 
 start_child_vnode_master (Module)
