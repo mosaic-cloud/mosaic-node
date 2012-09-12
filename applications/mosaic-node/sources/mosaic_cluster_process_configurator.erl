@@ -1,5 +1,5 @@
 
--module (mosaic_cluster_processes_configurator).
+-module (mosaic_cluster_process_configurator).
 
 -behaviour (gen_server).
 
@@ -12,10 +12,10 @@ start_supervised () ->
 	start_supervised (defaults).
 
 start_supervised (Configuration) ->
-	mosaic_node_sup:start_child_daemon ({local, mosaic_process_configurator}, mosaic_cluster_processes_configurator, Configuration).
+	mosaic_node_sup:start_child_daemon ({local, mosaic_process_configurator}, mosaic_cluster_process_configurator, Configuration).
 
 start_link (QualifiedName, Configuration) ->
-	mosaic_process_tools:start_link (gen_server, mosaic_cluster_processes_configurator, QualifiedName, Configuration).
+	mosaic_process_tools:start_link (gen_server, mosaic_cluster_process_configurator, QualifiedName, Configuration).
 
 
 -record (state, {qualified_name}).

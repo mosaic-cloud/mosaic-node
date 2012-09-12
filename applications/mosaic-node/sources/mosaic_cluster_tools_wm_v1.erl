@@ -1,5 +1,5 @@
 
--module (mosaic_cluster_wm_v1).
+-module (mosaic_cluster_tools_wm_v1).
 
 
 -export ([
