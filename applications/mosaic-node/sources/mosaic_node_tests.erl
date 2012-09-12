@@ -17,50 +17,63 @@ test () ->
 			{ok, boot} ->
 				{ok, defaults, [
 						{boot}, {activate}, {initialize}]};
-			{ok, 'test-rabbitmq'} ->
+			{ok, 'rabbitmq'} ->
 				{ok, defaults, [
-						{boot}, {activate}, {ping, default}, {initialize},
+						{boot}, {activate}, {initialize},
 						{define_and_create_processes, 'mosaic-components:rabbitmq', json, null, 1}]};
-			{ok, 'test-riak-kv'} ->
+			{ok, 'riak-kv'} ->
 				{ok, defaults, [
-						{boot}, {activate}, {ping, default}, {initialize},
+						{boot}, {activate}, {initialize},
 						{define_and_create_processes, 'mosaic-components:riak-kv', json, null, 1}]};
-			{ok, 'test-couchdb'} ->
+			{ok, 'couchdb'} ->
 				{ok, defaults, [
-						{boot}, {activate}, {ping, default}, {initialize},
+						{boot}, {activate}, {initialize},
 						{define_and_create_processes, 'mosaic-components:couchdb', json, null, 1}]};
-			{ok, 'test-riak-kv-4'} ->
+			{ok, 'riak-kv-4'} ->
 				{ok, defaults, [
-						{boot}, {activate}, {ping, default}, {initialize},
+						{boot}, {activate}, {initialize},
 						{define_and_create_processes, 'mosaic-components:riak-kv', json, null, 4}]};
 			{ok, 'examples-realtime-feeds'} ->
 				{ok, defaults, [
-						{boot}, {activate}, {ping, default}, {initialize},
+						{boot}, {activate}, {initialize},
 						{define_and_create_processes, 'mosaic-components:rabbitmq', json, null, 1},
 						{sleep, 2 * 1000},
 						{define_and_create_processes, 'mosaic-components:riak-kv', json, null, 1},
 						{sleep, 2 * 1000},
 						{define_and_create_processes, 'mosaic-components:httpg', json, null, 1},
-						{sleep, 1 * 1000},
+						{sleep, 2 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:fetcher', json, null, 1},
-						{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:scavanger', json, null, 1},
-						{sleep, 1 * 1000},
-						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer', json, null, 1},
-						%{sleep, 1 * 1000},
+						{sleep, 2 * 1000},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer', json, null, 1},
+						{sleep, 2 * 1000},
+						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:scavanger', json, null, 1},
+						%{sleep, 2 * 1000},
 						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:leacher', json, null, 1},
-						%{sleep, 1 * 1000},
+						%{sleep, 2 * 1000},
 						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:pusher', json, null, 1},
-						%{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-components:java-driver-amqp', json, [null], 1},
-						{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-components:java-driver-riak', json, [null], 1},
-						{sleep, 1 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer-java', json, [null], 1},
-						{sleep, 1 * 1000},
+						%{sleep, 2 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend-java', json, [null], 1},
-						{sleep, 1 * 1000}]};
-			{ok, 'test-ring-join-leave'} ->
+						{sleep, 2 * 1000}]};
+			{ok, 'examples-realtime-feeds-java'} ->
+				{ok, defaults, [
+						{boot}, {activate}, {initialize},
+						{define_and_create_processes, 'mosaic-components:rabbitmq', json, null, 1},
+						{sleep, 2 * 1000},
+						{define_and_create_processes, 'mosaic-components:riak-kv', json, null, 1},
+						{sleep, 2 * 1000},
+						{define_and_create_processes, 'mosaic-components:httpg', json, null, 1},
+						{sleep, 2 * 1000},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:fetcher', json, null, 1},
+						{sleep, 2 * 1000},
+						{define_and_create_processes, 'mosaic-components:java-driver-amqp', json, [null], 1},
+						{sleep, 2 * 1000},
+						{define_and_create_processes, 'mosaic-components:java-driver-riak', json, [null], 1},
+						{sleep, 2 * 1000},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer-java', json, [null], 1},
+						{sleep, 2 * 1000},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend-java', json, [null], 1},
+						{sleep, 2 * 1000}]};
+			{ok, 'ring-join-leave'} ->
 				Self = erlang:node (),
 				case application:get_env (mosaic_node, tests_nodes) of
 					{ok, [Self | _Peers]} ->
