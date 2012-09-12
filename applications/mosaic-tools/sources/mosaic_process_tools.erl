@@ -169,7 +169,7 @@ resolve_registered (QualifiedName = {local, LocalName})
 	end;
 	
 resolve_registered (QualifiedName = {global, GlobalName}) ->
-	case global:whereis (GlobalName) of
+	case global:whereis_name (GlobalName) of
 		Process when (is_pid (Process) orelse is_port (Process)) ->
 			{ok, Process};
 		undefined ->
