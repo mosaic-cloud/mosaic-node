@@ -176,7 +176,7 @@ send_file_stream (Path, Offset, Sleep) ->
 				{error, _Reason} ->
 					{<<>>, done}
 			end,
-			file:close (Descriptor),
+			_ = file:close (Descriptor),
 			Outcome;
 		{error, _Reason} ->
 			{<<>>, done}

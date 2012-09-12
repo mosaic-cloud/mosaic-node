@@ -46,9 +46,9 @@ cast (Component, Operation, Inputs, Data)
 	ok = gen_server:cast (mosaic_component_backend, {mosaic_component_callbacks, cast, Component, Operation, Inputs, Data}).
 
 
-call_return ({Sender, Reference}, Outcome)
+call_return (Target = {Sender, Reference}, Outcome)
 		when (is_pid (Sender) orelse is_atom (Sender)), is_reference (Reference) ->
-	_ = gen_server:reply (Sender, Outcome),
+	_ = gen_server:reply (Target, Outcome),
 	ok.
 
 

@@ -62,13 +62,15 @@ init ({QualifiedName, {Source, SourceToken, Target, TargetToken, Monitor, Monito
 terminate (Reason, _StateName, _StateData = #state{monitor = Monitor, monitor_token = MonitorToken}) ->
 	case Reason of
 		normal ->
-			Monitor ! {mosaic_process_migrator, migrate, MonitorToken, succeeded};
-		{error, Reason} ->
-			Monitor ! {mosaic_process_migrator, migrate, MonitorToken, failed, Reason};
+			Monitor ! {mosaic_process_migrator, migrate, MonitorToken, succeeded},
+			ok;
+		{error, ErrorReason} ->
+			Monitor ! {mosaic_process_migrator, migrate, MonitorToken, failed, ErrorReason},
+			ok;
 		_ ->
-			Monitor ! {mosaic_process_migrator, migrate, MonitorToken, failed, {unexpected_reason, Reason}}
-	end,
-	ok.
+			Monitor ! {mosaic_process_migrator, migrate, MonitorToken, failed, {unexpected_reason, Reason}},
+			ok
+	end.
 
 
 code_change (_OldVsn, StateName, StateData, _Arguments) ->
