@@ -2,7 +2,7 @@
 -module (mosaic_node_tests).
 
 
--export ([test/0, execute/1]).
+-export ([test/0]).
 
 
 test () ->
@@ -100,7 +100,7 @@ test () ->
 			undefined ->
 				throw ({error, undefined_scenario})
 		end,
-		Tests = lists:map (fun (Action) -> {mosaic_node_tests, execute, [Action], infinity} end, Actions),
+		Tests = lists:map (fun (Action) -> {mosaic_node_scripts, execute, [Action], infinity} end, Actions),
 		case mosaic_tests:test_scenario (Scenario, Tests) of
 			ok ->
 				ok;
@@ -115,7 +115,3 @@ test () ->
 			ok
 	end,
 	ok.
-
-
-execute (Action) ->
-	mosaic_node_scripts:execute (Action).
