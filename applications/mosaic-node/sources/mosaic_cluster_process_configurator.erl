@@ -110,6 +110,22 @@ handle_call ({mosaic_process_configurator, unregister, Type, ConfigurationEncodi
 			{reply, Error, State}
 	end;
 	
+handle_call ({mosaic_process_configurator, select}, _Sender, State = #state{}) ->
+	case mosaic_cluster_storage:map (
+			fun
+				(_Key, {undefined, {mosaic_cluster_processes, configurator, Type, ConfigurationEncoding, _Function}})
+						when is_atom (Type), is_atom (ConfigurationEncoding) ->
+					{ok, {Type, ConfigurationEncoding}};
+				(_, _) ->
+					ok
+			end)
+	of
+		{ok, Configurators, []} ->
+			{reply, {ok, lists:usort (Configurators)}, State};
+		{ok, _, Reasons} ->
+			{reply, {error, {storage_failure, Reasons}}, State}
+	end;
+	
 handle_call (Request, _Sender, State = #state{}) ->
 	Error = {error, {invalid_request, Request}},
 	{stop, Error, Error, State}.
