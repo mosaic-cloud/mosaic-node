@@ -134,6 +134,10 @@ configure_create_generic_component (Identifier, ExecutableName, Configuration, E
 	{error, {invalid_configuration, Configuration}}.
 
 
+configure_create_java_component_container (Identifier, {json, [Class, ClassPath]}, ExtraOptions)
+		when is_binary (Identifier), is_binary (Class), is_binary (ClassPath), is_list (ExtraOptions) ->
+	configure_create_java_component_container (Identifier, {json, [Class, null, [ClassPath]]}, ExtraOptions);
+	
 configure_create_java_component_container (Identifier, {json, [Class, Configuration, ClassPath]}, ExtraOptions)
 		when is_binary (Identifier), is_binary (Class), is_list (ClassPath), is_list (ExtraOptions) ->
 	try
@@ -176,6 +180,10 @@ configure_create_java_component_container (Identifier, Configuration, ExtraOptio
 	{error, {invalid_configuration, Configuration}}.
 
 
+configure_create_java_cloudlet_container (Identifier, {json, [Descriptor, ClassPath]}, ExtraOptions)
+		when is_binary (Identifier), is_binary (Descriptor), is_binary (ClassPath), is_list (ExtraOptions) ->
+	configure_create_java_cloudlet_container (Identifier, {json, [{struct, [{<<"descriptor">>, Descriptor}]}, [ClassPath]]}, ExtraOptions);
+	
 configure_create_java_cloudlet_container (Identifier, {json, [Configuration, ClassPath]}, ExtraOptions)
 		when is_binary (Identifier), is_list (ClassPath), is_list (ExtraOptions) ->
 	try
@@ -198,6 +206,10 @@ configure_create_java_cloudlet_container (Identifier, Configuration, ExtraOption
 	{error, {invalid_configuration, Configuration}}.
 
 
+configure_create_java_component (Identifier, ExecutableName, defaults, ExtraOptions)
+		when is_binary (Identifier), is_binary (ExecutableName), is_list (ExtraOptions) ->
+	configure_create_java_component (Identifier, ExecutableName, {json, [null]}, ExtraOptions);
+	
 configure_create_java_component (Identifier, ExecutableName, {json, [Configuration]}, ExtraOptions)
 		when is_binary (Identifier), is_binary (ExecutableName), is_list (ExtraOptions) ->
 	try
