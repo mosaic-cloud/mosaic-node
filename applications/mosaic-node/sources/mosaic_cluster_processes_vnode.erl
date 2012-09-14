@@ -131,7 +131,7 @@ handle_command ({mosaic_cluster, list}, _Sender, State = #state{process_controll
 			end, []),
 	{reply, {ok, Keys}, State};
 	
-handle_command ({mosaic_cluster, map, Mapper}, _Sender, State = #state{object_store = ObjectStore})
+handle_command ({mosaic_cluster, map, Mapper}, _Sender, State = #state{})
 		when is_function (Mapper, 2) ->
 	{reply, {error, unsupported_request}, State};
 	
