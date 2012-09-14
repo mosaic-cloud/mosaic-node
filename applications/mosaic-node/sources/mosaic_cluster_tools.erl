@@ -242,7 +242,7 @@ service_list_sync_command (Service, VnodeModule)
 			fun (_TargetKey, _Request, Reply) ->
 				case Reply of
 					{ok, Keys} when is_list (Keys) ->
-						{outcome, [Keys]};
+						{outcome, Keys};
 					Error = {error, _Reason} ->
 						Error;
 					_ ->
@@ -250,7 +250,7 @@ service_list_sync_command (Service, VnodeModule)
 				end
 			end,
 			TargetKeys, Service, VnodeModule, 1),
-	{ok, lists:usort (lists:flatten (Keys)), Reasons}.
+	{ok, lists:usort (lists:append (Keys)), Reasons}.
 
 
 service_map_sync_command (Service, VnodeModule, Mapper)
@@ -261,7 +261,7 @@ service_map_sync_command (Service, VnodeModule, Mapper)
 			fun (_TargetKey, _Request, Reply) ->
 				case Reply of
 					{ok, Objects} when is_list (Objects) ->
-						{outcome, [Objects]};
+						{outcome, Objects};
 					Error = {error, _Reason} ->
 						Error;
 					_ ->
@@ -269,7 +269,7 @@ service_map_sync_command (Service, VnodeModule, Mapper)
 				end
 			end,
 			TargetKeys, Service, VnodeModule, 1),
-	{ok, lists:keysort (1, lists:flatten (Objects)), Reasons}.
+	{ok, lists:append (Objects), Reasons}.
 
 
 service_process_name (Service, Type, Partition)
