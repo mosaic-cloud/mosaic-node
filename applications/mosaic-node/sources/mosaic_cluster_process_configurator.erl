@@ -130,15 +130,24 @@ handle_call ({mosaic_process_configurator, unregister, Type, ConfigurationEncodi
 handle_call ({mosaic_process_configurator, select}, _Sender, State = #state{}) ->
 	case mosaic_cluster_storage:map (
 			fun
-				(_Key, {undefined, {mosaic_cluster_processes, configurator, Type, ConfigurationEncoding, _Function, Annotation}})
+				(_Key, {undefined, {mosaic_cluster_processes, configurator, Type, ConfigurationEncoding, Function, Annotation}})
 						when is_atom (Type), is_atom (ConfigurationEncoding) ->
-					{ok, {Type, ConfigurationEncoding, Annotation}};
+					Information = orddict:from_list ([
+							{type, Type},
+							{configuration_encoding, ConfigurationEncoding},
+							{function, Function},
+							{annotation, Annotation}]),
+					{ok, Information};
 				(_, _) ->
 					ok
 			end)
 	of
-		{ok, Configurators, []} ->
-			{reply, {ok, lists:usort (Configurators)}, State};
+		{ok, Informations, []} ->
+			Comparator = fun (Information_1, Information_2) ->
+				{orddict:fetch (type, Information_1), orddict:fetch (configuration_encoding, Information_1)}
+						=< {orddict:fetch (type, Information_2), orddict:fetch (configuration_encoding, Information_2)}
+			end,
+			{reply, {ok, lists:usort (Comparator, Informations)}, State};
 		{ok, _, Reasons} ->
 			{reply, {error, {storage_failure, Reasons}}, State}
 	end;
