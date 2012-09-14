@@ -17,10 +17,15 @@ configure (Configurator, Type, Disposition, Identifier, ConfigurationEncoding, C
 register (Type, ConfigurationEncoding, Function) ->
 	register (mosaic_process_configurator, Type, ConfigurationEncoding, Function).
 
-register (Configurator, Type, ConfigurationEncoding, {Module, Function, FunctionExtraArguments})
+register (Configurator, Type, ConfigurationEncoding, {Module, Function, FunctionExtraArgument})
 		when (is_pid (Configurator) orelse is_atom (Configurator)), is_atom (Type), is_atom (ConfigurationEncoding),
 				is_atom (Module), is_atom (Function) ->
-	gen_server:call (Configurator, {mosaic_process_configurator, register, Type, ConfigurationEncoding, {Module, Function, FunctionExtraArguments}});
+	gen_server:call (Configurator, {mosaic_process_configurator, register, Type, ConfigurationEncoding, {Module, Function, FunctionExtraArgument}});
+	
+register (Configurator, Type, ConfigurationEncoding, {Module, Function})
+		when (is_pid (Configurator) orelse is_atom (Configurator)), is_atom (Type), is_atom (ConfigurationEncoding),
+				is_atom (Module), is_atom (Function) ->
+	gen_server:call (Configurator, {mosaic_process_configurator, register, Type, ConfigurationEncoding, {Module, Function}});
 	
 register (Configurator, Type, ConfigurationEncoding, Function)
 		when (is_pid (Configurator) orelse is_atom (Configurator)), is_atom (Type), is_atom (ConfigurationEncoding), is_function (Function, 4) ->

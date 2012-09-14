@@ -67,7 +67,7 @@ handle_call ({mosaic_process_configurator, configure, Type, Disposition, Identif
 			{reply, {error, configurator_not_registered}, State}
 	end;
 	
-handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding, {Module, Function, FunctionExtraArguments}}, Sender, State = #state{})
+handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding, {Module, Function, FunctionExtraArgument}}, Sender, State = #state{})
 		when is_atom (Type), is_atom (ConfigurationEncoding), is_atom (Module), is_atom (Function) ->
 	_ = code:ensure_loaded (Module),
 	ModuleLoaded = erlang:module_loaded (Module),
@@ -75,7 +75,24 @@ handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding
 	if
 		ModuleLoaded, FunctionExported ->
 			Function_ = fun (Type_, Disposition_, Identifier_, ConfigurationEncoding_, ConfigurationContent_) ->
-				erlang:apply (Module, Function, [Type_, Disposition_, Identifier_, ConfigurationEncoding_, ConfigurationContent_, FunctionExtraArguments])
+				erlang:apply (Module, Function, [Type_, Disposition_, Identifier_, ConfigurationEncoding_, ConfigurationContent_, FunctionExtraArgument])
+			end,
+			handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding, Function_}, Sender, State);
+		not ModuleLoaded ->
+			{reply, {error, {invalid_module, Module}}, State};
+		not FunctionExported ->
+			{reply, {error, {invalid_function, {Module, Function}}}, State}
+	end;
+	
+handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding, {Module, Function}}, Sender, State = #state{})
+		when is_atom (Type), is_atom (ConfigurationEncoding), is_atom (Module), is_atom (Function) ->
+	_ = code:ensure_loaded (Module),
+	ModuleLoaded = erlang:module_loaded (Module),
+	FunctionExported = erlang:function_exported (Module, Function, 5),
+	if
+		ModuleLoaded, FunctionExported ->
+			Function_ = fun (Type_, Disposition_, Identifier_, ConfigurationEncoding_, ConfigurationContent_) ->
+				erlang:apply (Module, Function, [Type_, Disposition_, Identifier_, ConfigurationEncoding_, ConfigurationContent_])
 			end,
 			handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding, Function_}, Sender, State);
 		not ModuleLoaded ->
