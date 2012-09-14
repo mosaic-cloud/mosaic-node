@@ -2,7 +2,8 @@
 -module (mosaic_cluster_storage).
 
 
--export ([select/1, include/3, exclude/2, update/2, update/4, list/0]).
+-export ([select/1, include/3, exclude/2, update/2, update/4]).
+-export ([list/0, map/1]).
 -export ([service_nodes/0, service_activate/0, service_deactivate/0, service_ping/0, service_ping/1]).
 
 
@@ -136,6 +137,9 @@ update (Key, Mutator)
 
 list () ->
 	mosaic_cluster_tools:service_list_sync_command (mosaic_cluster_storage, mosaic_cluster_storage_vnode).
+
+map (Mapper) ->
+	mosaic_cluster_tools:service_map_sync_command (mosaic_cluster_storage, mosaic_cluster_storage_vnode, Mapper).
 
 service_nodes () ->
 	mosaic_cluster_tools:service_nodes (mosaic_cluster_storage).
