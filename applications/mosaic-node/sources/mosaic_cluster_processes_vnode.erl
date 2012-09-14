@@ -66,6 +66,20 @@ handle_command ({mosaic_cluster_processes, resolve, Key}, _Sender, State = #stat
 			{reply, Error, State}
 	end;
 	
+handle_command ({mosaic_cluster_processes, examine, Key}, _Sender, State = #state{})
+		when is_binary (Key), (bit_size (Key) =:= 160) ->
+	case mosaic_cluster_storage:select (Key) of
+		{ok, undefined, {mosaic_cluster_processes, definition, Type, ConfigurationEncoding, ConfigurationContent}} ->
+			Details = [
+					{type, Type},
+					{configuration, ConfigurationEncoding, ConfigurationContent}],
+			{reply, {ok, Details}, State};
+		{ok, _, _} ->
+			{reply, {error, invalid_key}, State};
+		Error = {error, _Reason} ->
+			{reply, Error, State}
+	end;
+	
 handle_command ({mosaic_cluster_processes, define, Key, Type, ConfigurationEncoding, ConfigurationContent}, _Sender, State = #state{})
 		when is_binary (Key), (bit_size (Key) =:= 160), is_atom (Type), is_atom (ConfigurationEncoding) ->
 	case mosaic_cluster_storage:include (Key, undefined, {mosaic_cluster_processes, definition, Type, ConfigurationEncoding, ConfigurationContent}) of
@@ -116,6 +130,10 @@ handle_command ({mosaic_cluster, list}, _Sender, State = #state{process_controll
 				[Key | Keys]
 			end, []),
 	{reply, {ok, Keys}, State};
+	
+handle_command ({mosaic_cluster, map, Mapper}, _Sender, State = #state{object_store = ObjectStore})
+		when is_function (Mapper, 2) ->
+	{reply, {error, unsupported_request}, State};
 	
 handle_command (Request, Sender, State = #state{}) ->
 	ok = mosaic_transcript:trace_error ("received invalid command request; ignoring!", [{request, Request}, {sender, Sender}]),
