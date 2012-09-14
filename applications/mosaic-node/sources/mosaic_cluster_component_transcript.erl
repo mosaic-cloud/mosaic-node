@@ -85,6 +85,11 @@ handle_info (Message, State = #state{}) ->
 execute_push (Identifier, Data, Table) ->
 	Timestamp = erlang:now (),
 	true = ets:insert (Table, {{Identifier, Timestamp}, Data}),
+	IdentifierBinary = enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
+	<<IdentifierPart : 16 / binary, _ / binary>> = IdentifierBinary,
+	_ = io:put_chars (standard_error, [
+			<<"[">>, IdentifierPart, <<"] ">>,
+			Data]),
 	ok.
 
 
