@@ -42,6 +42,7 @@ enum _packet_stream_state {
 	_packet_stream_state_undefined = 0,
 	_packet_stream_state_initialized,
 	_packet_stream_state_inputing,
+	_packet_stream_state_inputing_line,
 	_packet_stream_state_outputing,
 	_packet_stream_state_closed,
 	_packet_stream_state_failed,
@@ -52,8 +53,10 @@ enum _packet_state {
 	_packet_state_undefined = 0,
 	_packet_state_initialized,
 	_packet_state_input_ready,
+	_packet_state_input_ready_line,
 	_packet_state_input_waiting_size,
 	_packet_state_input_waiting_data,
+	_packet_state_input_waiting_line,
 	_packet_state_inputed,
 	_packet_state_parsed,
 	_packet_state_output_ready,
@@ -121,6 +124,7 @@ struct _process {
 	struct _process_configuration * configuration;
 	struct _packet_stream * input_stream;
 	struct _packet_stream * output_stream;
+	struct _packet_stream * transcript_stream;
 	unsigned int descriptor;
 	unsigned int exit_status;
 	struct _cleanup * cleanup;
@@ -555,6 +559,13 @@ static void _context_check (
 				_trace_information ("closing process output stream...");
 				_packet_stream_destroy (&_context->process->input_stream);
 			}
+			if ((_context->process != 0) && (_context->process->transcript_stream != 0)
+					&& (_context->process->transcript_stream->state != _packet_stream_state_inputing_line)
+					&& (_context->process->transcript_stream->pending == 0)
+					&& (_context->process->transcript_stream->queue_head == 0)) {
+				_trace_information ("closing process transcript stream...");
+				_packet_stream_destroy (&_context->process->transcript_stream);
+			}
 			if ((_context->process != 0)
 					&& ((_context->controller_input_stream == 0) || (_context->state == _context_state_flushing))
 					&& (_context->process->output_stream != 0)
@@ -680,7 +691,7 @@ static void _context_handle_controller_packet (
 		case _packet_type_exchange :
 			if ((_context->process != 0) && (_context->process->output_stream != 0)) {
 				_trace_debugging ("transferring inbound packet from controller to component...");
-				// _trace_information (((char *) _packet->buffer->data) + 4); // !!!!
+				_trace_debugging (_packet->buffer->data + 4);
 				_packet->state = _packet_state_output_ready;
 				_packet->buffer->offset = 0;
 				_packet_stream_enqueue (_context->process->output_stream, &_packet);
@@ -719,7 +730,7 @@ static void _context_handle_component_packet (
 		case _packet_type_exchange :
 			if (_context->controller_output_stream != 0) {
 				_trace_debugging ("transferring inbound packet from component to controller...");
-				// _trace_information (((char *) _packet->buffer->data) + 4); // !!!!
+				_trace_debugging (_packet->buffer->data + 4);
 				_packet->state = _packet_state_output_ready;
 				_packet->buffer->offset = 0;
 				_packet_stream_enqueue (_context->controller_output_stream, &_packet);
@@ -742,6 +753,7 @@ static void _context_handle_packets (
 {
 	struct _packet_stream * _controller_input_stream;
 	struct _packet_stream * _component_input_stream;
+	struct _packet_stream * _component_transcript_stream;
 	struct _packet * _packet;
 	
 	_trace_debugging ("handling packets...");
@@ -761,6 +773,11 @@ static void _context_handle_packets (
 		_assert (_component_input_stream != 0);
 	} else
 		_component_input_stream = 0;
+	if ((_context->process != 0) && (_context->process->transcript_stream != 0)) {
+		_component_transcript_stream = _context->process->transcript_stream;
+		_assert (_component_transcript_stream != 0);
+	} else
+		_component_transcript_stream = 0;
 	
 	if (_controller_input_stream != 0) {
 		switch (_controller_input_stream->state) {
@@ -806,6 +823,28 @@ static void _context_handle_packets (
 				break;
 		}
 	}
+	if (_component_transcript_stream != 0) {
+		switch (_component_transcript_stream->state) {
+			case _packet_stream_state_closed :
+			case _packet_stream_state_failed :
+				if (_component_transcript_stream->queue_head == 0)
+					break;
+			case _packet_stream_state_inputing_line :
+				if (_component_transcript_stream->queue_head != 0) {
+					_packet = 0;
+					_packet_stream_dequeue (_component_transcript_stream, &_packet);
+					_assert (_packet != 0);
+					_context_handle_component_packet (_context, &_packet);
+					_assert (_packet == 0);
+				}
+				if (_component_transcript_stream->queue_head != 0)
+					*_reschedule = 1;
+				break;
+			default :
+				_enforce (0);
+				break;
+		}
+	}
 }
 
 // ----------------------------------------
@@ -819,7 +858,8 @@ static void _context_poll_packets (
 	struct _packet_stream * _controller_output_stream;
 	struct _packet_stream * _component_input_stream;
 	struct _packet_stream * _component_output_stream;
-	struct _packet_stream * _pollable_streams[4];
+	struct _packet_stream * _component_transcript_stream;
+	struct _packet_stream * _pollable_streams[5];
 	unsigned int _pollable_streams_count;
 	unsigned int _polled_streams_count;
 	
@@ -836,6 +876,7 @@ static void _context_poll_packets (
 	_controller_output_stream = 0;
 	_component_input_stream = 0;
 	_component_output_stream = 0;
+	_component_transcript_stream = 0;
 	if (_context->controller_input_stream != 0)
 		switch (_context->controller_input_stream->state) {
 			case _packet_stream_state_inputing :
@@ -876,6 +917,18 @@ static void _context_poll_packets (
 		switch (_context->process->output_stream->state) {
 			case _packet_stream_state_outputing :
 				_component_output_stream = _context->process->output_stream;
+				break;
+			case _packet_stream_state_closed :
+			case _packet_stream_state_failed :
+				break;
+			default :
+				_enforce (0);
+				break;
+		}
+	if ((_context->process != 0) && (_context->process->transcript_stream != 0))
+		switch (_context->process->transcript_stream->state) {
+			case _packet_stream_state_inputing_line :
+				_component_transcript_stream = _context->process->transcript_stream;
 				break;
 			case _packet_stream_state_closed :
 			case _packet_stream_state_failed :
@@ -926,6 +979,16 @@ static void _context_poll_packets (
 			_pollable_streams_count++;
 		}
 	}
+	if (_component_transcript_stream != 0) {
+		_component_transcript_stream->poll_waiting = POLLHUP | POLLERR;
+		if ((_component_transcript_stream->pending != 0) || (_component_transcript_stream->queue_head == 0))
+			_component_transcript_stream->poll_waiting |= POLLIN;
+		_component_transcript_stream->poll_pending = 0;
+		if (_component_transcript_stream->poll_waiting != 0) {
+			_pollable_streams[_pollable_streams_count] = _component_transcript_stream;
+			_pollable_streams_count++;
+		}
+	}
 	
 	_polled_streams_count = 0;
 	_packet_streams_poll (_pollable_streams, _timeout, _pollable_streams_count, &_polled_streams_count);
@@ -945,6 +1008,10 @@ static void _context_poll_packets (
 	if ((_component_output_stream != 0) && (_component_output_stream->poll_pending != 0)) {
 		_trace_debugging ("outputing outbound packets to component...");
 		_packet_stream_output (_component_output_stream);
+	}
+	if ((_component_transcript_stream != 0) && (_component_transcript_stream->poll_pending != 0)) {
+		_trace_debugging ("inputing transcript packets from component...");
+		_packet_stream_input (_component_transcript_stream);
 	}
 	
 	*_reschedule = (_polled_streams_count > 0);
@@ -1048,7 +1115,8 @@ static void _process_create (
 	struct _process_configuration * _configuration;
 	unsigned int _input_descriptors[2];
 	unsigned int _output_descriptors[2];
-	struct _cleanup * _close_cleanups[4];
+	unsigned int _transcript_descriptors[2];
+	struct _cleanup * _close_cleanups[6];
 	struct _cleanup * _kill_cleanup;
 	signed int _pipe_outcome;
 	signed int _fork_outcome;
@@ -1090,6 +1158,13 @@ static void _process_create (
 	_close_cleanups[3] = 0;
 	_cleanup_register_close (&_close_cleanups[3], _output_descriptors[1]);
 	
+	_pipe_outcome = pipe (_transcript_descriptors);
+	_enforce (_pipe_outcome == 0);
+	_close_cleanups[4] = 0;
+	_cleanup_register_close (&_close_cleanups[4], _transcript_descriptors[0]);
+	_close_cleanups[5] = 0;
+	_cleanup_register_close (&_close_cleanups[5], _transcript_descriptors[1]);
+	
 	_fork_outcome = fork ();
 	_enforce (_fork_outcome >= 0);
 	
@@ -1108,11 +1183,15 @@ static void _process_create (
 		_enforce (_pipe_outcome == 1);
 		_pipe_outcome = dup2 (_output_descriptors[0], 0);
 		_enforce (_pipe_outcome == 0);
+		_pipe_outcome = dup2 (_transcript_descriptors[1], 2);
+		_enforce (_pipe_outcome == 2);
 		_pipe_outcome = 0;
 		_pipe_outcome |= close (_input_descriptors[0]);
 		_pipe_outcome |= close (_input_descriptors[1]);
 		_pipe_outcome |= close (_output_descriptors[0]);
 		_pipe_outcome |= close (_output_descriptors[1]);
+		_pipe_outcome |= close (_transcript_descriptors[0]);
+		_pipe_outcome |= close (_transcript_descriptors[1]);
 		_enforce (_pipe_outcome == 0);
 		
 		_exec_outcome = execve (_process->configuration->executable, (char **) _process->configuration->argument_values, (char **) _process->configuration->environment_values);
@@ -1127,8 +1206,10 @@ static void _process_create (
 		_pipe_outcome = 0;
 		_pipe_outcome |= close (_input_descriptors[1]);
 		_pipe_outcome |= close (_output_descriptors[0]);
+		_pipe_outcome |= close (_transcript_descriptors[1]);
 		_close_cleanups[1]->action = _cleanup_action_canceled;
 		_close_cleanups[2]->action = _cleanup_action_canceled;
+		_close_cleanups[5]->action = _cleanup_action_canceled;
 		_enforce (_pipe_outcome == 0);
 		
 		_process->descriptor = _fork_outcome;
@@ -1138,6 +1219,9 @@ static void _process_create (
 		_packet_stream_create (&_process->output_stream, _output_descriptors[1]);
 		_process->output_stream->state = _packet_stream_state_outputing;
 		_process->output_stream->cleanup = _close_cleanups[3];
+		_packet_stream_create (&_process->transcript_stream, _transcript_descriptors[0]);
+		_process->transcript_stream->state = _packet_stream_state_inputing_line;
+		_process->transcript_stream->cleanup = _close_cleanups[4];
 		_process->state = _process_state_running;
 		_process->cleanup = _kill_cleanup;
 		
@@ -1167,6 +1251,8 @@ static void _process_destroy (
 			_packet_stream_destroy (&_process->input_stream);
 		if (_process->output_stream != 0)
 			_packet_stream_destroy (&_process->output_stream);
+		if (_process->transcript_stream != 0)
+			_packet_stream_destroy (&_process->transcript_stream);
 		_trace_information ("waiting process...");
 		for (_timeout = 0; _timeout < 6000; _timeout += _timeout_slice) {
 			_outcome = waitpid (_process->descriptor, &_status, WNOHANG);
@@ -1416,6 +1502,8 @@ static void _packet_parse_type (
 		_packet->type = _packet_type_signal;
 	else if (strcmp (_type_name, "resources") == 0)
 		_packet->type = _packet_type_exchange;
+	else if (strcmp (_type_name, "transcript") == 0)
+		_packet->type = _packet_type_exchange;
 	else
 		_packet->type = _packet_type_invalid;
 	_json_outcome = json_object_del (_packet->json, "__type__");
@@ -1441,7 +1529,7 @@ static void _packet_streams_poll (
 		_stream = _streams[_index];
 		_pollfd = &_pollfds[_index];
 		_assert (_stream != 0);
-		_assert ((_stream->state == _packet_stream_state_inputing) || (_stream->state == _packet_stream_state_outputing));
+		_assert ((_stream->state == _packet_stream_state_inputing) || (_stream->state == _packet_stream_state_outputing) || (_stream->state == _packet_stream_state_inputing_line));
 		_assert ((_stream->poll_waiting & ~(POLLIN | POLLOUT | POLLHUP | POLLERR)) == 0);
 		_assert (_stream->poll_pending == 0);
 		_pollfd->fd = _stream->descriptor;
@@ -1474,15 +1562,26 @@ static void _packet_stream_input (
 		struct _packet_stream * const _stream)
 {
 	_assert (_stream != 0);
-	_assert (_stream->state == _packet_stream_state_inputing);
+	_assert ((_stream->state == _packet_stream_state_inputing) || (_stream->state == _packet_stream_state_inputing_line));
 	if (_stream->pending == 0) {
 		_packet_allocate (&_stream->pending, 1024);
-		_stream->pending->state = _packet_state_input_ready;
+		switch (_stream->state) {
+			case _packet_stream_state_inputing :
+				_stream->pending->state = _packet_state_input_ready;
+				break;
+			case _packet_stream_state_inputing_line :
+				_stream->pending->state = _packet_state_input_ready_line;
+				break;
+			default :
+				_enforce (0);
+				break;
+		}
 	}
 	_packet_input (_stream->pending, _stream->descriptor);
 	switch (_stream->pending->state) {
 		case _packet_state_input_waiting_size :
 		case _packet_state_input_waiting_data :
+		case _packet_state_input_waiting_line :
 			break;
 		case _packet_state_inputed :
 			_packet_stream_enqueue (_stream, &_stream->pending);
@@ -1635,6 +1734,21 @@ static void _packet_input (
 			_packet->buffer->offset = 0;
 			_packet->buffer->available = 0;
 			_packet->state = _packet_state_input_waiting_size;
+			break;
+		case _packet_state_input_ready_line :
+			// !!!!
+			_assert (_packet->buffer->capacity >= 1024);
+			_packet->buffer->offset = 4;
+			_packet->buffer->available = 4;
+			char * const _header = "{\"__type__\":\"transcript\",\"action\":\"push\"}";
+			size_t _header_length = strlen (_header) + 1;
+			memcpy (_packet->buffer->data + _packet->buffer->offset, _header, _header_length);
+			_packet->buffer->offset += _header_length;
+			_packet->buffer->available += _header_length;
+			_packet->state = _packet_state_input_waiting_line;
+			break;
+	}
+	switch (_packet->state) {
 		case _packet_state_input_waiting_size :
 			_assert (_packet->size == 0); _assert (_packet->buffer->offset < 4);
 			_read_window = 4;
@@ -1643,11 +1757,17 @@ static void _packet_input (
 			_assert (_packet->size >= 0); _assert (_packet->buffer->offset >= 4); _assert (_packet->size <= _packet->buffer->capacity);
 			_read_window = _packet->size + (_packet->buffer->offset - 4);
 			break;
+		case _packet_state_input_waiting_line :
+			_assert (_packet->size >= 0); _assert (_packet->buffer->offset >= 4); _assert (_packet->size == 0);
+			// !!!!
+			_read_window = 1;
+			break;
 		default :
 			_assert (0);
 			break;
 	}
 	_assert (_packet->buffer->offset == _packet->buffer->available);
+	_assert ((_packet->buffer->offset + _read_window) <= _packet->buffer->capacity);
 	_read_outcome = read (_stream, _packet->buffer->data + _packet->buffer->offset, _read_window);
 	switch (_read_outcome) {
 		case 0 :
@@ -1677,6 +1797,19 @@ static void _packet_input (
 			if (_packet->buffer->offset == (_packet->size + 4)) {
 				_packet->buffer->offset = 0;
 				_packet->state = _packet_state_inputed;
+			}
+			break;
+		case _packet_state_input_waiting_line :
+			_assert (_packet->buffer->offset >= 4);
+			char _last = ((char const *) _packet->buffer->data) [_packet->buffer->offset - 1];
+			if ((_last == '\n') || (_last == '\0')) {
+				_packet->size = _packet->buffer->offset - 4;
+				*((unsigned int *) _packet->buffer->data) = htonl (_packet->size);
+				_packet->buffer->offset = 0;
+				_packet->state = _packet_state_inputed;
+			} else {
+				if (_packet->buffer->offset == _packet->buffer->capacity)
+					_buffer_reallocate (&_packet->buffer, _packet->buffer->capacity + 1024);
 			}
 			break;
 		case _packet_state_stream_closed :
