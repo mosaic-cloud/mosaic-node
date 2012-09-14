@@ -168,38 +168,30 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 					Error
 			end;
 		{processes, examine} ->
-			Examine = fun (Key) ->
-				case mosaic_cluster_storage:select (Key) of
-					{ok, undefined, {mosaic_cluster_processes, definition, ProcessType, json, ProcessConfigurationContent}} ->
+			Transform = fun ({Key, Details}) ->
+				{type, ProcessType} = proplists:lookup (type, Details),
+				{configuration, ProcessConfigurationEncoding, ProcessConfigurationContent} = proplists:lookup (configuration, Details),
+				case ProcessConfigurationEncoding of
+					json ->
 						{struct, [
 							{key, enforce_ok_1 (mosaic_component_coders:encode_component (Key))},
 							{ok, true},
 							{type, <<$#, (enforce_ok_1 (mosaic_generic_coders:encode_atom (ProcessType))) / binary>>},
 							{configuration, ProcessConfigurationContent}]};
-					{ok, undefined, {mosaic_cluster_processes, definition, _, _, _}} ->
+					_ ->
 						{struct, [
 							{key, enforce_ok_1 (mosaic_component_coders:encode_component (Key))},
 							{ok, false},
-							{error, enforce_ok_1 (mosaic_generic_coders:encode_reason (json, invalid_configuration))}]};
-					{ok, _, _} ->
-						{struct, [
-							{key, enforce_ok_1 (mosaic_component_coders:encode_component (Key))},
-							{ok, false},
-							{error, enforce_ok_1 (mosaic_generic_coders:encode_reason (json, invalid_storage))}]};
-					{error, Reason} ->
-						{struct, [
-							{key, enforce_ok_1 (mosaic_component_coders:encode_component (Key))},
-							{ok, false},
-							{error, enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reason))}]}
+							{error, enforce_ok_1 (mosaic_generic_coders:encode_reason (json, invalid_configuration))}]}
 				end
 			end,
-			case mosaic_cluster_processes:list () of
-				{ok, Keys, []} ->
+			case mosaic_cluster_processes:examine () of
+				{ok, Processes, []} ->
 					{ok, json_struct, [
-							{processes, [Examine (Key) || Key <- Keys]}]};
-				{ok, Keys, Reasons} ->
+							{processes, [Transform (Process) || Process <- Processes]}]};
+				{ok, Processes, Reasons} ->
 					{ok, json_struct, [
-							{processes, [Examine (Key) || Key <- Keys]},
+							{processes, [Transform (Process) || Process <- Processes]},
 							{error, [enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reason)) || Reason <- Reasons]}]};
 				Error = {error, _Reason} ->
 					Error
@@ -305,18 +297,14 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 										{ok, json_struct, [{ok, true}, {error, EncodedReason2}]}
 								end;
 							Error2 = {error, _Reason2} ->
-								Error2;
-							CallReply ->
-								{error, {invalid_reply, CallReply}}
+								Error2
 						end;
 					cast ->
 						case mosaic_process_router:cast (Key, Operation, Inputs, <<>>) of
 							ok ->
 								ok;
 							Error2 = {error, _Reason2} ->
-								Error2;
-							CastReply ->
-								{error, {invalid_reply, CastReply}}
+								Error2
 						end
 				end
 			catch throw : Error = {error, _Reason} -> Error end;
