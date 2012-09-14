@@ -219,8 +219,8 @@ configure_create_java_component (Identifier, ExecutableName, Configuration, Extr
 	{error, {invalid_configuration, Configuration}}.
 
 
-configure_create_socat_component (Identifier, {json, [Token, Endpoint]}, ExtraOptions)
-		when is_binary (Identifier), is_binary (Token), is_binary (Endpoint), is_list (ExtraOptions) ->
+configure_create_socat_component (Identifier, {json, Endpoint}, ExtraOptions)
+		when is_binary (Identifier), is_binary (Endpoint), is_list (ExtraOptions) ->
 	try
 		Executable = enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"socat">>)),
 		Options = [
@@ -232,6 +232,10 @@ configure_create_socat_component (Identifier, {json, [Token, Endpoint]}, ExtraOp
 				| ExtraOptions],
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
+	
+configure_create_socat_component (Identifier, {json, [Token, Endpoint]}, ExtraOptions)
+		when is_binary (Identifier), is_binary (Token), is_binary (Endpoint), is_list (ExtraOptions) ->
+	configure_create_socat_component (Identifier, {json, Endpoint}, ExtraOptions);
 	
 configure_create_socat_component (Identifier, Configuration, ExtraOptions)
 		when is_binary (Identifier), is_list (ExtraOptions) ->
