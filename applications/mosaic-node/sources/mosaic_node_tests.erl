@@ -33,6 +33,16 @@ test () ->
 				{ok, defaults, [
 						{boot}, {activate}, {initialize},
 						{define_and_create_processes, 'mosaic-components:riak-kv', json, null, 4}]};
+			{ok, 'cloudlet-environment'} ->
+				{ok, defaults, [
+						{boot}, {activate}, {initialize}, {start, wui},
+						{define_and_create_processes, 'mosaic-components:rabbitmq', json, null, 1},
+						{define_and_create_processes, 'mosaic-components:riak-kv', json, null, 1},
+						{sleep, 2 * 1000},
+						{define_and_create_processes, 'mosaic-components:httpg', json, null, 1},
+						{define_and_create_processes, 'mosaic-components:java-driver-amqp', json, null, 1},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend-java', json, null, 1},
+						{sleep, 2 * 1000}]};
 			{ok, 'examples-realtime-feeds'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {initialize},
@@ -52,7 +62,7 @@ test () ->
 						%{sleep, 2 * 1000},
 						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:pusher', json, null, 1},
 						%{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend-java', json, [null], 1},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend-java', json, null, 1},
 						{sleep, 2 * 1000}]};
 			{ok, 'examples-realtime-feeds-java'} ->
 				{ok, defaults, [
@@ -65,13 +75,13 @@ test () ->
 						{sleep, 2 * 1000},
 						{define_and_create_processes, 'mosaic-examples-realtime-feeds:fetcher', json, null, 1},
 						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-components:java-driver-amqp', json, [null], 1},
+						{define_and_create_processes, 'mosaic-components:java-driver-amqp', json, null, 1},
 						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-components:java-driver-riak', json, [null], 1},
+						{define_and_create_processes, 'mosaic-components:java-driver-riak', json, null, 1},
 						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer-java', json, [null], 1},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer-java', json, null, 1},
 						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend-java', json, [null], 1},
+						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend-java', json, null, 1},
 						{sleep, 2 * 1000}]};
 			{ok, 'ring-join-leave'} ->
 				Self = erlang:node (),
