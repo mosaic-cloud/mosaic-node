@@ -44,7 +44,7 @@ handle_call ({mosaic_process_configurator, configure, Type, Disposition, Identif
 				((Disposition =:= create) orelse (is_record (Disposition, migrate, 2) andalso ((element (2, Disposition) =:= source) orelse (element (2, Disposition) =:= target)))) ->
 	{ok, FunctionKey} = mosaic_cluster_tools:key ({mosaic_cluster_processes, configurator, Type, ConfigurationEncoding}),
 	case mosaic_cluster_storage:select (FunctionKey) of
-		{ok, undefined, {mosaic_cluster_processes, configurator, Type, ConfigurationEncoding, Function}} when is_function (Function, 5) ->
+		{ok, undefined, {mosaic_cluster_processes, configurator, Type, ConfigurationEncoding, Function, _Annotation}} when is_function (Function, 5) ->
 			try erlang:apply (Function, [Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent]) of
 				Outcome = {ok, Module, _Configuration} when is_atom (Module) ->
 					{reply, Outcome, State};
@@ -67,7 +67,7 @@ handle_call ({mosaic_process_configurator, configure, Type, Disposition, Identif
 			{reply, {error, configurator_not_registered}, State}
 	end;
 	
-handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding, {Module, Function, FunctionExtraArgument}}, Sender, State = #state{})
+handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding, {Module, Function, FunctionExtraArgument}, Annotation}, Sender, State = #state{})
 		when is_atom (Type), is_atom (ConfigurationEncoding), is_atom (Module), is_atom (Function) ->
 	_ = code:ensure_loaded (Module),
 	ModuleLoaded = erlang:module_loaded (Module),
@@ -77,14 +77,14 @@ handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding
 			Function_ = fun (Type_, Disposition_, Identifier_, ConfigurationEncoding_, ConfigurationContent_) ->
 				erlang:apply (Module, Function, [Type_, Disposition_, Identifier_, ConfigurationEncoding_, ConfigurationContent_, FunctionExtraArgument])
 			end,
-			handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding, Function_}, Sender, State);
+			handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding, Function_, Annotation}, Sender, State);
 		not ModuleLoaded ->
 			{reply, {error, {invalid_module, Module}}, State};
 		not FunctionExported ->
 			{reply, {error, {invalid_function, {Module, Function}}}, State}
 	end;
 	
-handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding, {Module, Function}}, Sender, State = #state{})
+handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding, {Module, Function}, Annotation}, Sender, State = #state{})
 		when is_atom (Type), is_atom (ConfigurationEncoding), is_atom (Module), is_atom (Function) ->
 	_ = code:ensure_loaded (Module),
 	ModuleLoaded = erlang:module_loaded (Module),
@@ -94,20 +94,20 @@ handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding
 			Function_ = fun (Type_, Disposition_, Identifier_, ConfigurationEncoding_, ConfigurationContent_) ->
 				erlang:apply (Module, Function, [Type_, Disposition_, Identifier_, ConfigurationEncoding_, ConfigurationContent_])
 			end,
-			handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding, Function_}, Sender, State);
+			handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding, Function_, Annotation}, Sender, State);
 		not ModuleLoaded ->
 			{reply, {error, {invalid_module, Module}}, State};
 		not FunctionExported ->
 			{reply, {error, {invalid_function, {Module, Function}}}, State}
 	end;
 	
-handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding, Function}, _Sender, State = #state{})
+handle_call ({mosaic_process_configurator, register, Type, ConfigurationEncoding, Function, Annotation}, _Sender, State = #state{})
 		when is_atom (Type), is_atom (ConfigurationEncoding), is_function (Function) ->
 	FunctionValid = erlang:is_function (Function, 5),
 	if
 		FunctionValid ->
 			{ok, FunctionKey} = mosaic_cluster_tools:key ({mosaic_cluster_processes, configurator, Type, ConfigurationEncoding}),
-			case mosaic_cluster_storage:include (FunctionKey, undefined, {mosaic_cluster_processes, configurator, Type, ConfigurationEncoding, Function}) of
+			case mosaic_cluster_storage:include (FunctionKey, undefined, {mosaic_cluster_processes, configurator, Type, ConfigurationEncoding, Function, Annotation}) of
 				ok ->
 					{reply, ok, State};
 				Error = {error, _Reason} ->
@@ -130,9 +130,9 @@ handle_call ({mosaic_process_configurator, unregister, Type, ConfigurationEncodi
 handle_call ({mosaic_process_configurator, select}, _Sender, State = #state{}) ->
 	case mosaic_cluster_storage:map (
 			fun
-				(_Key, {undefined, {mosaic_cluster_processes, configurator, Type, ConfigurationEncoding, _Function}})
+				(_Key, {undefined, {mosaic_cluster_processes, configurator, Type, ConfigurationEncoding, _Function, Annotation}})
 						when is_atom (Type), is_atom (ConfigurationEncoding) ->
-					{ok, {Type, ConfigurationEncoding}};
+					{ok, {Type, ConfigurationEncoding, Annotation}};
 				(_, _) ->
 					ok
 			end)

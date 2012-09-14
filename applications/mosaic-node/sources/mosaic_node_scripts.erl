@@ -107,6 +107,9 @@ execute ({define, {process_alias, Alias, Identifier}}) ->
 execute ({define, {process_configurator, Type, ConfigurationEncoding, Function}}) ->
 	ok = mosaic_process_configurator:register (Type, ConfigurationEncoding, Function);
 	
+execute ({define, {process_configurator, Type, ConfigurationEncoding, Function, Annotation}}) ->
+	ok = mosaic_process_configurator:register (Type, ConfigurationEncoding, Function, Annotation);
+	
 execute ({define, defaults}) ->
 	{ok, _, DefinitionsData} = mosaic_static_resources:contents (<<"/definitions.term">>),
 	execute ({define, DefinitionsData});
