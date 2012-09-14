@@ -6,7 +6,7 @@
 -export ([service_nodes/1, service_targets/2, service_targets/4, service_keys/2]).
 -export ([service_activate/2, service_deactivate/1, service_ping/3]).
 -export ([service_request_reply_sync_command/6, service_requests_generator/4, service_replies_collector/1, service_sync_command/4]).
--export ([service_list_sync_command/2]).
+-export ([service_list_sync_command/2, service_map_sync_command/3]).
 -export ([service_process_name/3]).
 -export ([node_activate/0, node_deactivate/0]).
 -export ([ring_nodes/0, ring_size/0, ring_partitions/0, ring_include/1, ring_exclude/1, ring_reboot/0]).
@@ -251,6 +251,25 @@ service_list_sync_command (Service, VnodeModule)
 			end,
 			TargetKeys, Service, VnodeModule, 1),
 	{ok, lists:usort (lists:flatten (Keys)), Reasons}.
+
+
+service_map_sync_command (Service, VnodeModule, Mapper)
+		when is_atom (Service), is_atom (VnodeModule), is_function (Mapper, 2) ->
+	{ok, TargetKeys} = service_keys (Service, primaries),
+	{ok, Objects, Reasons} = service_request_reply_sync_command (
+			fun (_TargetKey) -> {mosaic_cluster, map, Mapper} end,
+			fun (_TargetKey, _Request, Reply) ->
+				case Reply of
+					{ok, Objects} when is_list (Objects) ->
+						{outcome, [Objects]};
+					Error = {error, _Reason} ->
+						Error;
+					_ ->
+						{error, {invalid_reply, Reply}}
+				end
+			end,
+			TargetKeys, Service, VnodeModule, 1),
+	{ok, lists:keysort (1, lists:flatten (Objects)), Reasons}.
 
 
 service_process_name (Service, Type, Partition)
