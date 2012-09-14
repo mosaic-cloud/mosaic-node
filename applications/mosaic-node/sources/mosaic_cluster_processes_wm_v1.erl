@@ -14,8 +14,10 @@
 -import (mosaic_enforcements, [enforce_ok/1, enforce_ok_1/1]).
 
 
--dispatch ({[<<"v1">>, <<"processes">>], {processes}}).
--dispatch ({[<<"v1">>, <<"processes">>, <<"examine">>], {processes, examine}}).
+-dispatch ({[<<"v1">>, <<"processes">>], {processes, keys}}).
+-dispatch ({[<<"v1">>, <<"processes">>, <<"keys">>], {processes, keys}}).
+-dispatch ({[<<"v1">>, <<"processes">>, <<"descriptors">>], {processes, descriptors}}).
+-dispatch ({[<<"v1">>, <<"processes">>, <<"configurators">>], {processes, configurators}}).
 -dispatch ({[<<"v1">>, <<"processes">>, <<"create">>], {processes, create}}).
 -dispatch ({[<<"v1">>, <<"processes">>, <<"stop">>], {processes, stop}}).
 -dispatch ({[<<"v1">>, <<"processes">>, <<"call">>], {processes, call}}).
@@ -53,9 +55,11 @@ malformed_request (Request, OldState = #state{target = Target, arguments = none}
 			mosaic_webmachine:enforce_get_request ([], Request);
 		{nodes, self, Operation} when ((Operation =:= activate) orelse (Operation =:= deactivate)) ->
 			mosaic_webmachine:enforce_get_request ([], Request);
-		{processes} ->
+		{processes, keys} ->
 			mosaic_webmachine:enforce_get_request ([], Request);
-		{processes, examine} ->
+		{processes, descriptors} ->
+			mosaic_webmachine:enforce_get_request ([], Request);
+		{processes, configurators} ->
 			mosaic_webmachine:enforce_get_request ([], Request);
 		{processes, create} ->
 			case wrq:method (Request) of
@@ -137,7 +141,7 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			case mosaic_cluster_processes:service_nodes () of
 				{ok, Nodes} ->
 					{ok, json_struct, [
-							{self, mosaic_generic_coders:encode_atom (erlang:node ())},
+							{self, enforce_ok_1 (mosaic_generic_coders:encode_atom (erlang:node ()))},
 							{nodes, [enforce_ok_1 (mosaic_generic_coders:encode_atom (Node)) || Node <- Nodes]}]};
 				Error = {error, _Reason} ->
 					Error
@@ -156,7 +160,7 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 				Error = {error, _Reason} ->
 					Error
 			end;
-		{processes} ->
+		{processes, keys} ->
 			case mosaic_cluster_processes:list () of
 				{ok, Keys, []} ->
 					{ok, json_struct, [
@@ -168,7 +172,7 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 				Error = {error, _Reason} ->
 					Error
 			end;
-		{processes, examine} ->
+		{processes, descriptors} ->
 			Transform = fun ({Key, Information}) ->
 				ProcessType = orddict:fetch (type, Information),
 				{ProcessConfigurationEncoding, ProcessConfigurationContent} = orddict:fetch (configuration, Information),
@@ -200,14 +204,46 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 							{error, enforce_ok_1 (mosaic_generic_coders:encode_reason (json, invalid_configuration))}]}
 				end
 			end,
-			case mosaic_cluster_processes:examine () of
+			case mosaic_cluster_processes:select () of
 				{ok, Informations, []} ->
 					{ok, json_struct, [
 							{descriptors, [Transform (Information) || Information <- Informations]}]};
 				{ok, Informations, Reasons} ->
 					{ok, json_struct, [
-							{details, [Transform (Information) || Information <- Informations]},
+							{descriptors, [Transform (Information) || Information <- Informations]},
 							{error, [enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reason)) || Reason <- Reasons]}]};
+				Error = {error, _Reason} ->
+					Error
+			end;
+		{processes, configurators} ->
+			Transform = fun (Information) ->
+				Key = orddict:fetch (key, Information),
+				ProcessType = orddict:fetch (type, Information),
+				ProcessConfigurationEncoding = orddict:fetch (configuration_encoding, Information),
+				{ProcessAnnotationEncoding, ProcessAnnotationContent} = case orddict:fetch (annotation, Information) of
+					undefined ->
+						{json, null};
+					ProcessAnnotation_ = {json, _} ->
+						ProcessAnnotation_;
+					_ ->
+						{undefined, undefined}
+				end,
+				case {ProcessConfigurationEncoding, ProcessAnnotationEncoding} of
+					{json, json} ->
+						{struct, [
+							{key, enforce_ok_1 (mosaic_component_coders:encode_component (Key))},
+							{type, <<$#, (enforce_ok_1 (mosaic_generic_coders:encode_atom (ProcessType))) / binary>>},
+							{annotation, ProcessAnnotationContent}]};
+					{json, _} ->
+						null;
+					{_, json} ->
+						null
+				end
+			end,
+			case mosaic_process_configurator:select () of
+				{ok, Informations} ->
+					{ok, json_struct, [
+							{configurators, [Configurator || Configurator <- [Transform (Information) || Information <- Informations], (Configurator =/= null)]}]};
 				Error = {error, _Reason} ->
 					Error
 			end;

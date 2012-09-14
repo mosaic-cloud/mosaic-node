@@ -2,7 +2,7 @@
 -module (mosaic_cluster_processes).
 
 
--export ([resolve/1, resolve/0, define/4, define/5, examine/1, examine/0, create/1, stop/1, stop/2]).
+-export ([resolve/1, resolve/0, define/4, define/5, select/1, select/0, create/1, stop/1, stop/2]).
 -export ([define_and_create/3, define_and_create/4, define_and_create/5]).
 -export ([list/0, map/1]).
 -export ([service_nodes/0, service_activate/0, service_deactivate/0, service_ping/0, service_ping/1]).
@@ -51,9 +51,9 @@ resolve () ->
 	end.
 
 
-examine (Key)
+select (Key)
 		when is_binary (Key), (bit_size (Key) =:= 160) ->
-	case examine ([Key]) of
+	case select ([Key]) of
 		{ok, [{Key, Details}], []} ->
 			{ok, Details};
 		{ok, [], [{_Target, Key, Reason}]} ->
@@ -62,10 +62,10 @@ examine (Key)
 			{error, unreachable_vnode}
 	end;
 	
-examine (Keys)
+select (Keys)
 		when is_list (Keys), (Keys =/= []) ->
 	mosaic_cluster_tools:service_request_reply_sync_command (
-			fun (Key) -> {mosaic_cluster_processes, examine, Key} end,
+			fun (Key) -> {mosaic_cluster_processes, select, Key} end,
 			fun (Key, _Request, Reply) ->
 				case Reply of
 					{ok, Details} ->
@@ -78,12 +78,12 @@ examine (Keys)
 			end,
 			Keys, mosaic_cluster_processes, mosaic_cluster_processes_vnode, 1).
 
-examine () ->
+select () ->
 	case list () of
 		Outcome = {ok, [], ListReasons} when is_list (ListReasons) ->
 			Outcome;
 		{ok, Keys, ListReasons} when is_list (Keys), is_list (ListReasons) ->
-			case examine (Keys) of
+			case select (Keys) of
 				{ok, Details, ExamineReasons} ->
 					{ok, Details, ListReasons ++ ExamineReasons};
 				Error = {error, _Reason} ->

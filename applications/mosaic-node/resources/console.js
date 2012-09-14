@@ -90,6 +90,12 @@ _mosaic.cluster.ring.reboot = _wrapped (function () {
 _mosaic.processes = _wrapped (function () {
 	return (_get ("/v1/processes") .keys);
 });
+_mosaic.processes.descriptors = _wrapped (function () {
+	return (_get ("/v1/processes/descriptors") .descriptors);
+});
+_mosaic.processes.configurators = _wrapped (function () {
+	return (_get ("/v1/processes/configurators") .configurators);
+});
 _mosaic.processes.nodes = _wrapped (function () {
 	return (_get ("/v1/processes/nodes") .nodes);
 });
@@ -136,7 +142,4 @@ _mosaic.processes.cast = _wrapped (function (_key, _operation, _inputs) {
 		_inputs = null;
 	_inputs = JSON.stringify (_inputs);
 	return (_get ("/v1/processes/cast", {key : _key, operation : _operation, inputs : _inputs}) .ok);
-});
-_mosaic.processes.examine = _wrapped (function () {
-	return (_get ("/v1/processes/examine") .descriptors);
 });

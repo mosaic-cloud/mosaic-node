@@ -130,9 +130,10 @@ handle_call ({mosaic_process_configurator, unregister, Type, ConfigurationEncodi
 handle_call ({mosaic_process_configurator, select}, _Sender, State = #state{}) ->
 	case mosaic_cluster_storage:map (
 			fun
-				(_Key, {undefined, {mosaic_cluster_processes, configurator, Type, ConfigurationEncoding, Function, Annotation}})
+				(Key, {undefined, {mosaic_cluster_processes, configurator, Type, ConfigurationEncoding, Function, Annotation}})
 						when is_atom (Type), is_atom (ConfigurationEncoding) ->
 					Information = orddict:from_list ([
+							{key, Key},
 							{type, Type},
 							{configuration_encoding, ConfigurationEncoding},
 							{function, Function},

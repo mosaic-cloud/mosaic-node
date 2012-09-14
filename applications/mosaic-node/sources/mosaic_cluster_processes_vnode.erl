@@ -66,7 +66,7 @@ handle_command ({mosaic_cluster_processes, resolve, Key}, _Sender, State = #stat
 			{reply, Error, State}
 	end;
 	
-handle_command ({mosaic_cluster_processes, examine, Key}, _Sender, State = #state{process_controller = ProcessController})
+handle_command ({mosaic_cluster_processes, select, Key}, _Sender, State = #state{process_controller = ProcessController})
 		when is_binary (Key), (bit_size (Key) =:= 160) ->
 	case mosaic_cluster_storage:select (Key) of
 		{ok, undefined, {mosaic_cluster_processes, definition, Type, ConfigurationEncoding, ConfigurationContent, Annotation}} ->
@@ -77,6 +77,7 @@ handle_command ({mosaic_cluster_processes, examine, Key}, _Sender, State = #stat
 					undefined
 			end,
 			Information = orddict:from_list ([
+					{key, Key},
 					{type, Type},
 					{configuration, {ConfigurationEncoding, ConfigurationContent}},
 					{annotation, Annotation},
