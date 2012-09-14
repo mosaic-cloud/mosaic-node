@@ -2,8 +2,8 @@
 -module (mosaic_cluster_processes).
 
 
--export ([resolve/1, resolve/0, define/4, examine/1, examine/0, create/1, stop/1, stop/2]).
--export ([define_and_create/3, define_and_create/4]).
+-export ([resolve/1, resolve/0, define/4, define/5, examine/1, examine/0, create/1, stop/1, stop/2]).
+-export ([define_and_create/3, define_and_create/4, define_and_create/5]).
 -export ([list/0, map/1]).
 -export ([service_nodes/0, service_activate/0, service_deactivate/0, service_ping/0, service_ping/1]).
 
@@ -94,9 +94,12 @@ examine () ->
 	end.
 
 
-define (Type, ConfigurationEncoding, ConfigurationContent, Key)
+define (Type, ConfigurationEncoding, ConfigurationContent, Key) ->
+	define (Type, ConfigurationEncoding, ConfigurationContent, Key, undefined).
+
+define (Type, ConfigurationEncoding, ConfigurationContent, Key, Annotation)
 		when is_atom (Type), is_atom (ConfigurationEncoding), is_binary (Key), (bit_size (Key) =:= 160) ->
-	case define (Type, ConfigurationEncoding, ConfigurationContent, [Key]) of
+	case define (Type, ConfigurationEncoding, ConfigurationContent, [Key], Annotation) of
 		{ok, [Key], []} ->
 			ok;
 		{ok, [], [{_Target, Key, Reason}]} ->
@@ -105,10 +108,10 @@ define (Type, ConfigurationEncoding, ConfigurationContent, Key)
 			{error, unreachable_vnode}
 	end;
 	
-define (Type, ConfigurationEncoding, ConfigurationContent, Keys)
+define (Type, ConfigurationEncoding, ConfigurationContent, Keys, Annotation)
 		when is_atom (Type), is_atom (ConfigurationEncoding), is_list (Keys), (Keys =/= []) ->
 	mosaic_cluster_tools:service_request_reply_sync_command (
-			fun (Key) -> {mosaic_cluster_processes, define, Key, Type, ConfigurationEncoding, ConfigurationContent} end,
+			fun (Key) -> {mosaic_cluster_processes, define, Key, Type, ConfigurationEncoding, ConfigurationContent, Annotation} end,
 			fun (Key, _, Reply) ->
 				case Reply of
 					ok ->
@@ -181,10 +184,13 @@ stop (Keys, Signal)
 			Keys, mosaic_cluster_processes, mosaic_cluster_processes_vnode, 1).
 
 
-define_and_create (Type, ConfigurationEncoding, ConfigurationContent)
+define_and_create (Type, ConfigurationEncoding, ConfigurationContent) ->
+	define_and_create (Type, ConfigurationEncoding, ConfigurationContent, undefined).
+
+define_and_create (Type, ConfigurationEncoding, ConfigurationContent, Annotation)
 		when is_atom (Type), is_atom (ConfigurationEncoding) ->
 	{ok, Key} = mosaic_cluster_tools:key (),
-	case define (Type, ConfigurationEncoding, ConfigurationContent, Key) of
+	case define (Type, ConfigurationEncoding, ConfigurationContent, Key, Annotation) of
 		ok ->
 			case create (Key) of
 				ok ->
@@ -202,10 +208,10 @@ define_and_create (Type, ConfigurationEncoding, ConfigurationContent)
 	end.
 
 
-define_and_create (Type, ConfigurationEncoding, ConfigurationContent, Count)
+define_and_create (Type, ConfigurationEncoding, ConfigurationContent, Annotation, Count)
 		when is_atom (Type), is_atom (ConfigurationEncoding), is_integer (Count), (Count > 0) ->
 	{ok, Keys} = mosaic_cluster_tools:keys (Count),
-	case define (Type, ConfigurationEncoding, ConfigurationContent, Keys) of
+	case define (Type, ConfigurationEncoding, ConfigurationContent, Keys, Annotation) of
 		{ok, [], DefineReasons} ->
 			{ok, [], DefineReasons};
 		{ok, DefineKeys, DefineReasons} ->

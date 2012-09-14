@@ -63,13 +63,14 @@ malformed_request (Request, OldState = #state{target = Target, arguments = none}
 					case mosaic_webmachine:enforce_get_request (
 							[
 								{<<"type">>, fun mosaic_generic_coders:decode_string/1},
-								{<<"configuration">>, fun mosaic_json_coders:decode_json/1},
-								{<<"count">>, fun mosaic_generic_coders:decode_integer/1}],
+								{<<"configuration">>, fun mosaic_json_coders:decode_json/1, null},
+								{<<"annotation">>, fun mosaic_json_coders:decode_json/1, null},
+								{<<"count">>, fun mosaic_generic_coders:decode_integer/1, 1}],
 							Request) of
-						{ok, false, [Type, Configuration, Count]} ->
+						{ok, false, [Type, Configuration, Annotation, Count]} ->
 							if
 								(Count > 0), (Count =< 128) ->
-									{ok, false, OldState#state{arguments = dict:from_list ([{type, Type}, {configuration, Configuration}, {count, Count}])}};
+									{ok, false, OldState#state{arguments = dict:from_list ([{type, Type}, {configuration, Configuration}, {annotation, Annotation}, {count, Count}])}};
 								true ->
 									{error, true, {invalid_argument, <<"count">>, {out_of_range, 1, 128}}}
 							end;
@@ -98,7 +99,7 @@ malformed_request (Request, OldState = #state{target = Target, arguments = none}
 					[
 						{<<"key">>, fun mosaic_generic_coders:decode_string/1},
 						{<<"operation">>, fun mosaic_generic_coders:decode_string/1},
-						{<<"inputs">>, fun mosaic_json_coders:decode_json/1}],
+						{<<"inputs">>, fun mosaic_json_coders:decode_json/1, null}],
 					Request) of
 				{ok, false, [Key, Operation, Inputs]} ->
 					{ok, false, OldState#state{arguments = dict:from_list ([{key, Key}, {operation, Operation}, {inputs, Inputs}])}};
@@ -107,7 +108,7 @@ malformed_request (Request, OldState = #state{target = Target, arguments = none}
 			end;
 		{ping} ->
 			case mosaic_webmachine:enforce_get_request (
-					[{<<"count">>, fun mosaic_generic_coders:decode_integer/1}],
+					[{<<"count">>, fun mosaic_generic_coders:decode_integer/1, 4}],
 					Request) of
 				{ok, false, [Count]} ->
 					if
@@ -168,17 +169,31 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 					Error
 			end;
 		{processes, examine} ->
-			Transform = fun ({Key, Details}) ->
-				{type, ProcessType} = proplists:lookup (type, Details),
-				{configuration, ProcessConfigurationEncoding, ProcessConfigurationContent} = proplists:lookup (configuration, Details),
-				case ProcessConfigurationEncoding of
-					json ->
+			Transform = fun ({Key, Information}) ->
+				ProcessType = orddict:fetch (type, Information),
+				{ProcessConfigurationEncoding, ProcessConfigurationContent} = orddict:fetch (configuration, Information),
+				{ProcessAnnotationEncoding, ProcessAnnotationContent} = case orddict:fetch (annotation, Information) of
+					undefined ->
+						{json, null};
+					ProcessAnnotation_ = {json, _} ->
+						ProcessAnnotation_;
+					_ ->
+						{undefined, undefined}
+				end,
+				case {ProcessConfigurationEncoding, ProcessAnnotationEncoding} of
+					{json, json} ->
 						{struct, [
 							{key, enforce_ok_1 (mosaic_component_coders:encode_component (Key))},
 							{ok, true},
 							{type, <<$#, (enforce_ok_1 (mosaic_generic_coders:encode_atom (ProcessType))) / binary>>},
-							{configuration, ProcessConfigurationContent}]};
-					_ ->
+							{configuration, ProcessConfigurationContent},
+							{annotation, ProcessAnnotationContent}]};
+					{json, _} ->
+						{struct, [
+							{key, enforce_ok_1 (mosaic_component_coders:encode_component (Key))},
+							{ok, false},
+							{error, enforce_ok_1 (mosaic_generic_coders:encode_reason (json, invalid_annotation))}]};
+					{_, json} ->
 						{struct, [
 							{key, enforce_ok_1 (mosaic_component_coders:encode_component (Key))},
 							{ok, false},
@@ -186,12 +201,12 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 				end
 			end,
 			case mosaic_cluster_processes:examine () of
-				{ok, Processes, []} ->
+				{ok, Informations, []} ->
 					{ok, json_struct, [
-							{processes, [Transform (Process) || Process <- Processes]}]};
-				{ok, Processes, Reasons} ->
+							{descriptors, [Transform (Information) || Information <- Informations]}]};
+				{ok, Informations, Reasons} ->
 					{ok, json_struct, [
-							{processes, [Transform (Process) || Process <- Processes]},
+							{details, [Transform (Information) || Information <- Informations]},
 							{error, [enforce_ok_1 (mosaic_generic_coders:encode_reason (json, Reason)) || Reason <- Reasons]}]};
 				Error = {error, _Reason} ->
 					Error
@@ -210,8 +225,9 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 						throw ({error, {invalid_type, ProcessType_}})
 				end,
 				ProcessConfigurationContent = dict:fetch (configuration, Arguments),
+				ProcessAnnotationContent = dict:fetch (annotation, Arguments),
 				Count = dict:fetch (count, Arguments),
-				case mosaic_cluster_processes:define_and_create (ProcessType, json, ProcessConfigurationContent, Count) of
+				case mosaic_cluster_processes:define_and_create (ProcessType, json, ProcessConfigurationContent, {json, ProcessAnnotationContent}, Count) of
 					{ok, Processes, []} ->
 						{ok, json_struct, [
 								{keys, [enforce_ok_1 (mosaic_component_coders:encode_component (Key)) || {Key, _Process} <- Processes]}]};
@@ -342,17 +358,18 @@ process_post (Request, State = #state{target = Target, arguments = Json}) ->
 				ProcessSpecifications = lists:keysort (5, lists:map (
 						fun ({ProcessName, {struct, ProcessSpecification}}) ->
 							[
+									{<<"annotation">>, ProcessAnnotation},
 									{<<"configuration">>, ProcessConfiguration},
 									{<<"count">>, Count},
 									{<<"delay">>, Delay},
 									{<<"order">>, Order},
 									{<<"type">>, ProcessType}
 							] = lists:keysort (1, ProcessSpecification),
-							{ProcessName, ProcessType, ProcessConfiguration, Count, Order, Delay}
+							{ProcessName, ProcessType, ProcessConfiguration, ProcessAnnotation, Count, Order, Delay}
 						end,
 						ProcessSpecifications_)),
 				ProcessOutcomes = lists:map (
-						fun ({ProcessName, ProcessType_, ProcessConfigurationContent, Count, _Order, Delay}) ->
+						fun ({ProcessName, ProcessType_, ProcessConfigurationContent, ProcessAnnotationContent, Count, _Order, Delay}) ->
 							ProcessOutcome = try
 								ProcessType = case ProcessType_ of
 									<<$#, ProcessType__ / binary>> ->
@@ -365,7 +382,7 @@ process_post (Request, State = #state{target = Target, arguments = Json}) ->
 									ProcessType__ ->
 										throw ({error, {invalid_type, ProcessType__}})
 								end,
-								case mosaic_cluster_processes:define_and_create (ProcessType, json, ProcessConfigurationContent, Count) of
+								case mosaic_cluster_processes:define_and_create (ProcessType, json, ProcessConfigurationContent, {json, ProcessAnnotationContent}, Count) of
 									{ok, Processes, []} ->
 										ok = timer:sleep (Delay),
 										{struct, [
@@ -410,6 +427,7 @@ json_schema (process_specification_attributes) ->
 	[
 		{<<"type">>, {is_string, invalid_type}},
 		{<<"configuration">>, {is_json, invalid_configuration}},
+		{<<"annotation">>, {is_json, invalid_annotation}},
 		{<<"count">>, {is_integer, invalid_count}},
 		{<<"delay">>, {is_integer, invalid_delay}},
 		{<<"order">>, {is_integer, invalid_order}}].

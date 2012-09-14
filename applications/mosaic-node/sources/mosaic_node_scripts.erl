@@ -175,7 +175,16 @@ execute ({ping, Count}) ->
 	ok;
 	
 execute ({define_and_create_processes, Type, ConfigurationEncoding, ConfigurationContent, Count}) ->
-	ok = case mosaic_cluster_processes:define_and_create (Type, ConfigurationEncoding, ConfigurationContent, Count) of
+	ok = case mosaic_cluster_processes:define_and_create (Type, ConfigurationEncoding, ConfigurationContent, undefined, Count) of
+		{ok, _Processes, []} ->
+			ok;
+		{ok, _Processes, Reasons} ->
+			erlang:exit ({error, Reasons})
+	end,
+	ok;
+	
+execute ({define_and_create_processes, Type, ConfigurationEncoding, ConfigurationContent, Annotation, Count}) ->
+	ok = case mosaic_cluster_processes:define_and_create (Type, ConfigurationEncoding, ConfigurationContent, Annotation, Count) of
 		{ok, _Processes, []} ->
 			ok;
 		{ok, _Processes, Reasons} ->

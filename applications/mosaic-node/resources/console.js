@@ -108,13 +108,15 @@ _mosaic.processes.ping = _wrapped (function (_count) {
 		var _outcome = _get ("/v1/processes/ping", {count : _count});
 	return ({pongs : _outcome.pongs, pangs : _outcome.pangs});
 });
-_mosaic.processes.create = _wrapped (function (_type, _configuration, _count) {
+_mosaic.processes.create = _wrapped (function (_type, _configuration, _annotation, _count) {
 	if (_configuration == undefined)
 		_configuration = null;
+	if (_annotation == undefined)
+		_annotation = null;
 	if (_count == undefined)
 		_count = 1;
 	_configuration = JSON.stringify (_configuration);
-	var _outcome = _get ("/v1/processes/create", {type : _type, configuration : _configuration, count : _count});
+	var _outcome = _get ("/v1/processes/create", {type : _type, configuration : _configuration, annotation : _annotation, count : _count});
 	if (_count == 1)
 		return (_outcome.keys[0]);
 	else
@@ -134,4 +136,7 @@ _mosaic.processes.cast = _wrapped (function (_key, _operation, _inputs) {
 		_inputs = null;
 	_inputs = JSON.stringify (_inputs);
 	return (_get ("/v1/processes/cast", {key : _key, operation : _operation, inputs : _inputs}) .ok);
+});
+_mosaic.processes.examine = _wrapped (function () {
+	return (_get ("/v1/processes/examine") .descriptors);
 });

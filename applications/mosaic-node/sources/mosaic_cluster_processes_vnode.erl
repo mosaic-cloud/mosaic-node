@@ -66,23 +66,31 @@ handle_command ({mosaic_cluster_processes, resolve, Key}, _Sender, State = #stat
 			{reply, Error, State}
 	end;
 	
-handle_command ({mosaic_cluster_processes, examine, Key}, _Sender, State = #state{})
+handle_command ({mosaic_cluster_processes, examine, Key}, _Sender, State = #state{process_controller = ProcessController})
 		when is_binary (Key), (bit_size (Key) =:= 160) ->
 	case mosaic_cluster_storage:select (Key) of
-		{ok, undefined, {mosaic_cluster_processes, definition, Type, ConfigurationEncoding, ConfigurationContent}} ->
-			Details = [
+		{ok, undefined, {mosaic_cluster_processes, definition, Type, ConfigurationEncoding, ConfigurationContent, Annotation}} ->
+			Process = case mosaic_process_controller:resolve (ProcessController, Key) of
+				{ok, Process_} ->
+					Process_;
+				{error, _Reason} ->
+					undefined
+			end,
+			Information = orddict:from_list ([
 					{type, Type},
-					{configuration, ConfigurationEncoding, ConfigurationContent}],
-			{reply, {ok, Details}, State};
+					{configuration, {ConfigurationEncoding, ConfigurationContent}},
+					{annotation, Annotation},
+					{process, Process}]),
+			{reply, {ok, Information}, State};
 		{ok, _, _} ->
 			{reply, {error, invalid_key}, State};
 		Error = {error, _Reason} ->
 			{reply, Error, State}
 	end;
 	
-handle_command ({mosaic_cluster_processes, define, Key, Type, ConfigurationEncoding, ConfigurationContent}, _Sender, State = #state{})
+handle_command ({mosaic_cluster_processes, define, Key, Type, ConfigurationEncoding, ConfigurationContent, Annotation}, _Sender, State = #state{})
 		when is_binary (Key), (bit_size (Key) =:= 160), is_atom (Type), is_atom (ConfigurationEncoding) ->
-	case mosaic_cluster_storage:include (Key, undefined, {mosaic_cluster_processes, definition, Type, ConfigurationEncoding, ConfigurationContent}) of
+	case mosaic_cluster_storage:include (Key, undefined, {mosaic_cluster_processes, definition, Type, ConfigurationEncoding, ConfigurationContent, Annotation}) of
 		ok ->
 			{reply, ok, State};
 		Error = {error, _Reason} ->
@@ -92,7 +100,7 @@ handle_command ({mosaic_cluster_processes, define, Key, Type, ConfigurationEncod
 handle_command ({mosaic_cluster_processes, create, Key}, _Sender, State = #state{process_controller = ProcessController})
 		when is_binary (Key), (bit_size (Key) =:= 160) ->
 	case mosaic_cluster_storage:select (Key) of
-		{ok, undefined, {mosaic_cluster_processes, definition, Type, ConfigurationEncoding, ConfigurationContent}} ->
+		{ok, undefined, {mosaic_cluster_processes, definition, Type, ConfigurationEncoding, ConfigurationContent, _Annotation}} ->
 			case mosaic_process_configurator:configure (Type, create, Key, ConfigurationEncoding, ConfigurationContent) of
 				{ok, Module, Configuration} ->
 					case mosaic_process_controller:create (ProcessController, Key, Module, Configuration) of
@@ -164,7 +172,7 @@ handle_handoff_command ({mosaic_cluster_processes, handoff_request, Vnode, Refer
 		when is_pid (Vnode), is_reference (Reference), is_binary (Key), (bit_size (Key) =:= 160), is_pid (PeerProcessController) ->
 	% ok = mosaic_transcript:trace_information ("requested process handoff as source...", [{vnode, Vnode}, {key, Key}]),
 	case mosaic_cluster_storage:select (Key) of
-		{ok, undefined, {mosaic_cluster_processes, definition, Type, _, _}} ->
+		{ok, undefined, {mosaic_cluster_processes, definition, Type, _, _, _}} ->
 			case mosaic_process_configurator:configure (Type, {migrate, source}, Key, term, defaults) of
 				{ok, none, SourceConfiguration} ->
 					case mosaic_process_configurator:configure (Type, {migrate, target}, Key, term, defaults) of
