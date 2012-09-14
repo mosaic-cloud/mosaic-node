@@ -6,6 +6,7 @@
 -export ([return_with_outcome/3, respond_with_outcome/3]).
 -export ([return_with_content/5, respond_with_content/4]).
 -export ([enforce_get_request/2, enforce_post_request/3]).
+-export ([parse_arguments/2, parse_argument/3]).
 
 
 start () ->
@@ -278,16 +279,46 @@ parse_arguments ([Name | Arguments], Request, Names, Values)
 	
 parse_arguments ([{Name, Parser} | Arguments], Request, Names, Values)
 		when is_binary (Name), is_function (Parser, 1) ->
+	case parse_argument (Name, Parser, Request) of
+		{ok, Value} ->
+			parse_arguments (Arguments, Request, [Name | Names], [Value | Values]);
+		Error = {error, _Reason} ->
+			Error
+	end;
+	
+parse_arguments ([{Name, Parser, Default} | Arguments], Request, Names, Values)
+		when is_binary (Name), is_function (Parser, 1) ->
+	case parse_argument (Name, {Parser, Default}, Request) of
+		{ok, Value} ->
+			parse_arguments (Arguments, Request, [Name | Names], [Value | Values]);
+		Error = {error, _Reason} ->
+			Error
+	end.
+
+
+parse_argument (Name, Parser, Request)
+		when is_binary (Name), is_function (Parser, 1) ->
 	case wrq:get_qs_value (erlang:binary_to_list (Name), Request) of
 		ValueString when is_list (ValueString) ->
 			case Parser (ValueString) of
-				{ok, ValueTerm} ->
-					parse_arguments (Arguments, Request, [Name | Names], [ValueTerm | Values]);
+				Outcome = {ok, _ValueTerm} ->
+					Outcome;
 				{error, Reason} ->
 					{error, {invalid_argument, Name, Reason}}
 			end;
 		undefined ->
 			{error, {missing_argument, Name}}
+	end;
+	
+parse_argument (Name, {Parser, Default}, Request)
+		when is_binary (Name), is_function (Parser, 1) ->
+	case parse_argument (Name, Parser, Request) of
+		Outcome = {ok, _Value} ->
+			Outcome;
+		{error, {missing_argument, Name}} ->
+			{ok, Default};
+		Error = {error, _Reason} ->
+			Error
 	end.
 
 
