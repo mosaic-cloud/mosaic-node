@@ -109,6 +109,23 @@ handle_command ({mosaic_cluster, list}, _Sender, State = #state{object_store = O
 			end, []),
 	{reply, {ok, Keys}, State};
 	
+handle_command ({mosaic_cluster, map, Mapper}, _Sender, State = #state{object_store = ObjectStore})
+		when is_function (Mapper, 2) ->
+	{ok, Outcomes} = mosaic_object_store:fold (ObjectStore,
+			fun ({Key, Revision, Data}, Outcomes) ->
+				try Mapper (Key, {Revision, Data}) of
+					ok ->
+						Outcomes;
+					{ok, Outcome} ->
+						[Outcome, Outcomes];
+					Error = {error, _Reason} ->
+						Error;
+					Return ->
+						{error, {invalid_return, Return}}
+				catch _ : Reason -> {error, {caught, Reason}} end
+			end, []),
+	{reply, {ok, Outcomes}, State};
+	
 handle_command (Request, Sender, State = #state{}) ->
 	ok = mosaic_transcript:trace_error ("received invalid command request; ignoring!", [{request, Request}, {sender, Sender}]),
 	{reply, {error, {invalid_request, Request}}, State}.
