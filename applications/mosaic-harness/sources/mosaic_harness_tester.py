@@ -6,7 +6,7 @@ if __name__ != "__main__" :
 
 ## ----------------------------------------
 
-_trace_level = 2 # 1 -> debugging; 2 -> information; 3 -> warning; 4 -> error
+_trace_level = 1 # 1 -> debugging; 2 -> information; 3 -> warning; 4 -> error
 
 ## ----------------------------------------
 
@@ -417,7 +417,7 @@ def _frontend (_scenario) :
 				stdin = subprocess.PIPE, stdout = subprocess.PIPE)
 	else :
 		_process = subprocess.Popen (
-				["[mosaic_harness_strace]", "-e", "trace=file,desc,process", "--", "./.outputs/gcc/applications-elf/mosaic_harness.elf"],
+				["[mosaic_harness_strace]", "-e", "trace=file,desc,process", "-s", "512", "-o", "/tmp/harness.pipe", "-f", "--", "./.outputs/gcc/applications-elf/mosaic_harness.elf"],
 				executable = "/usr/bin/strace",
 				stdin = subprocess.PIPE, stdout = subprocess.PIPE)
 	
@@ -441,20 +441,25 @@ import time
 ## ----------------------------------------
 
 def _input () :
-	_size = _input_stream.read (4)
-	if _size == "" :
-		return None
-	(_size,) = struct.unpack (">l", _size)
-	_data = _input_stream.read (_size)
-	_split = _data.find ("\0")
-	if _split == -1 :
-		raise Exception ()
-	_message = _data[:_split]
-	_payload = _data[_split+1:]
-	_message = _message.decode ("utf-8")
-	_message = json.loads (_message)
-	_packet = (_message, _payload)
-	_trace_debugging ("received `%s`;", _packet)
+	while True :
+		_size = _input_stream.read (4)
+		if _size == "" :
+			return None
+		(_size,) = struct.unpack (">l", _size)
+		_data = _input_stream.read (_size)
+		_split = _data.find ("\0")
+		if _split == -1 :
+			raise Exception ()
+		_message = _data[:_split]
+		_payload = _data[_split+1:]
+		_message = _message.decode ("utf-8")
+		_message = json.loads (_message)
+		if _message["__type__"] == "transcript" :
+			print >> sys.stderr, "[%5d][::] %s" % (os.getpid (), _payload.strip ("\n"))
+			continue
+		_packet = (_message, _payload)
+		_trace_debugging ("received `%s`;", _packet)
+		break
 	return _packet
 
 def _input_close () :

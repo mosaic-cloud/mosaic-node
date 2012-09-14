@@ -291,6 +291,10 @@ encode_packet ({resources, MetaData, Data})
 		when is_list (MetaData), is_binary (Data) ->
 	{ok, {json, [{<<"__type__">>, <<"resources">>} | MetaData], Data}};
 	
+encode_packet ({transcript, MetaData, Data})
+		when is_list (MetaData), is_binary (Data) ->
+	{ok, {json, [{<<"__type__">>, <<"transcript">>} | MetaData], Data}};
+	
 encode_packet ({generic, Type, MetaData, Data})
 		when is_binary (Type), is_list (MetaData), is_binary (Data) ->
 	{ok, {json, [{<<"__type__">>, Type} | MetaData], Data}};
@@ -339,6 +343,8 @@ decode_packet (Packet = {json, MetaData, Data})
 				{ok, {exchange, RemainingMetaData, Data}};
 			<<"resources">> ->
 				{ok, {resources, RemainingMetaData, Data}};
+			<<"transcript">> ->
+				{ok, {transcript, RemainingMetaData, Data}};
 			<<"exit">> ->
 				{ok, {exit, RemainingMetaData, Data}};
 			_ when is_binary (Type) ->
@@ -391,6 +397,11 @@ encode_packet_fully (Packet = {resources, _MetaData, _Data}) ->
 		NewPacket -> encode_packet_fully (NewPacket)
 	catch throw : Error = {error, _Reason} -> Error end;
 	
+encode_packet_fully (Packet = {transcript, _MetaData, _Data}) ->
+	try enforce_ok_1 (encode_packet (Packet)) of
+		NewPacket -> encode_packet_fully (NewPacket)
+	catch throw : Error = {error, _Reason} -> Error end;
+	
 encode_packet_fully (Packet = {generic, _Type, _MetaData, _Data}) ->
 	try enforce_ok_1 (encode_packet (Packet)) of
 		NewPacket -> encode_packet_fully (NewPacket)
@@ -425,6 +436,9 @@ decode_packet_fully (Packet = {exchange, _MetaData, _Data}) ->
 	{ok, Packet};
 	
 decode_packet_fully (Packet = {resources, _MetaData, _Data}) ->
+	{ok, Packet};
+	
+decode_packet_fully (Packet = {transcript, _MetaData, _Data}) ->
 	{ok, Packet};
 	
 decode_packet_fully (Packet = {generic, _MetaData, _Data}) ->

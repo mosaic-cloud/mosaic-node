@@ -16,7 +16,7 @@
 -include ("mosaic_component_process.hrl").
 
 
--record (state, {identifier, status, harness, harness_token, harness_status, harness_options, execute, resources, router, inbound_pending_calls, outbound_pending_calls}).
+-record (state, {identifier, status, harness, harness_token, harness_status, harness_options, execute, resources, transcript, router, inbound_pending_calls, outbound_pending_calls}).
 -record (inbound_pending_call, {correlation, sender}).
 -record (outbound_pending_call, {reference, correlation}).
 
@@ -28,13 +28,13 @@ init (Disposition, Identifier, OriginalConfiguration)
 		Configuration = enforce_ok_1 (mosaic_component_process_coders:parse_configuration (Disposition, term, OriginalConfiguration)),
 		#configuration{
 				harness = HarnessOptions, execute = ExecuteSpecification,
-				resources = Resources, router = Router
+				resources = Resources, transcript = Transcript, router = Router
 		} = Configuration,
 		Status = if (Disposition =:= create) -> executing; (Disposition =:= migrate) -> pre_migrating_as_target end,
-		init (prepare, Identifier, {Status, HarnessOptions, ExecuteSpecification, Resources, Router})
+		init (prepare, Identifier, {Status, HarnessOptions, ExecuteSpecification, Resources, Router, Transcript})
 	catch throw : {error, Reason} -> {stop, Reason} end;
 	
-init (prepare, Identifier, {Status, HarnessOptions, ExecuteSpecification, Resources, Router}) ->
+init (prepare, Identifier, {Status, HarnessOptions, ExecuteSpecification, Resources, Router, Transcript}) ->
 	true = erlang:process_flag (trap_exit, true),
 	try
 		{ok, Harness, HarnessToken, HarnessStatus} = if
@@ -53,7 +53,7 @@ init (prepare, Identifier, {Status, HarnessOptions, ExecuteSpecification, Resour
 				status = Status,
 				harness = Harness, harness_token = HarnessToken, harness_status = HarnessStatus, harness_options = HarnessOptions,
 				execute = ExecuteSpecification,
-				resources = Resources, router = Router,
+				resources = Resources, transcript = Transcript, router = Router,
 				inbound_pending_calls = orddict:new (), outbound_pending_calls = orddict:new ()},
 		{ok, State}
 	catch throw : {error, Reason} -> {stop, Reason} end.
@@ -118,6 +118,8 @@ handle_info (
 			handle_register (Group, Correlation, State);
 		{acquire, Specification, Correlation} ->
 			handle_acquire (Specification, Correlation, State);
+		{transcript_push, Data} ->
+			handle_transcript_push (Data, State);
 		Packet ->
 			{stop, {error, {invalid_packet, Packet}}, State}
 	catch throw : Error = {error, _Reason} -> {stop, Error, State} end;
@@ -276,6 +278,11 @@ handle_acquire (Specification, Correlation, State = #state{identifier = Identifi
 	Outcome = mosaic_component_resources:acquire (Resources, Identifier, erlang:self (), Specification),
 	Packet = {acquire_return, Correlation, Outcome},
 	handle_info ({mosaic_component_process_internals, push_packet, Packet}, State).
+
+
+handle_transcript_push (Data, State = #state{identifier = Identifier, transcript = Transcript}) ->
+	Outcome = mosaic_component_transcript:push (Transcript, Identifier, Data),
+	{noreply, State}.
 
 
 begin_migration (source, Configuration_, CompletionFun, OldState = #state{status = executing, harness = Harness, harness_token = HarnessToken, harness_status = owner, execute = ExecuteSpecification})

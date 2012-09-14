@@ -47,26 +47,32 @@ start_daemons () ->
 	ok = case mosaic_cluster_process_configurator:start_supervised () of
 		{ok, _Configurator} ->
 			ok;
-		Error2 = {error, _Reason2} ->
-			throw (Error2)
+		Error1 = {error, _Reason1} ->
+			throw (Error1)
 	end,
 	ok = case mosaic_cluster_process_router:start_supervised () of
 		{ok, _Router} ->
 			ok;
-		Error3 = {error, _Reason3} ->
-			throw (Error3)
+		Error2 = {error, _Reason2} ->
+			throw (Error2)
 	end,
 	ok = case mosaic_cluster_component_resources:start_supervised () of
 		{ok, _Resources} ->
 			ok;
-		Error1 = {error, _Reason1} ->
-			throw (Error1)
+		Error3 = {error, _Reason3} ->
+			throw (Error3)
+	end,
+	ok = case mosaic_cluster_component_transcript:start_supervised () of
+		{ok, _Transcript} ->
+			ok;
+		Error4 = {error, _Reason4} ->
+			throw (Error4)
 	end,
 	case mosaic_webmachine:start_supervised () of
 		{ok, _Webmachine} ->
 			ok;
-		Error4 = {error, _Reason4} ->
-			throw (Error4)
+		Error5 = {error, _Reason5} ->
+			throw (Error5)
 	end,
 	ok.
 

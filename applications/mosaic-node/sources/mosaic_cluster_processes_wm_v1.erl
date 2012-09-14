@@ -22,6 +22,7 @@
 -dispatch ({[<<"v1">>, <<"processes">>, <<"stop">>], {processes, stop}}).
 -dispatch ({[<<"v1">>, <<"processes">>, <<"call">>], {processes, call}}).
 -dispatch ({[<<"v1">>, <<"processes">>, <<"cast">>], {processes, cast}}).
+-dispatch ({[<<"v1">>, <<"processes">>, <<"transcript">>], {processes, transcript}}).
 -dispatch ({[<<"v1">>, <<"processes">>, <<"ping">>], {ping}}).
 -dispatch ({[<<"v1">>, <<"processes">>, <<"nodes">>], {nodes}}).
 -dispatch ({[<<"v1">>, <<"processes">>, <<"nodes">>, <<"self">>, <<"activate">>], {nodes, self, activate}}).
@@ -107,6 +108,15 @@ malformed_request (Request, OldState = #state{target = Target, arguments = none}
 					Request) of
 				{ok, false, [Key, Operation, Inputs]} ->
 					{ok, false, OldState#state{arguments = dict:from_list ([{key, Key}, {operation, Operation}, {inputs, Inputs}])}};
+				Error = {error, true, _Reason} ->
+					Error
+			end;
+		{processes, transcript} ->
+			case mosaic_webmachine:enforce_get_request (
+					[{<<"key">>, fun mosaic_generic_coders:decode_string/1, undefined}],
+					Request) of
+				{ok, false, [Key]} ->
+					{ok, false, OldState#state{arguments = dict:from_list ([{key, Key}])}};
 				Error = {error, true, _Reason} ->
 					Error
 			end;
@@ -303,6 +313,53 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 							Error2 = {error, _Reason2} ->
 								Error2
 						end;
+					Error2 = {error, _Reason2} ->
+						Error2
+				end
+			catch throw : Error = {error, _Reason} -> Error end;
+		{processes, transcript} ->
+			try
+				Transform = fun (Record) ->
+					case Record of
+						{Key, Timestamp_, Data} ->
+							{MegaSeconds, Seconds, Microseconds} = Timestamp_,
+							Timestamp = (MegaSeconds * 1000000 + Seconds) * 1000000 + Microseconds,
+							{struct, [
+									{key, enforce_ok_1 (mosaic_component_coders:encode_component (Key))},
+									{timestamp, Timestamp},
+									{data, Data}]};
+						{Timestamp_, Data} ->
+							{MegaSeconds, Seconds, Microseconds} = Timestamp_,
+							Timestamp = (MegaSeconds * 1000000 + Seconds) * 1000000 + Microseconds,
+							{struct, [
+									{timestamp, Timestamp},
+									{data, Data}]}
+					end
+				end,
+				Key = case dict:fetch (key, Arguments) of
+					<<$#, Alias_ / binary>> ->
+						case mosaic_process_router:resolve_alias (Alias_) of
+							{ok, Key_} ->
+								Key_;
+							{error, _Reason1} ->
+								throw ({error, {unresolved_alias, Alias_}})
+						end;
+					Key_ when (byte_size (Key_) =:= 40) ->
+						case mosaic_component_coders:decode_component (Key_) of
+							{ok, Key__} ->
+								Key__;
+							{error, _Reason1} ->
+								throw ({error, {invalid_component, Key_, invalid_content}})
+						end;
+					undefined ->
+						undefined;
+					Key_ ->
+						throw ({error, {invalid_component, Key_, invalid_length}})
+				end,
+				case mosaic_component_transcript:select (Key) of
+					{ok, Records} ->
+						{ok, json_struct, [
+								{records, [Transform (Record) || Record <- Records]}]};
 					Error2 = {error, _Reason2} ->
 						Error2
 				end

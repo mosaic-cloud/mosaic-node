@@ -10,7 +10,7 @@
 
 validate_configuration (
 			Disposition,
-			#configuration{harness = HarnessOptions, execute = ExecuteSpecification, resources = Resources, router = Router})
+			#configuration{harness = HarnessOptions, execute = ExecuteSpecification, resources = Resources, transcript = Transcript, router = Router})
 		when ((Disposition =:= create) orelse (Disposition =:= migrate)) ->
 	try
 		ok = if
@@ -39,6 +39,12 @@ validate_configuration (
 				throw ({error, {invalid_resources, Resources}})
 		end,
 		ok = if
+			(is_pid (Transcript) orelse is_atom (Transcript)) ->
+				ok;
+			true ->
+				throw ({error, {invalid_transcript, Transcript}})
+		end,
+		ok = if
 			(is_pid (Router) orelse is_atom (Router)) ->
 				ok;
 			true ->
@@ -60,10 +66,10 @@ validate_configuration (Disposition, _Configuration) ->
 
 parse_configuration (Disposition, term, OriginalOptions)
 		when ((Disposition =:= create) orelse (Disposition =:= migrate)), is_list (OriginalOptions) ->
-	DefaultOptions = [{harness, defaults}, {execute, undefined}, {resources, defaults}, {router, defaults}],
+	DefaultOptions = [{harness, defaults}, {execute, undefined}, {resources, defaults}, {transcript, defaults}, {router, defaults}],
 	FinalOptions = OriginalOptions ++ DefaultOptions,
 	case lists:sort (proplists:get_keys (FinalOptions)) of
-		[execute, harness, resources, router] ->
+		[execute, harness, resources, router, transcript] ->
 			try
 				{ok, HarnessOptions} = case proplists:get_value (harness, FinalOptions) of
 					undefined ->
@@ -100,6 +106,16 @@ parse_configuration (Disposition, term, OriginalOptions)
 					Resources_ ->
 						throw ({error, {invalid_resources, Resources_}})
 				end,
+				{ok, Transcript} = case proplists:get_value (transcript, FinalOptions) of
+					undefined ->
+						throw ({error, missing_transcript});
+					defaults ->
+						{ok, mosaic_component_transcript};
+					Transcript_ when (is_pid (Transcript_) orelse is_atom (Transcript_)) ->
+						{ok, Transcript_};
+					Transcript_ ->
+						throw ({error, {invalid_transcript, Transcript_}})
+				end,
 				{ok, Router} = case proplists:get_value (router, FinalOptions) of
 					undefined ->
 						throw ({error, missing_router});
@@ -114,6 +130,7 @@ parse_configuration (Disposition, term, OriginalOptions)
 						harness = HarnessOptions,
 						execute = ExecuteSpecification,
 						resources = Resources,
+						transcript = Transcript,
 						router = Router},
 				{ok, Configuration}
 			catch

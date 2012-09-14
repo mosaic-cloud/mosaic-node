@@ -1,2 +1,2 @@
 
--record (configuration, {harness, execute, resources, router}).
+-record (configuration, {harness, execute, resources, transcript, router}).

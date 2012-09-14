@@ -343,6 +343,13 @@ encode_packet ({acquire_return, Correlation, {error, Reason}})
 					{<<"ok">>, false}, {<<"error">>, EncodedReason}], <<>>}}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
+encode_packet ({transcript_push, Data})
+		when is_binary (Data) ->
+	try
+		{ok, {transcript, [
+					{<<"action">>, <<"push">>}], Data}}
+	catch throw : Error = {error, _Reason} -> Error end;
+	
 encode_packet (Packet) ->
 	{error, {invalid_packet, Packet}}.
 
@@ -419,6 +426,17 @@ decode_packet (Packet = {resources, MetaData, Data})
 		end
 	catch throw : Error = {error, _Reason} -> Error end;
 	
+decode_packet (Packet = {transcript, MetaData, Data})
+		when is_list (MetaData), is_binary (Data) ->
+	try
+		case MetaData of
+			[{<<"action">>, <<"push">>}] ->
+				{ok, {transcript_push, Data}};
+			_ ->
+				throw ({error, {invalid_packet, Packet}})
+		end
+	catch throw : Error = {error, _Reason} -> Error end;
+	
 decode_packet (Packet) ->
 	{error, {invalid_packet, Packet}}.
 
@@ -427,6 +445,9 @@ encode_packet_fully (Packet = {exchange, _MetaData, _Data}) ->
 	{ok, Packet};
 	
 encode_packet_fully (Packet = {resources, _MetaData, _Data}) ->
+	{ok, Packet};
+	
+encode_packet_fully (Packet = {transcript, _MetaData, _Data}) ->
 	{ok, Packet};
 	
 encode_packet_fully (Packet = {generic, _MetaData, _Data}) ->
@@ -497,6 +518,11 @@ encode_packet_fully (Packet = {acquire_return, _Correlation, {error, _Reason}}) 
 		NewPacket -> encode_packet_fully (NewPacket)
 	catch throw : Error = {error, _Reason} -> Error end;
 	
+encode_packet_fully (Packet = {transcript_push, Data}) ->
+	try enforce_ok_1 (encode_packet (Packet)) of
+		NewPacket -> encode_packet_fully (NewPacket)
+	catch throw : Error = {error, _Reason} -> Error end;
+	
 encode_packet_fully (Packet) ->
 	{error, {invalid_packet, Packet}}.
 
@@ -540,6 +566,9 @@ decode_packet_fully (Packet = {acquire_return,  _Correlation, {ok, _Descriptors}
 decode_packet_fully (Packet = {acquire_return, _Correlation, {error, _Reason}}) ->
 	{ok, Packet};
 	
+decode_packet_fully (Packet = {transcript_push, _Data}) ->
+	{ok, Packet};
+	
 decode_packet_fully (Packet = {exit, _ExitStatus}) ->
 	{ok, Packet};
 	
@@ -552,6 +581,11 @@ decode_packet_fully (Packet = {exchange, _MetaData, _Data}) ->
 	catch throw : Error = {error, _Reason} -> Error end;
 	
 decode_packet_fully (Packet = {resources, _MetaData, _Data}) ->
+	try enforce_ok_1 (decode_packet (Packet)) of
+		NewPacket -> decode_packet_fully (NewPacket)
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+decode_packet_fully (Packet = {transcript, _MetaData, _Data}) ->
 	try enforce_ok_1 (decode_packet (Packet)) of
 		NewPacket -> decode_packet_fully (NewPacket)
 	catch throw : Error = {error, _Reason} -> Error end;

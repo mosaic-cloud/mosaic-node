@@ -182,6 +182,12 @@ handle_info (
 	{noreply, State};
 	
 handle_info (
+			{mosaic_harness_frontend_internals, inbound_packet, Packet = {transcript, _MetaData, _Data}},
+			State = #state{controller = Controller, controller_token = ControllerToken}) ->
+	Controller ! {mosaic_harness_frontend, ControllerToken, push_packet, Packet},
+	{noreply, State};
+	
+handle_info (
 			{mosaic_harness_frontend_internals, inbound_packet, {exit, ExitStatus}},
 			State = #state{controller = Controller, controller_token = ControllerToken}) ->
 	Controller ! {mosaic_harness_frontend, ControllerToken, exit, ExitStatus},
