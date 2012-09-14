@@ -117,7 +117,7 @@ handle_command ({mosaic_cluster, map, Mapper}, _Sender, State = #state{object_st
 					ok ->
 						Outcomes;
 					{ok, Outcome} ->
-						[Outcome, Outcomes];
+						[Outcome | Outcomes];
 					Error = {error, _Reason} ->
 						Error;
 					Return ->
