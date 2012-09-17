@@ -61,6 +61,20 @@ handle_call ({mosaic_process_router, resolve, Identifier}, _Sender, State = #sta
 		{reply, {ok, Process}, State}
 	catch throw : Error = {error, _Reason} -> {reply, Error, State} end;
 	
+handle_call ({mosaic_process_router, register_group, Group, {}}, _Sender, State = #state{})
+		when is_binary (Group), (bit_size (Group) =:= 160) ->
+	try
+		enforce_ok (execute_register_group (Group)),
+		{reply, ok, State}
+	catch throw : Error = {error, _Reason} -> {reply, Error, State} end;
+	
+handle_call ({mosaic_process_router, unregister_group, Group, {}}, _Sender, State = #state{})
+		when is_binary (Group), (bit_size (Group) =:= 160) ->
+	try
+		enforce_ok (execute_unregister_group (Group)),
+		{reply, ok, State}
+	catch throw : Error = {error, _Reason} -> {reply, Error, State} end;
+	
 handle_call ({mosaic_process_router, register_group, Group, Process}, _Sender, State = #state{})
 		when is_binary (Group), (bit_size (Group) =:= 160), is_pid (Process) ->
 	try
@@ -200,6 +214,18 @@ execute_resolve_group (Group) ->
 		Error = {error, _Reason} ->
 			Error
 	end.
+
+
+execute_register_group (Group) ->
+	Key = enforce_ok_1 (mosaic_cluster_tools:key ({mosaic_cluster_processes, group, Group})),
+	enforce_ok (mosaic_cluster_storage:include (Key, undefined, {mosaic_cluster_processes, group, Group, []})),
+	ok.
+
+
+execute_unregister_group (Group) ->
+	Key = enforce_ok_1 (mosaic_cluster_tools:key ({mosaic_cluster_processes, group, Group})),
+	enforce_ok (mosaic_cluster_storage:exculde (Key, undefined)),
+	ok.
 
 
 execute_register_group (Group, Process) ->

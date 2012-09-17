@@ -53,7 +53,7 @@ register_group (Group, Process) ->
 	register_group (mosaic_process_router, Group, Process).
 
 register_group (Delegate, Group, Process)
-		when (is_pid (Delegate) orelse is_atom (Delegate)), is_binary (Group), (bit_size (Group) =:= 160), is_pid (Process) ->
+		when (is_pid (Delegate) orelse is_atom (Delegate)), is_binary (Group), (bit_size (Group) =:= 160), (is_pid (Process) orelse (Process =:= {})) ->
 	try gen_server:call (Delegate, {mosaic_process_router, register_group, Group, Process}) of
 		ok -> ok;
 		Error = {error, _Reason} -> Error;
@@ -65,7 +65,7 @@ unregister_group (Group, Process) ->
 	unregister_group (mosaic_process_router, Group, Process).
 
 unregister_group (Delegate, Group, Process)
-		when (is_pid (Delegate) orelse is_atom (Delegate)), is_binary (Group), (bit_size (Group) =:= 160), is_pid (Process) ->
+		when (is_pid (Delegate) orelse is_atom (Delegate)), is_binary (Group), (bit_size (Group) =:= 160), (is_pid (Process) orelse (Process =:= {})) ->
 	try gen_server:call (Delegate, {mosaic_process_router, unregister_group, Group, Process}) of
 		ok -> ok;
 		Error = {error, _Reason} -> Error;
