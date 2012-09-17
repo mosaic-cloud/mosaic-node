@@ -172,11 +172,11 @@ handle_call ({mosaic_object_store, update, Key, Mutator}, _Sender, State = #stat
 			{reply, {error, {invalid_return, Return}}, State}
 	catch
 		throw : Reason ->
-			{reply, {error, {unexpected_error, Reason}}, State};
+			{reply, {error, {unexpected_error, {caught, Reason, erlang:get_stacktrace ()}}}, State};
 		error : Reason ->
-			{reply, {error, {unexpected_error, Reason}}, State};
+			{reply, {error, {unexpected_error, {caught, Reason, erlang:get_stacktrace ()}}}, State};
 		exit : Reason ->
-			{reply, {error, {unexpected_error, Reason}}, State}
+			{reply, {error, {unexpected_error, {caught, Reason, erlang:get_stacktrace ()}}}, State}
 	end;
 	
 handle_call ({mosaic_object_store, exclude, Key, Revision}, _Sender, State = #state{table = Table}) ->

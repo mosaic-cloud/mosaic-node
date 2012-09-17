@@ -122,7 +122,7 @@ handle_command ({mosaic_cluster, map, Mapper}, _Sender, State = #state{object_st
 						Error;
 					Return ->
 						{error, {invalid_return, Return}}
-				catch _ : Reason -> {error, {caught, Reason}} end
+				catch _ : Reason -> {error, {caught, Reason, erlang:get_stacktrace ()}} end
 			end, []),
 	{reply, {ok, Outcomes}, State};
 	
