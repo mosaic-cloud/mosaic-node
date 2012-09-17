@@ -53,19 +53,46 @@ handle_call (
 	catch throw : Error = {error, _Reason} -> {reply, Error, State} end;
 	
 handle_call (
-			{mosaic_component_transcript, select, Identifier}, _Sender,
+			{mosaic_component_transcript, select, Identifier}, Sender,
+			State = #state{})
+		when is_binary (Identifier), (bit_size (Identifier) =:= 160) ->
+	erlang:spawn (fun () ->
+		Outcome = try
+			Records = enforce_ok_1 (execute_select_global (Identifier)),
+			{ok, Records}
+		catch throw : Error = {error, _Reason} -> Error end,
+		_ = gen_server:reply (Sender, Outcome),
+		erlang:exit (normal)
+	end),
+	{noreply, State};
+	
+handle_call (
+			{mosaic_component_transcript, select}, Sender,
+			State = #state{}) ->
+	erlang:spawn (fun () ->
+		Outcome = try
+			Records = enforce_ok_1 (execute_select_global ()),
+			{ok, Records}
+		catch throw : Error = {error, _Reason} -> Error end,
+		_ = gen_server:reply (Sender, Outcome),
+		erlang:exit (normal)
+	end),
+	{noreply, State};
+	
+handle_call (
+			{mosaic_component_transcript, select_local, Identifier}, _Sender,
 			State = #state{table = Table})
 		when is_binary (Identifier), (bit_size (Identifier) =:= 160) ->
 	try
-		Records = enforce_ok_1 (execute_select (Identifier, Table)),
+		Records = enforce_ok_1 (execute_select_local (Identifier, Table)),
 		{reply, {ok, Records}, State}
 	catch throw : Error = {error, _Reason} -> {reply, Error, State} end;
 	
 handle_call (
-			{mosaic_component_transcript, select}, _Sender,
+			{mosaic_component_transcript, select_local}, _Sender,
 			State = #state{table = Table}) ->
 	try
-		Records = enforce_ok_1 (execute_select (Table)),
+		Records = enforce_ok_1 (execute_select_local (Table)),
 		{reply, {ok, Records}, State}
 	catch throw : Error = {error, _Reason} -> {reply, Error, State} end;
 	
@@ -93,17 +120,37 @@ execute_push (Identifier, Data, Table) ->
 	ok.
 
 
-execute_select (Identifier, Table) ->
-	execute_select ({Identifier, {0, 0, 0}}, Table, []).
+execute_select_global () ->
+	execute_select_global_ ({mosaic_component_transcript, select_local}).
 
-execute_select (PreviousKey = {Identifier, _PreviousTimestamp}, Table, PreviousRecords) ->
+execute_select_global (Identifier) ->
+	execute_select_global_ ({mosaic_component_transcript, select_local, Identifier}).
+
+execute_select_global_ (Request) ->
+	Nodes = enforce_ok_1 (mosaic_cluster_tools:ring_nodes ()),
+	{Replies, _FailedNodes} = gen_server:multi_call (Nodes, mosaic_component_transcript, Request),
+	Records = lists:foldl (
+			fun
+				({_Node, {ok, Records}}, CollectedRecords) ->
+					Records ++ CollectedRecords;
+				({_Node, {error, _Reason}}, CollectedRecords) ->
+					CollectedRecords
+			end,
+			[], Replies),
+	{ok, Records}.
+
+
+execute_select_local (Identifier, Table) ->
+	execute_select_local ({Identifier, {0, 0, 0}}, Table, []).
+
+execute_select_local (PreviousKey = {Identifier, _PreviousTimestamp}, Table, PreviousRecords) ->
 	case ets:next (Table, PreviousKey) of
 		CurrentKey = {Identifier, CurrentTimestamp} ->
 			case ets:lookup (Table, CurrentKey) of
 				[{CurrentKey, CurrentData}] ->
-					execute_select (CurrentKey, Table, [{CurrentTimestamp, CurrentData} | PreviousRecords]);
+					execute_select_local (CurrentKey, Table, [{CurrentTimestamp, CurrentData} | PreviousRecords]);
 				[] ->
-					execute_select (CurrentKey, Table, PreviousRecords)
+					execute_select_local (CurrentKey, Table, PreviousRecords)
 			end;
 		{OtherIdentifier, _OtherTimestamp} when (OtherIdentifier =/= Identifier) ->
 			{ok, PreviousRecords};
@@ -112,7 +159,7 @@ execute_select (PreviousKey = {Identifier, _PreviousTimestamp}, Table, PreviousR
 	end.
 
 
-execute_select (Table) ->
+execute_select_local (Table) ->
 	{ok, ets:foldl (
 			fun ({{Identifier, Timestamp}, Data}, PreviousRecords) ->
 				[{Identifier, Timestamp, Data} | PreviousRecords]
