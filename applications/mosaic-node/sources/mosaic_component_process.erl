@@ -269,7 +269,7 @@ handle_outbound_cast (Component, Operation, Inputs, Data, State = #state{status 
 
 
 handle_register (Group, Correlation, State = #state{router = Router}) ->
-	Outcome = mosaic_process_router:register (Router, Group, erlang:self ()),
+	Outcome = mosaic_process_router:register_group (Router, Group, erlang:self ()),
 	Packet = {register_return, Correlation, Outcome},
 	handle_info ({mosaic_component_process_internals, push_packet, Packet}, State).
 

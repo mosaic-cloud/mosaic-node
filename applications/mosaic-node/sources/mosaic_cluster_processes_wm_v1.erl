@@ -289,11 +289,11 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			try
 				Key = case dict:fetch (key, Arguments) of
 					<<$#, Alias_ / binary>> ->
-						case mosaic_process_router:resolve_alias (Alias_) of
+						case mosaic_process_router:generate_alias (Alias_) of
 							{ok, Key_} ->
 								Key_;
 							{error, _Reason1} ->
-								throw ({error, {unresolved_alias, Alias_}})
+								throw ({error, {invalid_alias, Alias_}})
 						end;
 					Key_ when (byte_size (Key_) =:= 40) ->
 						case mosaic_component_coders:decode_component (Key_) of
@@ -338,11 +338,11 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 				end,
 				Key = case dict:fetch (key, Arguments) of
 					<<$#, Alias_ / binary>> ->
-						case mosaic_process_router:resolve_alias (Alias_) of
+						case mosaic_process_router:generate_alias (Alias_) of
 							{ok, Key_} ->
 								Key_;
 							{error, _Reason1} ->
-								throw ({error, {unresolved_alias, Alias_}})
+								throw ({error, {invalid_alias, Alias_}})
 						end;
 					Key_ when (byte_size (Key_) =:= 40) ->
 						case mosaic_component_coders:decode_component (Key_) of
@@ -368,11 +368,11 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			try
 				Key = case dict:fetch (key, Arguments) of
 					<<$#, Alias_ / binary>> ->
-						case mosaic_process_router:resolve_alias (Alias_) of
+						case mosaic_process_router:generate_alias (Alias_) of
 							{ok, Key_} ->
 								Key_;
 							{error, _Reason1} ->
-								throw ({error, {unresolved_alias, Alias_}})
+								throw ({error, {invalid_alias, Alias_}})
 						end;
 					Key_ when (byte_size (Key_) =:= 40) ->
 						case mosaic_component_coders:decode_component (Key_) of

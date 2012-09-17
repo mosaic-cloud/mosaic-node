@@ -85,8 +85,8 @@ handle_info (Message, State = #state{}) ->
 
 
 execute_configure (Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent) ->
-	FunctionKey = enforce_ok_1 (mosaic_cluster_tools:key ({mosaic_cluster_processes, configurator, Type, ConfigurationEncoding})),
-	case mosaic_cluster_storage:select (FunctionKey) of
+	Key = enforce_ok_1 (mosaic_cluster_tools:key ({mosaic_cluster_processes, configurator, Type, ConfigurationEncoding})),
+	case mosaic_cluster_storage:select (Key) of
 		{ok, undefined, {mosaic_cluster_processes, configurator, Type, ConfigurationEncoding, Function, _Annotation}} when is_function (Function, 5) ->
 			try erlang:apply (Function, [Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent]) of
 				Outcome = {ok, Module, _Configuration} when is_atom (Module) ->
@@ -114,23 +114,15 @@ execute_configure (Type, Disposition, Identifier, ConfigurationEncoding, Configu
 
 
 execute_register (Type, ConfigurationEncoding, Function, Annotation) ->
-	FunctionKey = enforce_ok_1 (mosaic_cluster_tools:key ({mosaic_cluster_processes, configurator, Type, ConfigurationEncoding})),
-	case mosaic_cluster_storage:include (FunctionKey, undefined, {mosaic_cluster_processes, configurator, Type, ConfigurationEncoding, Function, Annotation}) of
-		ok ->
-			ok;
-		Error = {error, _Reason} ->
-			Error
-	end.
+	Key = enforce_ok_1 (mosaic_cluster_tools:key ({mosaic_cluster_processes, configurator, Type, ConfigurationEncoding})),
+	enforce_ok (mosaic_cluster_storage:include (Key, undefined, {mosaic_cluster_processes, configurator, Type, ConfigurationEncoding, Function, Annotation})),
+	ok.
 
 
 execute_unregister (Type, ConfigurationEncoding) ->
-	FunctionKey = enforce_ok_1 (mosaic_cluster_tools:key ({mosaic_cluster_processes, configurator, Type, ConfigurationEncoding})),
-	case mosaic_cluster_storage:exculde (FunctionKey, undefined) of
-		ok ->
-			ok;
-		Error = {error, _Reason} ->
-			Error
-	end.
+	Key = enforce_ok_1 (mosaic_cluster_tools:key ({mosaic_cluster_processes, configurator, Type, ConfigurationEncoding})),
+	enforce_ok (mosaic_cluster_storage:exculde (Key, undefined)),
+	ok.
 
 
 execute_select () ->

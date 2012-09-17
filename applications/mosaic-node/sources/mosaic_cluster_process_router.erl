@@ -21,13 +21,13 @@ start_link (QualifiedName, Configuration) ->
 	mosaic_process_tools:start_link (gen_server, mosaic_cluster_process_router, QualifiedName, Configuration).
 
 
--record (state, {qualified_name, aliases}).
+-record (state, {qualified_name}).
 
 
 init ({QualifiedName, defaults}) ->
 	try
 		ok = enforce_ok (mosaic_process_tools:ensure_registered (QualifiedName)),
-		State = #state{qualified_name = QualifiedName, aliases = orddict:new ()},
+		State = #state{qualified_name = QualifiedName},
 		{ok, State}
 	catch throw : {error, Reason} -> {stop, Reason} end.
 
@@ -41,87 +41,70 @@ code_change (_OldVsn, State = #state{}, _Arguments) ->
 
 
 handle_call ({mosaic_process_router, call, Identifier, Operation, Inputs, Data}, Sender, State = #state{})
-		when is_binary (Identifier), (bit_size (Identifier) =:= 160), is_binary (Operation), is_binary (Data) ->
-	handle_cast ({mosaic_process_router, call, Identifier, Operation, Inputs, Data, Sender}, State);
-	
-handle_call ({mosaic_process_router, call, Identifier, Operation, Inputs, Data, FinalSender}, Sender, State = #state{})
-		when is_binary (Identifier), (bit_size (Identifier) =:= 160), is_binary (Operation), is_binary (Data) ->
-	gen_server:reply (Sender, ok),
-	handle_cast ({mosaic_process_router, call, Identifier, Operation, Inputs, Data, FinalSender}, State);
-	
-handle_call ({mosaic_process_router, resolve, Identifier}, _Sender, State = #state{})
-		when is_binary (Identifier), (bit_size (Identifier) =:= 160) ->
+		when is_binary (Identifier), is_binary (Operation), is_binary (Data) ->
 	try
-		Process = enforce_ok_1 (execute_resolve (Identifier)),
-		{reply, {ok, Process}, State}
-	catch throw : Error = {error, _Reason} -> {reply, Error, State} end;
+		enforce_ok (execute_call (Identifier, Operation, Inputs, Data, Sender)),
+		{noreply, State}
+	catch throw : _Error = {error, _Reason} -> {noreply, State} end;
 	
-handle_call ({mosaic_process_router, register, Identifier, Process}, _Sender, State = #state{})
-		when is_binary (Identifier), (bit_size (Identifier) =:= 160), is_pid (Process) ->
+handle_call ({mosaic_process_router, call, Identifier, Operation, Inputs, Data, FinalSender}, _Sender, State = #state{})
+		when is_binary (Identifier), is_binary (Operation), is_binary (Data) ->
 	try
-		Mutator = fun
-						({_Identifier_, none, Processes}) ->
-							{ok, none, [Process | Processes]};
-						({_Identifier_}) ->
-							{ok, none, [Process]}
-					end,
-		ok = enforce_ok (mosaic_cluster_storage:update (Identifier, Mutator)),
+		enforce_ok (execute_call (Identifier, Operation, Inputs, Data, FinalSender)),
 		{reply, ok, State}
 	catch throw : Error = {error, _Reason} -> {reply, Error, State} end;
 	
-handle_call ({mosaic_process_router, unregister, Identifier, Process}, _Sender, State = #state{})
-		when is_binary (Identifier), (bit_size (Identifier) =:= 160), is_pid (Process) ->
-	{reply, {error, unsupported_request}, State};
-	
-handle_call ({mosaic_process_router, resolve_alias, Alias}, _Sender, State = #state{aliases = Aliases})
-		when  is_binary (Alias), (byte_size (Alias) > 0) ->
-	case orddict:find (Alias, Aliases) of
-		{ok, Identifier} ->
-			{reply, {ok, Identifier}, State};
-		error ->
-			{reply, {error, does_not_exist}, State}
-	end;
-	
-handle_call ({mosaic_process_router, register_alias, Alias, Identifier}, _Sender, OldState = #state{aliases = OldAliases})
-		when is_binary (Alias), (byte_size (Alias) > 0), is_binary (Identifier), (bit_size (Identifier) =:= 160) ->
+handle_call ({mosaic_process_router, resolve, Identifier}, _Sender, State = #state{})
+		when is_binary (Identifier) ->
 	try
-		Registered = orddict:is_key (Alias, OldAliases),
-		ok = if
-			Registered -> throw ({error, already_exists});
-			true -> ok
-		end,
-		NewAliases = orddict:store (Alias, Identifier, OldAliases),
-		NewState = OldState#state{aliases = NewAliases},
-		{reply, ok, NewState}
-	catch throw : Error = {error, _Reason} -> {reply, Error, OldState} end;
+		Process = enforce_ok_1 (execute_resolve_all (Identifier)),
+		{reply, {ok, Process}, State}
+	catch throw : Error = {error, _Reason} -> {reply, Error, State} end;
+	
+handle_call ({mosaic_process_router, register_group, Group, Process}, _Sender, State = #state{})
+		when is_binary (Group), (bit_size (Group) =:= 160), is_pid (Process) ->
+	try
+		enforce_ok (execute_register_group (Group, Process)),
+		{reply, ok, State}
+	catch throw : Error = {error, _Reason} -> {reply, Error, State} end;
+	
+handle_call ({mosaic_process_router, unregister_group, Group, Process}, _Sender, State = #state{})
+		when is_binary (Group), (bit_size (Group) =:= 160), is_pid (Process) ->
+	try
+		enforce_ok (execute_unregister_group (Group, Process)),
+		{reply, ok, State}
+	catch throw : Error = {error, _Reason} -> {reply, Error, State} end;
+	
+handle_call ({mosaic_process_router, register_alias, Alias, Identifier}, _Sender, State = #state{})
+		when is_binary (Alias), (bit_size (Alias) =:= 160), is_binary (Identifier), (bit_size (Identifier) =:= 160) ->
+	try
+		enforce_ok (execute_register_alias (Alias, Identifier)),
+		{reply, ok, State}
+	catch throw : Error = {error, _Reason} -> {reply, Error, State} end;
 	
 handle_call ({mosaic_process_router, unregister_alias, Alias}, _Sender, State = #state{})
-		when  is_binary (Alias), (byte_size (Alias) > 0) ->
-	{reply, {error, unsupported_request}, State};
+		when  is_binary (Alias), (bit_size (Alias) =:= 160) ->
+	try
+		enforce_ok (execute_unregister_alias (Alias)),
+		{reply, ok, State}
+	catch throw : Error = {error, _Reason} -> {reply, Error, State} end;
 	
 handle_call (Request, _Sender, State = #state{}) ->
 	Error = {error, {invalid_request, Request}},
 	{stop, Error, Error, State}.
 
 
-handle_cast ({mosaic_process_router, call, Identifier, Operation, Inputs, Data, Sender = {SenderProcess, SenderReference}}, State = #state{})
-		when is_binary (Identifier), (bit_size (Identifier) =:= 160), is_binary (Operation), is_binary (Data),
-				is_pid (SenderProcess), is_reference (SenderReference) ->
+handle_cast ({mosaic_process_router, call, Identifier, Operation, Inputs, Data, Sender}, State = #state{})
+		when is_binary (Identifier), is_binary (Operation), is_binary (Data) ->
 	try
-		Process = enforce_ok_1 (execute_resolve (Identifier)),
-		Process ! {'$gen_call', Sender, {mosaic_process, call, Operation, Inputs, Data}},
+		enforce_ok (execute_call (Identifier, Operation, Inputs, Data, Sender)),
 		{noreply, State}
-	catch
-		throw : Error = {error, _Reason} ->
-			_ = gen_server:reply (Sender, Error),
-			{noreply, State}
-	end;
+	catch throw : {error, _Reason} -> {noreply, State} end;
 	
 handle_cast ({mosaic_process_router, cast, Identifier, Operation, Inputs, Data}, State = #state{})
-		when is_binary (Identifier), (bit_size (Identifier) =:= 160), is_binary (Operation), is_binary (Data) ->
+		when is_binary (Identifier), is_binary (Operation), is_binary (Data) ->
 	try
-		Process = enforce_ok_1 (execute_resolve (Identifier)),
-		Process ! {'$gen_cast', {mosaic_process, cast, Operation, Inputs, Data}},
+		enforce_ok (execute_cast (Identifier, Operation, Inputs, Data)),
 		{noreply, State}
 	catch throw : {error, _Reason} -> {noreply, State} end;
 	
@@ -133,41 +116,137 @@ handle_info (Message, State = #state{}) ->
 	{stop, {error, {invalid_message, Message}}, State}.
 
 
-execute_resolve (Identifier) ->
+execute_call (Identifier, Operation, Inputs, Data, Sender) ->
+	try
+		Process = enforce_ok_1 (execute_resolve_all (Identifier)),
+		Process ! {'$gen_call', Sender, {mosaic_process, call, Operation, Inputs, Data}},
+		ok
+	catch
+		throw : Error = {error, _Reason} ->
+			gen_server:reply (Sender, Error),
+			Error
+	end.
+
+
+execute_cast (Identifier, Operation, Inputs, Data) ->
+	Process = enforce_ok_1 (execute_resolve_all (Identifier)),
+	Process ! {'$gen_cast', {mosaic_process, cast, Operation, Inputs, Data}},
+	ok.
+
+
+execute_resolve_all (Name)
+		when is_binary (Name), (bit_size (Name) =:= 160) ->
+	execute_resolve_all ({process, Name});
+	
+execute_resolve_all ({process, Identifier}) ->
 	case mosaic_cluster_processes:resolve (Identifier) of
 		Outcome = {ok, _Process} ->
 			Outcome;
 		{error, does_not_exist} ->
-			case mosaic_cluster_storage:select (Identifier) of
-				{ok, none, RegisteredProcesses} ->
-					LiveProcesses = lists:filter (
-								fun (Process) ->
-									Monitor = erlang:monitor (process, Process),
-									receive
-										{'DOWN', Monitor, process, Process, _} ->
-											false
-									after 0 ->
-										true = demonitor(Monitor, [flush]),
-										true
-									end
-								end,
-								RegisteredProcesses),
-					case LiveProcesses of
-						[] ->
-							{error, {noproc, group_is_empty}};
-						_ ->
-							Process = lists:nth (random:uniform (erlang:length (LiveProcesses)), LiveProcesses),
-							{ok, Process}
-					end;
-				{ok, undefined, {mosaic_cluster_processes, definition, _, _, _}} ->
-					{error, {noproc, process_does_not_exist}};
-				{ok, _, _} ->
-					{error, {noproc, resolve_failed}};
-				{error, does_not_exist} ->
-					{error, {noproc, process_does_not_exist}};
-				{error, Reason} ->
-					{error, {noproc, {resolve_failed, Reason}}}
-			end;
+			execute_resolve_all ({group, Identifier});
 		{error, Reason} ->
-			{error, {noproc, {resolve_failed, Reason}}}
+			{error, {noproc, Reason}}
+	end;
+	
+execute_resolve_all ({group, Identifier}) ->
+	case execute_resolve_group (Identifier) of
+		Outcome = {ok, _Process} ->
+			Outcome;
+		{error, group_not_registered} ->
+			execute_resolve_all ({alias, Identifier});
+		{error, Reason} ->
+			{error, {noproc, Reason}}
+	end;
+	
+execute_resolve_all ({alias, Alias}) ->
+	case execute_resolve_alias (Alias) of
+		{ok, Identifier} ->
+			% FIXME: Possible infinite recursion starting from here...
+			execute_resolve_all ({process, Identifier});
+		{error, alias_not_registered} ->
+			{error, noproc};
+		{error, Reason} ->
+			{error, {noproc, Reason}}
 	end.
+
+
+execute_resolve_group (Group) ->
+	Key = enforce_ok_1 (mosaic_cluster_tools:key ({mosaic_cluster_processes, group, Group})),
+	case mosaic_cluster_storage:select (Key) of
+		{ok, undefined, {mosaic_cluster_processes, group, Group, Processes}} ->
+			LiveProcesses = lists:filter (
+						fun (Process) ->
+							Monitor = erlang:monitor (process, Process),
+							receive
+								{'DOWN', Monitor, process, Process, _} ->
+									false
+							after 0 ->
+								true = demonitor(Monitor, [flush]),
+								true
+							end
+						end,
+						Processes),
+			case LiveProcesses of
+				[] ->
+					{error, group_is_empty};
+				_ ->
+					Process = lists:nth (random:uniform (erlang:length (LiveProcesses)), LiveProcesses),
+					{ok, Process}
+			end;
+		{ok, _, _} ->
+			{error, group_not_registered};
+		{error, does_not_exist} ->
+			{error, group_not_registered};
+		Error = {error, _Reason} ->
+			Error
+	end.
+
+
+execute_register_group (Group, Process) ->
+	Key = enforce_ok_1 (mosaic_cluster_tools:key ({mosaic_cluster_processes, group, Group})),
+	Mutator = fun
+			({Key_, undefined, {mosaic_cluster_processes, group, Group_, Processes}}) when (Key_ =:= Key), (Group_ =:= Group) ->
+				{ok, undefined, {mosaic_cluster_processes, group, Group, [Process | Processes]}};
+			({Key_}) when (Key_ =:= Key) ->
+				{ok, undefined, {mosaic_cluster_processes, group, Group, [Process]}}
+	end,
+	enforce_ok (mosaic_cluster_storage:update (Key, Mutator)),
+	ok.
+
+
+execute_unregister_group (Group, Process) ->
+	Key = enforce_ok_1 (mosaic_cluster_tools:key ({mosaic_cluster_processes, group, Group})),
+	Mutator = fun
+			({Key_, undefined, {mosaic_cluster_processes, group, Group_, Processes}}) when (Key_ =:= Key), (Group_ =:= Group) ->
+				{ok, undefined, {mosaic_cluster_processes, group, Group, lists:delete (Process, Processes)}};
+			({Key_}) when (Key_ =:= Key) ->
+				{ok, undefined, {mosaic_cluster_processes, group, Group, []}}
+	end,
+	enforce_ok (mosaic_cluster_storage:update (Key, Mutator)),
+	ok.
+
+
+execute_resolve_alias (Alias) ->
+	Key = enforce_ok_1 (mosaic_cluster_tools:key ({mosaic_cluster_processes, alias, Alias})),
+	case mosaic_cluster_storage:select (Key) of
+		{ok, undefined, {mosaic_cluster_processes, alias, Alias, Identifier}} ->
+			{ok, Identifier};
+		{ok, _, _} ->
+			{error, alias_not_registered};
+		{error, does_not_exist} ->
+			{error, alias_not_registered};
+		Error = {error, _Reason} ->
+			Error
+	end.
+
+
+execute_register_alias (Alias, Identifier) ->
+	Key = enforce_ok_1 (mosaic_cluster_tools:key ({mosaic_cluster_processes, alias, Alias})),
+	enforce_ok (mosaic_cluster_storage:include (Key, undefined, {mosaic_cluster_processes, alias, Alias, Identifier})),
+	ok.
+
+
+execute_unregister_alias (Alias) ->
+	Key = enforce_ok_1 (mosaic_cluster_tools:key ({mosaic_cluster_processes, alias, Alias})),
+	enforce_ok (mosaic_cluster_storage:exculde (Key, undefined)),
+	ok.

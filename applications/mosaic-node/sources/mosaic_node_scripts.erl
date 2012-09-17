@@ -102,7 +102,8 @@ execute ({initialize}) ->
 	execute ({define, defaults});
 	
 execute ({define, {process_alias, Alias, Identifier}}) ->
-	ok = mosaic_process_router:register_alias (Alias, Identifier);
+	{ok, Alias_} = mosaic_process_router:generate_alias (Alias),
+	ok = mosaic_process_router:register_alias (Alias_, Identifier);
 	
 execute ({define, {process_configurator, Type, ConfigurationEncoding, Function}}) ->
 	ok = mosaic_process_configurator:register (Type, ConfigurationEncoding, Function);

@@ -3,8 +3,9 @@
 
 
 -export ([call/5, call/6, cast/4, cast/5]).
--export ([resolve/1, resolve/2, register/2, register/3, unregister/2, unregister/3]).
--export ([resolve_alias/1, register_alias/2, unregister_alias/1]).
+-export ([resolve/1, resolve/2]).
+-export ([register_group/2, register_group/3, unregister_group/2, unregister_group/3]).
+-export ([resolve_alias/1, register_alias/2, unregister_alias/1, generate_alias/1]).
 
 
 call (Identifier, Operation, Inputs, Data, Sender) ->
@@ -48,24 +49,24 @@ resolve (Delegate, Identifier)
 	gen_server:call (Delegate, {mosaic_process_router, resolve, Identifier}).
 
 
-register (Identifier, Process) ->
-	register (mosaic_process_router, Identifier, Process).
+register_group (Group, Process) ->
+	register_group (mosaic_process_router, Group, Process).
 
-register (Delegate, Identifier, Process)
-		when (is_pid (Delegate) orelse is_atom (Delegate)), is_binary (Identifier), (bit_size (Identifier) =:= 160), is_pid (Process) ->
-	try gen_server:call (Delegate, {mosaic_process_router, register, Identifier, Process}) of
+register_group (Delegate, Group, Process)
+		when (is_pid (Delegate) orelse is_atom (Delegate)), is_binary (Group), (bit_size (Group) =:= 160), is_pid (Process) ->
+	try gen_server:call (Delegate, {mosaic_process_router, register_group, Group, Process}) of
 		ok -> ok;
 		Error = {error, _Reason} -> Error;
 		Reply -> {error, {invalid_reply, Reply}}
 	catch exit : {Reason, {gen_server, call, _}} -> {error, Reason} end.
 
 
-unregister (Identifier, Process) ->
-	unregister (mosaic_process_router, Identifier, Process).
+unregister_group (Group, Process) ->
+	unregister_group (mosaic_process_router, Group, Process).
 
-unregister (Delegate, Identifier, Process)
-		when (is_pid (Delegate) orelse is_atom (Delegate)), is_binary (Identifier), (bit_size (Identifier) =:= 160), is_pid (Process) ->
-	try gen_server:call (Delegate, {mosaic_process_router, unregister, Identifier, Process}) of
+unregister_group (Delegate, Group, Process)
+		when (is_pid (Delegate) orelse is_atom (Delegate)), is_binary (Group), (bit_size (Group) =:= 160), is_pid (Process) ->
+	try gen_server:call (Delegate, {mosaic_process_router, unregister_group, Group, Process}) of
 		ok -> ok;
 		Error = {error, _Reason} -> Error;
 		Reply -> {error, {invalid_reply, Reply}}
@@ -107,3 +108,7 @@ unregister_alias (Delegate, Alias)
 		Error = {error, _Reason} -> Error;
 		Reply -> {error, {invalid_reply, Reply}}
 	catch exit : {Reason, {gen_server, call, _}} -> {error, Reason} end.
+
+
+generate_alias (Token) ->
+	mosaic_cluster_tools:key ({mosaic_process_router, alias, Token}).
