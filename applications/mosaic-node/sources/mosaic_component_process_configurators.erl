@@ -4,34 +4,59 @@
 
 -export ([configure/7]).
 -export ([configure_hardcoded/6]).
+-export ([configure_static/6]).
 
 
 -import (mosaic_enforcements, [enforce_ok_1/1]).
 
 
-configure (ConfigureCreate, Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent, defaults) ->
-	configure (ConfigureCreate, Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent, []);
-	
 configure (ConfigureCreate, Type, create, Identifier, term, OriginalConfiguration, ExtraOptions)
-		when is_function (ConfigureCreate, 4), is_atom (Type), is_binary (Identifier), is_list (ExtraOptions) ->
+		when is_function (ConfigureCreate, 4), is_atom (Type), is_binary (Identifier) ->
 	case ConfigureCreate (Type, Identifier, OriginalConfiguration, ExtraOptions) of
-		{ok, Options} ->
+		{ok, Options} when is_list (Options) ->
 			case mosaic_component_process_coders:parse_configuration (create, term, Options) of
 				{ok, Configuration} ->
 					{ok, mosaic_component_process, Configuration};
 				Error = {error, _Reason} ->
 					Error
 			end;
+		Outcome = {ok, Module, _Configuration} when is_atom (Module) ->
+			Outcome;
 		Error = {error, _Reason} ->
 			Error
 	end;
 	
-configure (ConfigureCreate, Type, {migrate, source}, Identifier, term, defaults, ExtraOptions)
-		when is_function (ConfigureCreate, 4), is_atom (Type), is_binary (Identifier), is_list (ExtraOptions) ->
+configure (ConfigureCreate, Type, {migrate, Disposition}, Identifier, term, Configuration, ExtraOptions)
+		when is_function (ConfigureCreate, 4), is_atom (Type), ((Disposition =:= source) orelse (Disposition =:= target)), is_binary (Identifier) ->
+	configure_migrate (Disposition, Type, Identifier, Configuration, ExtraOptions);
+	
+configure (ConfigureCreate, Type, Disposition, Identifier, term, _Configuration, _ExtraOptions)
+		when is_function (ConfigureCreate, 4), is_atom (Type), is_binary (Identifier) ->
+	{error, {invalid_disposition, Disposition}};
+	
+configure (ConfigureCreate, Type, Disposition, Identifier, json, null, ExtraOptions) ->
+	configure (ConfigureCreate, Type, Disposition, Identifier, term, defaults, ExtraOptions);
+	
+configure (ConfigureCreate, Type, Disposition, Identifier, json, {struct, []}, ExtraOptions) ->
+	configure (ConfigureCreate, Type, Disposition, Identifier, term, defaults, ExtraOptions);
+	
+configure (ConfigureCreate, Type, Disposition, Identifier, json, Configuration, ExtraOptions) ->
+	configure (ConfigureCreate, Type, Disposition, Identifier, term, {json, Configuration}, ExtraOptions);
+	
+configure (ConfigureCreate, Type, _Disposition, Identifier, ConfigurationEncoding, _Configuration, _ExtraOptions)
+		when is_function (ConfigureCreate, 4), is_atom (Type), is_binary (Identifier) ->
+	{error, {invalid_configuration_encoding, ConfigurationEncoding}}.
+
+
+configure_migrate (Disposition, Type, Identifier, Configuration, defaults) ->
+	configure_migrate (Disposition, Type, Identifier, Configuration, []);
+	
+configure_migrate (source, Type, Identifier, defaults, ExtraOptions)
+		when is_atom (Type), is_binary (Identifier), is_list (ExtraOptions) ->
 	{ok, none, defaults};
 	
-configure (ConfigureCreate, Type, {migrate, target}, Identifier, term, defaults, ExtraOptions)
-		when is_function (ConfigureCreate, 4), is_atom (Type), is_binary (Identifier), is_list (ExtraOptions) ->
+configure_migrate (target, Type, Identifier, defaults, ExtraOptions)
+		when is_atom (Type), is_binary (Identifier), is_list (ExtraOptions) ->
 	Options = [
 			{harness, [
 				{argument0, <<"[", "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]}
@@ -43,25 +68,22 @@ configure (ConfigureCreate, Type, {migrate, target}, Identifier, term, defaults,
 			Error
 	end;
 	
-configure (ConfigureCreate, Type, Disposition, Identifier, term, _Configuration, ExtraOptions)
-		when is_function (ConfigureCreate, 4), is_atom (Type), is_binary (Identifier), is_list (ExtraOptions) ->
-	{error, {invalid_disposition, Disposition}};
+configure_migrate (Disposition, Type, Identifier, defaults, ExtraOptions)
+		when ((Disposition =:= source) orelse (Disposition =:= target)), is_atom (Type), is_binary (Identifier) ->
+	{error, {invalid_extra_options, ExtraOptions}};
 	
-configure (ConfigureCreate, Type, Disposition, Identifier, json, null, ExtraOptions) ->
-	configure (ConfigureCreate, Type, Disposition, Identifier, term, defaults, ExtraOptions);
-	
-configure (ConfigureCreate, Type, Disposition, Identifier, json, {struct, []}, ExtraOptions) ->
-	configure (ConfigureCreate, Type, Disposition, Identifier, term, defaults, ExtraOptions);
-	
-configure (ConfigureCreate, Type, Disposition, Identifier, json, Configuration, ExtraOptions) ->
-	configure (ConfigureCreate, Type, Disposition, Identifier, term, {json, Configuration}, ExtraOptions).
-
+configure_migrate (Disposition, Type, Identifier, Configuration, _ExtraOptions)
+		when ((Disposition =:= source) orelse (Disposition =:= target)), is_atom (Type), is_binary (Identifier) ->
+	{error, {invalid_configuration, Configuration}}.
 
 
 configure_hardcoded (Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent, ExtraOptions) ->
 	configure (fun configure_create_hardcoded/4, Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent, ExtraOptions).
 
 
+configure_create_hardcoded (Type, Identifier, Configuration, defaults) ->
+	configure_create_hardcoded (Type, Identifier, Configuration, []);
+	
 configure_create_hardcoded (Type, Identifier, Configuration, ExtraOptions)
 		when is_atom (Type), is_binary (Identifier), is_list (ExtraOptions) ->
 	
@@ -112,7 +134,11 @@ configure_create_hardcoded (Type, Identifier, Configuration, ExtraOptions)
 		
 		_ ->
 			{error, {invalid_type, Type}}
-	end.
+	end;
+	
+configure_create_hardcoded (Type, Identifier, _Configuration, ExtraOptions)
+		when is_atom (Type), is_binary (Identifier) ->
+	{error, {invalid_extra_options, ExtraOptions}}.
 
 
 configure_create_generic_component (Identifier, ExecutableName, defaults, ExtraOptions)
@@ -269,4 +295,33 @@ configure_create_exec_component (Identifier, {json, [Executable, Arguments]}, Ex
 	
 configure_create_exec_component (Identifier, Configuration, ExtraOptions)
 		when is_binary (Identifier), is_list (ExtraOptions) ->
+	{error, {invalid_configuration, Configuration}}.
+
+
+configure_static (Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent, ExtraOptions) ->
+	configure (fun configure_create_static/4, Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent, ExtraOptions).
+
+
+configure_create_static (Type, Identifier, Configuration, defaults) ->
+	configure_create_static (Type, Identifier, Configuration, []);
+	
+configure_create_static (Type, Identifier, Configuration, {json, {struct, Context}}) ->
+	configure_create_static (Type, Identifier, Configuration, Context);
+	
+configure_create_static (_, Identifier, defaults, Context)
+		when is_list (Context) ->
+	try
+		case lists:sort (Context) of
+			[{<<"configuration">>, Configuration}, {<<"type">>, <<$#, Type_ / binary>>}] ->
+				Type = enforce_ok_1 (mosaic_generic_coders:decode_atom (Type_)),
+				configure_hardcoded (Type, create, Identifier, json, Configuration, defaults);
+			_ ->
+				{error, {invalid_context, Context}}
+		end
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+configure_create_static (_Type, _Identifier, defaults, Context) ->
+	{error, {invalid_context, Context}};
+	
+configure_create_static (_Type, _Identifier, Configuration, _Context) ->
 	{error, {invalid_configuration, Configuration}}.

@@ -18,6 +18,7 @@
 -dispatch ({[<<"v1">>, <<"processes">>, <<"keys">>], {processes, keys}}).
 -dispatch ({[<<"v1">>, <<"processes">>, <<"descriptors">>], {processes, descriptors}}).
 -dispatch ({[<<"v1">>, <<"processes">>, <<"configurators">>], {processes, configurators}}).
+-dispatch ({[<<"v1">>, <<"processes">>, <<"configurators">>, <<"register">>], {processes, configurators, register}}).
 -dispatch ({[<<"v1">>, <<"processes">>, <<"create">>], {processes, create}}).
 -dispatch ({[<<"v1">>, <<"processes">>, <<"stop">>], {processes, stop}}).
 -dispatch ({[<<"v1">>, <<"processes">>, <<"call">>], {processes, call}}).
@@ -62,6 +63,20 @@ malformed_request (Request, OldState = #state{target = Target, arguments = none}
 			mosaic_webmachine:enforce_get_request ([], Request);
 		{processes, configurators} ->
 			mosaic_webmachine:enforce_get_request ([], Request);
+		{processes, configurators, register} ->
+			case mosaic_webmachine:enforce_get_request (
+					[
+						{<<"type">>, fun mosaic_generic_coders:decode_string/1},
+						{<<"backend_module">>, fun mosaic_generic_coders:decode_atom/1},
+						{<<"backend_function">>, fun mosaic_generic_coders:decode_atom/1, configure},
+						{<<"context">>, fun mosaic_json_coders:decode_json/1, null},
+						{<<"annotation">>, fun mosaic_json_coders:decode_json/1, null}],
+					Request) of
+				{ok, false, [Type, BackendModule, BackendFunction, Context, Annotation]} ->
+					{ok, false, OldState#state{arguments = dict:from_list ([{type, Type}, {backend_module, BackendModule}, {backend_function, BackendModule}, {backend_function, BackendFunction}, {context, Context}, {annotation, Annotation}])}};
+				Error = {error, true, _Reason} ->
+					Error
+			end;
 		{processes, create} ->
 			case wrq:method (Request) of
 				'GET' ->
@@ -257,6 +272,33 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 				Error = {error, _Reason} ->
 					Error
 			end;
+		{processes, configurators, register} ->
+			try
+				ConfiguratorType = case dict:fetch (type, Arguments) of
+					<<$#, ConfiguratorType_ / binary>> ->
+						case mosaic_generic_coders:decode_atom (ConfiguratorType_) of
+							{ok, ConfiguratorType__} ->
+								ConfiguratorType__;
+							{error, {inexistent_atom, ConfiguratorType_}} ->
+								% !!!!
+								erlang:binary_to_atom (ConfiguratorType_, utf8);
+							Error1 = {error, _Reason1} ->
+								throw (Error1)
+						end;
+					ConfiguratorType_ ->
+						throw ({error, {invalid_type, ConfiguratorType_}})
+				end,
+				ConfiguratorBackendModule = dict:fetch (backend_module, Arguments),
+				ConfiguratorBackendFunction = dict:fetch (backend_function, Arguments),
+				ConfiguratorContext = dict:fetch (context, Arguments),
+				ConfiguratorAnnotation = dict:fetch (annotation, Arguments),
+				case mosaic_process_configurator:register (ConfiguratorType, json, {ConfiguratorBackendModule, ConfiguratorBackendFunction, {json, ConfiguratorContext}}, {json, ConfiguratorAnnotation}) of
+					ok ->
+						ok;
+					Error2 = {error, _Reason2} ->
+						Error2
+				end
+			catch throw : Error = {error, _Reason} -> Error end;
 		{processes, create} ->
 			try
 				ProcessType = case dict:fetch (type, Arguments) of
