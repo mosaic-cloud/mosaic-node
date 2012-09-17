@@ -96,6 +96,13 @@ _mosaic.processes.descriptors = _wrapped (function () {
 _mosaic.processes.configurators = _wrapped (function () {
 	return (_get ("/v1/processes/configurators") .configurators);
 });
+_mosaic.processes.configurators.register = _wrapped (function (_type, _backend_module, _backend_function, _context, _annotation) {
+	if (_annotation == undefined)
+		_annotation = null;
+	_context = JSON.stringify (_context);
+	_annotation = JSON.stringify (_annotation);
+	return (_get ("/v1/processes/configurators/register", {type : _type, backend_module : _backend_module, backend_function : _backend_function, context : _context, annotation : _annotation}) .ok);
+});
 _mosaic.processes.nodes = _wrapped (function () {
 	return (_get ("/v1/processes/nodes") .nodes);
 });
@@ -122,6 +129,7 @@ _mosaic.processes.create = _wrapped (function (_type, _configuration, _annotatio
 	if (_count == undefined)
 		_count = 1;
 	_configuration = JSON.stringify (_configuration);
+	_annotation = JSON.stringify (_annotation);
 	var _outcome = _get ("/v1/processes/create", {type : _type, configuration : _configuration, annotation : _annotation, count : _count});
 	if (_count == 1)
 		return (_outcome.keys[0]);
