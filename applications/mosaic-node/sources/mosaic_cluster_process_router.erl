@@ -218,7 +218,13 @@ execute_resolve_group (Group) ->
 
 execute_register_group (Group) ->
 	Key = enforce_ok_1 (mosaic_cluster_tools:key ({mosaic_cluster_processes, group, Group})),
-	enforce_ok (mosaic_cluster_storage:include (Key, undefined, {mosaic_cluster_processes, group, Group, []})),
+	Mutator = fun
+			({Key_, undefined, {mosaic_cluster_processes, group, Group_, Processes}}) when (Key_ =:= Key), (Group_ =:= Group) ->
+				{ok, undefined, {mosaic_cluster_processes, group, Group, Processes}};
+			({Key_}) when (Key_ =:= Key) ->
+				{ok, undefined, {mosaic_cluster_processes, group, Group, []}}
+	end,
+	enforce_ok (mosaic_cluster_storage:update (Key, Mutator)),
 	ok.
 
 
