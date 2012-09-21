@@ -200,6 +200,31 @@ execute ({define_and_create_processes, Type, ConfigurationEncoding, Configuratio
 	end,
 	ok;
 	
+execute ({call_process, Alias, Operation, Inputs})
+		when is_atom (Alias) ->
+	{ok, Identifier} = mosaic_process_router:generate_alias (Alias),
+	execute ({call_process, Identifier, Operation, Inputs});
+	
+execute ({call_process, Identifier, Operation, Inputs}) ->
+	ok = case mosaic_process_router:call (Identifier, Operation, Inputs) of
+		{ok, Outputs, _} ->
+			ok = mosaic_transcript:trace_information ("succeeded calling process", [{identifier, Identifier}, {operation, Operation}, {outputs, Outputs}]),
+			ok;
+		{error, Reason} ->
+			ok = mosaic_transcript:trace_error ("failed calling process", [{identifier, Identifier}, {operation, Operation}, {reason, Reason}]),
+			ok
+	end,
+	ok;
+	
+execute ({cast_process, Alias, Operation, Inputs})
+		when is_atom (Alias) ->
+	{ok, Identifier} = mosaic_process_router:generate_alias (Alias),
+	execute ({cast_process, Identifier, Operation, Inputs});
+	
+execute ({cast_process, Identifier, Operation, Inputs}) ->
+	ok = mosaic_process_router:cast (Identifier, Operation, Inputs),
+	ok;
+	
 execute ({sleep, Timeout}) ->
 	ok = mosaic_tests:sleep (Timeout),
 	ok;

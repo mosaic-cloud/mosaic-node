@@ -1,17 +1,17 @@
 
-{process_group_alias, <<"mosaic-components:rabbitmq">>, <<16#8cd74b5e4ecd322fd7bbfc762ed6cf7d601eede8 : 160>>}.
+{process_group_alias, 'mosaic-components:rabbitmq', <<16#8cd74b5e4ecd322fd7bbfc762ed6cf7d601eede8 : 160>>}.
 {process_configurator, 'mosaic-components:rabbitmq', term, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 {process_configurator, 'mosaic-components:rabbitmq', json, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 
-{process_group_alias, <<"mosaic-components:riak-kv">>, <<16#9cdce23e78027ef6a52636da7db820c47e695d11 : 160>>}.
+{process_group_alias, 'mosaic-components:riak-kv', <<16#9cdce23e78027ef6a52636da7db820c47e695d11 : 160>>}.
 {process_configurator, 'mosaic-components:riak-kv', term, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 {process_configurator, 'mosaic-components:riak-kv', json, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 
-{process_group_alias, <<"mosaic-components:couchdb">>, <<16#f867c1725a2845f4a68a1165f430fdaa10b8aa16 : 160>>}.
+{process_group_alias, 'mosaic-components:couchdb', <<16#f867c1725a2845f4a68a1165f430fdaa10b8aa16 : 160>>}.
 {process_configurator, 'mosaic-components:couchdb', term, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 {process_configurator, 'mosaic-components:couchdb', json, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 
-{process_group_alias, <<"mosaic-components:httpg">>, <<16#0891f3a4b73a16cc5ac6947c56924d3e1dd2395e : 160>>}.
+{process_group_alias, 'mosaic-components:httpg', <<16#0891f3a4b73a16cc5ac6947c56924d3e1dd2395e : 160>>}.
 {process_configurator, 'mosaic-components:httpg', term, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 {process_configurator, 'mosaic-components:httpg', json, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 
@@ -21,40 +21,43 @@
 {process_configurator, 'mosaic-components:java-cloudlet-container', term, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 {process_configurator, 'mosaic-components:java-cloudlet-container', json, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 
+{process_group_alias, 'mosaic-components:java-driver-amqp', <<16#a5e40f0b2c041bc694ace68ace08420d40f9cbc0 : 160>>}.
 {process_configurator, 'mosaic-components:java-driver-amqp', term, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 {process_configurator, 'mosaic-components:java-driver-amqp', json, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 
+{process_group_alias, 'mosaic-components:java-driver-riak', <<16#a3e40f0b2c041bc694ace68ace08420d40f9cbc0 : 160>>}.
 {process_configurator, 'mosaic-components:java-driver-riak', term, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 {process_configurator, 'mosaic-components:java-driver-riak', json, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 
+{process_group_alias, 'mosaic-components:java-driver-hdfs', <<16#dcf43eb337ff13f71731ac4beb935f58b66cb719 : 160>>}.
 {process_configurator, 'mosaic-components:java-driver-hdfs', term, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 {process_configurator, 'mosaic-components:java-driver-hdfs', json, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 
-{process_group_alias, <<"mosaic-examples-realtime-feeds:fetcher">>, <<16#4cb6ba9f09150c29b590b82b02a5a295ffc742d2 : 160>>}.
+{process_group_alias, 'mosaic-examples-realtime-feeds:fetcher', <<16#4cb6ba9f09150c29b590b82b02a5a295ffc742d2 : 160>>}.
 {process_configurator, 'mosaic-examples-realtime-feeds:fetcher', term, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 {process_configurator, 'mosaic-examples-realtime-feeds:fetcher', json, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 
-{process_group_alias, <<"mosaic-examples-realtime-feeds:indexer">>, <<16#d4a751daa35f3661797b3fff37eb12dd4c9a8ce8 : 160>>}.
+{process_group_alias, 'mosaic-examples-realtime-feeds:indexer', <<16#d4a751daa35f3661797b3fff37eb12dd4c9a8ce8 : 160>>}.
 {process_configurator, 'mosaic-examples-realtime-feeds:indexer', term, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 {process_configurator, 'mosaic-examples-realtime-feeds:indexer', json, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 
-{process_group_alias, <<"mosaic-examples-realtime-feeds:scavanger">>, <<16#1f0818a9870f401b3795097be1806a8b9c2c2240 : 160>>}.
+{process_group_alias, 'mosaic-examples-realtime-feeds:scavanger', <<16#1f0818a9870f401b3795097be1806a8b9c2c2240 : 160>>}.
 {process_configurator, 'mosaic-examples-realtime-feeds:scavanger', term, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 {process_configurator, 'mosaic-examples-realtime-feeds:scavanger', json, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 
-{process_group_alias, <<"mosaic-examples-realtime-feeds:leacher">>, <<16#cdb21a6acac6f9a798d5dab03b9309f92bd15c9d : 160>>}.
+{process_group_alias, 'mosaic-examples-realtime-feeds:leacher', <<16#cdb21a6acac6f9a798d5dab03b9309f92bd15c9d : 160>>}.
 {process_configurator, 'mosaic-examples-realtime-feeds:leacher', term, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 {process_configurator, 'mosaic-examples-realtime-feeds:leacher', json, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 
-{process_group_alias, <<"mosaic-examples-realtime-feeds:pusher">>, <<16#b3310a2ea81b7ccfc03e38d1fc32fcc634b92735 : 160>>}.
+{process_group_alias, 'mosaic-examples-realtime-feeds:pusher', <<16#b3310a2ea81b7ccfc03e38d1fc32fcc634b92735 : 160>>}.
 {process_configurator, 'mosaic-examples-realtime-feeds:pusher', term, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 {process_configurator, 'mosaic-examples-realtime-feeds:pusher', json, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 
-{process_group_alias, <<"mosaic-examples-realtime-feeds:frontend-java">>, <<16#a2e40f0b2c041bc694ace68ace08420d40f9cbc0 : 160>>}.
+{process_group_alias, 'mosaic-examples-realtime-feeds:frontend-java', <<16#a2e40f0b2c041bc694ace68ace08420d40f9cbc0 : 160>>}.
 {process_configurator, 'mosaic-examples-realtime-feeds:frontend-java', term, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 {process_configurator, 'mosaic-examples-realtime-feeds:frontend-java', json, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 
-{process_group_alias, <<"mosaic-examples-realtime-feeds:indexer-java">>, <<16#13c025be552e4403add3e0acc626d64d490d9ebe : 160>>}.
+{process_group_alias, 'mosaic-examples-realtime-feeds:indexer-java', <<16#13c025be552e4403add3e0acc626d64d490d9ebe : 160>>}.
 {process_configurator, 'mosaic-examples-realtime-feeds:indexer-java', term, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 {process_configurator, 'mosaic-examples-realtime-feeds:indexer-java', json, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 

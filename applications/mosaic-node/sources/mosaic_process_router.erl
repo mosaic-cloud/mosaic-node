@@ -2,11 +2,14 @@
 -module (mosaic_process_router).
 
 
--export ([call/5, call/6, cast/4, cast/5]).
+-export ([call/3, call/5, call/6, cast/3, cast/4, cast/5]).
 -export ([resolve/1, resolve/2]).
 -export ([register_group/2, register_group/3, unregister_group/2, unregister_group/3]).
 -export ([resolve_alias/1, register_alias/2, unregister_alias/1, generate_alias/1]).
 
+
+call (Identifier, Operation, Inputs) ->
+	call (Identifier, Operation, Inputs, <<>>, undefined).
 
 call (Identifier, Operation, Inputs, Data, Sender) ->
 	call (mosaic_process_router, Identifier, Operation, Inputs, Data, Sender).
@@ -30,6 +33,9 @@ call (Delegate, Identifier, Operation, Inputs, Data, undefined)
 		Reply -> {error, {invalid_reply, Reply}}
 	catch exit : {Reason, {gen_server, call, _}} -> {error, Reason} end.
 
+
+cast (Identifier, Operation, Inputs) ->
+	cast (Identifier, Operation, Inputs, <<>>, undefined).
 
 cast (Identifier, Operation, Inputs, Data) ->
 	cast (mosaic_process_router, Identifier, Operation, Inputs, Data).
@@ -110,5 +116,10 @@ unregister_alias (Delegate, Alias)
 	catch exit : {Reason, {gen_server, call, _}} -> {error, Reason} end.
 
 
-generate_alias (Token) ->
+generate_alias (Token)
+		when is_atom (Token) ->
+	generate_alias (erlang:atom_to_binary (Token, utf8));
+	
+generate_alias (Token)
+		when is_binary (Token) ->
 	mosaic_cluster_tools:key ({mosaic_process_router, alias, Token}).
