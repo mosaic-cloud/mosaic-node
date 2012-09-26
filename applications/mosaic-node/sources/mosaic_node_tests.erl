@@ -57,7 +57,6 @@ test () ->
 						{define_and_create_processes, 'mosaic-components:httpg', json, null, 1},
 						{define_and_create_processes, 'mosaic-components:java-driver-amqp', json, null, 1},
 						{define_and_create_processes, 'mosaic-components:java-driver-riak', json, null, 1},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend-java', json, null, 1},
 						{sleep, 2 * 1000}]};
 			{ok, 'examples-realtime-feeds'} ->
 				{ok, defaults, [
