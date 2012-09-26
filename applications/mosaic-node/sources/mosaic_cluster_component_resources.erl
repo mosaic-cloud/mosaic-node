@@ -80,7 +80,7 @@ execute_acquire (OwnerIdentifier, OwnerProcess, Specifications, Table) ->
 	{ok, Descriptors}.
 
 
-try_acquire (Owner, Specification = {Identifier, Type = <<"socket:ipv4:tcp">>, defaults}) ->
+try_acquire (Owner, Specification = {Identifier, Type = <<"socket:ipv4:tcp">>, defaults}, _Retry) ->
 	try
 		Fqdn = enforce_ok_1 (mosaic_generic_coders:application_env_get (node_fqdn, mosaic_node,
 				{decode, fun mosaic_generic_coders:decode_string/1}, {error, missing_node_fqdn})),
@@ -93,12 +93,31 @@ try_acquire (Owner, Specification = {Identifier, Type = <<"socket:ipv4:tcp">>, d
 		{ok, {Key, Data, Descriptor, Specification}}
 	catch throw : Error = {error, _Reason} -> Error end;
 	
-try_acquire (_Owner, Specification) ->
+try_acquire (Owner, Specification = {Identifier, Type = <<"socket:ipv4:tcp-service:http">>, defaults}, Retry) ->
+	try
+		Fqdn = enforce_ok_1 (mosaic_generic_coders:application_env_get (node_fqdn, mosaic_node,
+				{decode, fun mosaic_generic_coders:decode_string/1}, {error, missing_node_fqdn})),
+		Ip = enforce_ok_1 (mosaic_generic_coders:application_env_get (node_ip, mosaic_node,
+				{decode, fun mosaic_generic_coders:decode_string/1}, {error, missing_node_ip})),
+		Port = if Retry == 1 -> 31000; true -> crypto:rand_uniform (32769, 49150) end,
+		Key = {Type, Ip, Port},
+		Data = {Identifier, Type, Owner, {Ip, Port, Fqdn}},
+		Descriptor = {Identifier, [{<<"type">>, Type}, {<<"ip">>, Ip}, {<<"port">>, Port}, {<<"fqdn">>, Fqdn}]},
+		{ok, {Key, Data, Descriptor, Specification}}
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+try_acquire (_Owner, Specification, _Retry) ->
 	throw ({error, {invalid_specification, Specification}}).
 
 
 try_acquire (Owner, Specification, Table, OldCache) ->
-	Record = {Key, _Data, _Descriptor, _Specification} = enforce_ok_1 (try_acquire (Owner, Specification)),
+	try_acquire (Owner, Specification, Table, OldCache, 1).
+
+try_acquire (_Owner, _Specification, _Table, _OldCache, Retry) when (Retry >= 10) ->
+	{error, unavailable_resources};
+	
+try_acquire (Owner, Specification, Table, OldCache, Retry) ->
+	Record = {Key, _Data, _Descriptor, _Specification} = enforce_ok_1 (try_acquire (Owner, Specification, Retry)),
 	case ets:lookup (Table, Key) of
 		[] ->
 			case orddict:is_key (Key, OldCache) of
@@ -106,8 +125,8 @@ try_acquire (Owner, Specification, Table, OldCache) ->
 					NewCache = orddict:store (Key, Record, OldCache),
 					{ok, NewCache};
 				true ->
-					try_acquire (Owner, Specification, Table, OldCache)
+					try_acquire (Owner, Specification, Table, OldCache, Retry + 1)
 			end;
 		_ ->
-			try_acquire (Owner, Specification, Table, OldCache)
+			try_acquire (Owner, Specification, Table, OldCache, Retry + 1)
 	end.
