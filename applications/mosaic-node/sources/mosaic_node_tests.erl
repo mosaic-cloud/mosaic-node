@@ -41,6 +41,13 @@ test () ->
 						{define_and_create_processes, 'mosaic-components:java-driver-riak', json, null, 1},
 						{sleep, 2 * 1000},
 						{call_process, 'mosaic-components:java-driver-riak', <<"mosaic-component:get.channel.data">>, null}]};
+			{ok, 'httpg-environment'} ->
+				{ok, defaults, [
+						{boot}, {activate}, {initialize}, {start, wui},
+						{define_and_create_processes, 'mosaic-components:rabbitmq', json, null, 1},
+						{sleep, 2 * 1000},
+						{define_and_create_processes, 'mosaic-components:httpg', json, null, 1},
+						{sleep, 2 * 1000}]};
 			{ok, 'cloudlet-environment'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {initialize}, {start, wui},
