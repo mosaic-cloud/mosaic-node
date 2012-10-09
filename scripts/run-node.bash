@@ -82,13 +82,6 @@ _erl_env+=(
 		mosaic_node_ip="${_ip}"
 )
 
-if test -n "${_repositories:-}" ; then
-	_erl_env+=(
-			_mosaic_repositories="${_repositories}"
-			PATH="$( find "${_repositories}"/*/ -path "${_repositories}"'/mosaic-*/.outputs/package/bin' -exec readlink -e {} \; | tr '\n' ':' ):${_outputs}/gcc/applications-elf:${_PATH}"
-	)
-fi
-
 if test -n "${_log}" -a -f "${_log}" ; then
 	_erl_env+=(
 			mosaic_node_log="${_log}"
