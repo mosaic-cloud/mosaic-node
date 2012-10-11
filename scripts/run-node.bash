@@ -97,7 +97,7 @@ else
 	if test ! -e "${_tmp}/log.pipe" ; then
 		mkfifo "${_tmp}/log.pipe"
 	fi
-	tee -a /dev/stderr <"${_tmp}/log.pipe" >"${_log}" &
+	tee -a /dev/stderr <"${_tmp}/log.pipe" >|"${_log}" &
 	exec </dev/null >/dev/null 2>|"${_tmp}/log.pipe" 1>&2
 fi
 

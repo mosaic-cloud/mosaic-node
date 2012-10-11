@@ -60,16 +60,6 @@ _erl_env+=(
 		mosaic_node_ip="${_ip}"
 )
 
-if test -e "${_workbench}/.repositories" ; then
-	_erl_env+=(
-			PATH="$(
-					find "${_workbench}/.repositories"/*/ \
-							-path "${_workbench}/.repositories"'/mosaic-*/.outputs/package/bin'
-							-exec readlink -e {} \; | tr '\n' ':'
-				):${_outputs}/gcc/applications-elf:${_PATH}"
-	)
-fi
-
 mkdir -p -- "${_tmp}"
 cd -- "${_tmp}"
 
