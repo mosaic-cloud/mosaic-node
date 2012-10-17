@@ -141,7 +141,7 @@ start_discovery () ->
 start_wui () ->
 	try
 		WuiExecutable = try
-			enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-node-wui--run-node-wui">>))
+			enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-node-wui--run-service">>))
 		catch throw : _Error1 = {error, _Reason1} -> throw (ok) end,
 		{WebmachineSocketIp, WebmachineSocketPort} = enforce_ok_1 (mosaic_generic_coders:application_env_get (webmachine_address, mosaic_node,
 				{decode,
