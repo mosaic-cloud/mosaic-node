@@ -2,6 +2,9 @@
 About
 =====
 
+This work is part of the mOSAIC project open-source outcomes released under the Apache 2.0 license (see the "Notice" section below).
+    http://developers.mosaic-cloud.eu/
+
 ...
 
 
