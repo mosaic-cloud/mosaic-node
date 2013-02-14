@@ -17,6 +17,15 @@ test () ->
 			{ok, boot} ->
 				{ok, defaults, [
 						{boot}, {activate}, {initialize}]};
+			{ok, 'enforced-node'} ->
+				{ok, Executable} = mosaic_generic_coders:os_bin_get (<<"mosaic_port_process_dummy.elf">>),
+				Node = erlang:atom_to_binary (erlang:node (), 'utf8'),
+				Timeout = <<"30s">>,
+				{ok, defaults, [
+						{boot}, {activate}, {initialize}, {start, discovery},
+						{sleep, 2 * 1000},
+						{define_and_create_processes, 'mosaic-tests:exec', json, [Executable, [Timeout, Node]], {json, {[{<<"mosaic:enforced-node">>, Node}]}}, 8},
+						{sleep, 2 * 1000}]};
 			{ok, 'rabbitmq'} ->
 				{ok, defaults, [
 						{boot}, {activate}, {initialize},

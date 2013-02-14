@@ -189,7 +189,7 @@ define_and_create (Type, ConfigurationEncoding, ConfigurationContent) ->
 
 define_and_create (Type, ConfigurationEncoding, ConfigurationContent, Annotation)
 		when is_atom (Type), is_atom (ConfigurationEncoding) ->
-	{ok, Key} = mosaic_cluster_tools:key (),
+	{ok, [Key]} = generate_keys (Annotation, 1),
 	case define (Type, ConfigurationEncoding, ConfigurationContent, Key, Annotation) of
 		ok ->
 			case create (Key) of
@@ -210,7 +210,7 @@ define_and_create (Type, ConfigurationEncoding, ConfigurationContent, Annotation
 
 define_and_create (Type, ConfigurationEncoding, ConfigurationContent, Annotation, Count)
 		when is_atom (Type), is_atom (ConfigurationEncoding), is_integer (Count), (Count > 0) ->
-	{ok, Keys} = mosaic_cluster_tools:keys (Count),
+	{ok, Keys} = generate_keys (Annotation, Count),
 	case define (Type, ConfigurationEncoding, ConfigurationContent, Keys, Annotation) of
 		{ok, [], DefineReasons} ->
 			{ok, [], DefineReasons};
@@ -226,6 +226,27 @@ define_and_create (Type, ConfigurationEncoding, ConfigurationContent, Annotation
 							{ok, Processes, DefineReasons ++ CreateReasons ++ ResolveReasons}
 					end
 			end
+	end.
+
+
+generate_keys (undefined, Count) ->
+	mosaic_cluster_tools:keys (Count);
+	
+generate_keys ({json, null}, Count) ->
+	generate_keys (undefined, Count);
+	
+generate_keys ({json, Annotation}, Count) ->
+	case Annotation of
+		{struct, Attributes} ->
+			case proplists:lookup (<<"mosaic:enforced-node">>, Attributes) of
+				{<<"mosaic:enforced-node">>, NodeBinary} when is_binary (NodeBinary) ->
+					Node = erlang:binary_to_existing_atom (NodeBinary, 'utf8'),
+					mosaic_cluster_tools:keys_for_node (Node, Count);
+				none ->
+					generate_keys (undefined, Count)
+			end;
+		null ->
+			generate_keys (undefined, Count)
 	end.
 
 

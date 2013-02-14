@@ -2,7 +2,7 @@
 -module (mosaic_cluster_tools).
 
 
--export ([key/0, key/1, key/2, keys/1, keys/2]).
+-export ([key/0, key/1, key/2, keys/1, keys/2, keys_for_node/2]).
 -export ([service_nodes/1, service_targets/2, service_targets/4, service_keys/2]).
 -export ([service_activate/2, service_deactivate/1, service_ping/3]).
 -export ([service_request_reply_sync_command/6, service_requests_generator/4, service_replies_collector/1, service_sync_command/4]).
@@ -34,6 +34,24 @@ keys (Token, Count)
 			fun (Index) -> {ok, Key} = key (Token, Index), Key end,
 			lists:seq (0, Count - 1)),
 	{ok, Keys}.
+
+
+keys_for_node (Node, Count)
+		when is_atom (Node), is_integer (Count), (Count > 0) ->
+	{ok, Ring} = riak_core_ring_manager:get_my_ring (),
+	keys_for_node (Node, Count, Ring, []).
+
+keys_for_node (_Node, 0, _Ring, Keys) ->
+	{ok, Keys};
+	
+keys_for_node (Node, Count, Ring, Keys) ->
+	{ok, Key} = key (),
+	case riak_core_ring:preflist (Key, Ring) of
+		[{_, Node} | _] ->
+			keys_for_node (Node, Count - 1, Ring, [Key | Keys]);
+		[_ | _] ->
+			keys_for_node (Node, Count, Ring, Keys)
+	end.
 
 
 service_nodes (Service)
