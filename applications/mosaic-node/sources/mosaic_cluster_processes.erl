@@ -242,6 +242,8 @@ generate_keys ({json, Annotation}, Count) ->
 				{<<"mosaic:enforced-node">>, NodeBinary} when is_binary (NodeBinary) ->
 					Node = erlang:binary_to_existing_atom (NodeBinary, 'utf8'),
 					mosaic_cluster_tools:keys_for_node (Node, Count);
+				{<<"mosaic:enforced-node">>, NodeIndex} when is_integer (NodeIndex), (NodeIndex >= 0) ->
+					mosaic_cluster_tools:keys_for_node (NodeIndex, Count);
 				none ->
 					generate_keys (undefined, Count)
 			end;

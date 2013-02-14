@@ -36,6 +36,13 @@ keys (Token, Count)
 	{ok, Keys}.
 
 
+keys_for_node (NodeIndex, Count)
+		when is_integer (NodeIndex), (NodeIndex >= 0), is_integer (Count), (Count > 0) ->
+	{ok, Ring} = riak_core_ring_manager:get_my_ring (),
+	Nodes = lists:sort (riak_core_ring:all_members (Ring)),
+	Node = lists:nth (NodeIndex + 1, Nodes),
+	keys_for_node (Node, Count);
+	
 keys_for_node (Node, Count)
 		when is_atom (Node), is_integer (Count), (Count > 0) ->
 	{ok, Ring} = riak_core_ring_manager:get_my_ring (),

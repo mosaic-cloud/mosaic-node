@@ -17,14 +17,22 @@ test () ->
 			{ok, boot} ->
 				{ok, defaults, [
 						{boot}, {activate}, {initialize}]};
-			{ok, 'enforced-node'} ->
+			{ok, Enforcement} when (Enforcement =:= 'enforce-node-by-name') orelse (Enforcement =:= 'enforce-node-by-index') ->
 				{ok, Executable} = mosaic_generic_coders:os_bin_get (<<"mosaic_port_process_dummy.elf">>),
-				Node = erlang:atom_to_binary (erlang:node (), 'utf8'),
+				{ok, Nodes} = application:get_env (mosaic_node, tests_nodes),
+				Node = erlang:node (),
+				NodeBinary = erlang:atom_to_binary (erlang:node (), 'utf8'),
+				NodeSelector = case Enforcement of
+					'enforce-node-by-name' ->
+						NodeBinary;
+					'enforce-node-by-index' ->
+						lists:foldl (fun (OtherNode, Count) when (OtherNode < Node) -> Count + 1; (_, Count) -> Count end, 0, Nodes)
+				end,
 				Timeout = <<"30s">>,
 				{ok, defaults, [
 						{boot}, {activate}, {initialize}, {start, discovery},
 						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-tests:exec', json, [Executable, [Timeout, Node]], {json, {[{<<"mosaic:enforced-node">>, Node}]}}, 8},
+						{define_and_create_processes, 'mosaic-tests:exec', json, [Executable, [Timeout, NodeBinary]], {json, {struct, [{<<"mosaic:enforced-node">>, NodeSelector}]}}, 8},
 						{sleep, 2 * 1000}]};
 			{ok, 'rabbitmq'} ->
 				{ok, defaults, [
