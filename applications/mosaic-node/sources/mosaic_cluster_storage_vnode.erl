@@ -126,6 +126,10 @@ handle_command ({mosaic_cluster, map, Mapper}, _Sender, State = #state{object_st
 			end, []),
 	{reply, {ok, Outcomes}, State};
 	
+handle_command ({riak_vnode_req_v1, _Index, Sender, Request}, _Sender, State = #state{}) ->
+	% TODO: Fixes a bug in riak-core during handoff
+	handle_command (Request, Sender, State);
+	
 handle_command (Request, Sender, State = #state{}) ->
 	ok = mosaic_transcript:trace_error ("received invalid command request; ignoring!", [{request, Request}, {sender, Sender}]),
 	{reply, {error, {invalid_request, Request}}, State}.
@@ -164,6 +168,10 @@ handle_handoff_command ({mosaic_cluster_storage, handoff_request, Vnode, Referen
 			Vnode ! {mosaic_cluster_storage, handoff_request, Reference, failed, Reason},
 			{reply, Error, State}
 	end;
+	
+handle_handoff_command ({riak_vnode_req_v1, _Index, Sender, Request}, _Sender, State = #state{}) ->
+	% TODO: Fixes a bug in riak-core during handoff
+	handle_handoff_command (Request, Sender, State);
 	
 handle_handoff_command (Request, Sender, State = #state{}) ->
 	ok = mosaic_transcript:trace_warning ("received unknown command request during handoff; forwarding!", [{request, Request}, {sender, Sender}]),
