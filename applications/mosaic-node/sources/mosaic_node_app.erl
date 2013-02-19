@@ -142,7 +142,10 @@ start_wui () ->
 	try
 		WuiExecutable = try
 			enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-node-wui--run-service">>))
-		catch throw : _Error1 = {error, _Reason1} -> throw (ok) end,
+		catch throw : _Error1 = {error, Reason1} ->
+			ok = mosaic_transcript:trace_error ("failed to find WUI service executable; ignoring!", [{reason, Reason1}]),
+			throw (ok)
+		end,
 		{WebmachineSocketIp, WebmachineSocketPort} = enforce_ok_1 (mosaic_generic_coders:application_env_get (webmachine_address, mosaic_node,
 				{decode,
 						fun

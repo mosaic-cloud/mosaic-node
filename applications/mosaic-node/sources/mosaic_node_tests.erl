@@ -123,7 +123,7 @@ test () ->
 				case application:get_env (mosaic_node, tests_nodes) of
 					{ok, [Self | _Peers]} ->
 						{ok, ring_join_leave_master, [
-								{boot}, {ring, reboot}, {activate}, {initialize}]};
+								{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui}]};
 					{ok, [First | _]} ->
 						{ok, ring_join_leave_slaves, [
 								{boot}, {ring, reboot}, {activate},
