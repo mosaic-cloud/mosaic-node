@@ -16,7 +16,7 @@ test () ->
 		{ok, Scenario, Actions} = case application:get_env (mosaic_node, tests_scenario) of
 			{ok, boot} ->
 				{ok, defaults, [
-						{boot}, {activate}, {initialize}]};
+						{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui}]};
 			{ok, Enforcement} when (Enforcement =:= 'enforce-node-by-name') orelse (Enforcement =:= 'enforce-node-by-index') ->
 				{ok, Executable} = mosaic_generic_coders:os_bin_get (<<"mosaic_port_process_dummy.elf">>),
 				{ok, Nodes} = application:get_env (mosaic_node, tests_nodes),
@@ -30,29 +30,32 @@ test () ->
 				end,
 				Timeout = <<"30s">>,
 				{ok, defaults, [
-						{boot}, {activate}, {initialize}, {start, discovery},
+						{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui},
+						{start, discovery},
+						{sleep, 2 * 1000},
+						{ring, wait_stable},
 						{sleep, 2 * 1000},
 						{define_and_create_processes, 'mosaic-tests:exec', json, [Executable, [Timeout, NodeBinary]], {json, {struct, [{<<"mosaic:enforced-node">>, NodeSelector}]}}, 8},
 						{sleep, 2 * 1000}]};
 			{ok, 'rabbitmq'} ->
 				{ok, defaults, [
-						{boot}, {activate}, {initialize},
+						{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui},
 						{define_and_create_processes, 'mosaic-components:rabbitmq', json, null, 1}]};
 			{ok, 'riak-kv'} ->
 				{ok, defaults, [
-						{boot}, {activate}, {initialize},
+						{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui},
 						{define_and_create_processes, 'mosaic-components:riak-kv', json, null, 1}]};
 			{ok, 'couchdb'} ->
 				{ok, defaults, [
-						{boot}, {activate}, {initialize},
+						{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui},
 						{define_and_create_processes, 'mosaic-components:couchdb', json, null, 1}]};
 			{ok, 'riak-kv-4'} ->
 				{ok, defaults, [
-						{boot}, {activate}, {initialize},
+						{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui},
 						{define_and_create_processes, 'mosaic-components:riak-kv', json, null, 4}]};
 			{ok, 'riak-driver'} ->
 				{ok, defaults, [
-						{boot}, {activate}, {initialize}, {start, wui},
+						{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui},
 						{define_and_create_processes, 'mosaic-components:riak-kv', json, null, 1},
 						{sleep, 2 * 1000},
 						{define_and_create_processes, 'mosaic-components:java-driver-riak', json, null, 1},
@@ -60,14 +63,14 @@ test () ->
 						{call_process, 'mosaic-components:java-driver-riak', <<"mosaic-component:get.channel.data">>, null}]};
 			{ok, 'httpg-environment'} ->
 				{ok, defaults, [
-						{boot}, {activate}, {initialize}, {start, wui},
+						{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui},
 						{define_and_create_processes, 'mosaic-components:rabbitmq', json, null, 1},
 						{sleep, 2 * 1000},
 						{define_and_create_processes, 'mosaic-components:httpg', json, null, 1},
 						{sleep, 2 * 1000}]};
 			{ok, 'cloudlet-environment'} ->
 				{ok, defaults, [
-						{boot}, {activate}, {initialize}, {start, wui},
+						{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui},
 						{define_and_create_processes, 'mosaic-components:rabbitmq', json, null, 1},
 						{define_and_create_processes, 'mosaic-components:riak-kv', json, null, 1},
 						{sleep, 2 * 1000},
@@ -77,7 +80,7 @@ test () ->
 						{sleep, 2 * 1000}]};
 			{ok, 'examples-realtime-feeds'} ->
 				{ok, defaults, [
-						{boot}, {activate}, {initialize}, {start, wui},
+						{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui},
 						{define_and_create_processes, 'mosaic-components:rabbitmq', json, null, 1},
 						{sleep, 2 * 1000},
 						{define_and_create_processes, 'mosaic-components:riak-kv', json, null, 1},
@@ -98,7 +101,7 @@ test () ->
 						{sleep, 2 * 1000}]};
 			{ok, 'examples-realtime-feeds-java'} ->
 				{ok, defaults, [
-						{boot}, {activate}, {initialize}, {start, wui},
+						{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui},
 						{define_and_create_processes, 'mosaic-components:rabbitmq', json, null, 1},
 						{sleep, 2 * 1000},
 						{define_and_create_processes, 'mosaic-components:riak-kv', json, null, 1},
@@ -120,19 +123,14 @@ test () ->
 				case application:get_env (mosaic_node, tests_nodes) of
 					{ok, [Self | _Peers]} ->
 						{ok, ring_join_leave_master, [
-								{boot},
-								{activate},
-								{ping, 4},
-								{initialize}]};
-					{ok, Nodes} ->
-						Peers = lists:delete (Self, Nodes),
+								{boot}, {ring, reboot}, {activate}, {initialize}]};
+					{ok, [First | _]} ->
 						{ok, ring_join_leave_slaves, [
-								{boot}, {activate}, {ping, 4},
-								{sleep, 2 * 1000}, {ring, include, Peers},
-								{sleep, 2 * 10}, {ping, 4},
-								{sleep, 12 * 1000}, {ring, exclude, Self},
-								{sleep, 2 * 10}, {ping, 4},
-								{sleep, 12 * 1000},
+								{boot}, {ring, reboot}, {activate},
+								{ring, join, First}, {sleep, 2 * 1000},
+								{ring, wait_stable}, {sleep, 2 * 1000},
+								{ring, exclude, self}, {sleep, 2 * 1000},
+								{ring, wait_stable}, {sleep, 2 * 1000},
 								{exit}]};
 					undefined ->
 						throw ({error, undefined_nodes})

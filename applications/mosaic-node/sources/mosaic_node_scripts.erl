@@ -150,6 +150,9 @@ execute ({ring, include, [Node | Nodes]})
 	ok = execute ({ring, include, Node}),
 	execute ({ring, include, Nodes});
 	
+execute ({ring, exclude, self}) ->
+	execute ({ring, exclude, erlang:node ()});
+	
 execute ({ring, exclude, Node})
 		when is_atom (Node) ->
 	ok = mosaic_cluster_tools:ring_exclude (Node),
@@ -160,8 +163,26 @@ execute ({ring, exclude, [Node | Nodes]})
 	ok = execute ({ring, exclude, Node}),
 	execute ({ring, exclude, Nodes});
 	
-execute ({ring, exclude, self}) ->
-	execute ({ring, exclude, erlang:node ()});
+execute ({ring, join, Node})
+		when is_atom (Node) ->
+	ok = riak_core_gossip:send_ring (Node, erlang:node ()),
+	ok;
+	
+execute ({ring, wait_stable}) ->
+	case mosaic_cluster_tools:ring_stable () of
+		ok ->
+			ok;
+		{error, {diverging, Partitions}} ->
+			ok = mosaic_transcript:trace_information ("ring is not stable yet (still diverging); waiting...", [{diverging, erlang:length (Partitions)}]),
+			ok = timer:sleep (1000),
+			execute ({ring, wait_stable});
+		{error, {transferring, Partitions}} ->
+			ok = mosaic_transcript:trace_information ("ring is not stable yet (still transferring); waiting...", [{transferring, erlang:length (Partitions)}]),
+			ok = timer:sleep (1000),
+			execute ({ring, wait_stable});
+		Error = {error, {nodesdown, _Nodes}} ->
+			Error
+	end;
 	
 execute ({ring, reboot}) ->
 	ok = mosaic_cluster_tools:ring_reboot (),

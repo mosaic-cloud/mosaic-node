@@ -9,7 +9,7 @@
 -export ([service_list_sync_command/2, service_map_sync_command/3]).
 -export ([service_process_name/3]).
 -export ([node_activate/0, node_deactivate/0]).
--export ([ring_nodes/0, ring_size/0, ring_partitions/0, ring_include/1, ring_exclude/1, ring_reboot/0]).
+-export ([ring_nodes/0, ring_size/0, ring_partitions/0, ring_include/1, ring_exclude/1, ring_reboot/0, ring_stable/0]).
 
 
 key () ->
@@ -63,7 +63,9 @@ keys_for_node (Node, Count, Ring, Keys) ->
 
 service_nodes (Service)
 		when is_atom (Service) ->
-	{ok, riak_core_node_watcher:nodes (Service)}.
+	Nodes_1 = riak_core_node_watcher:nodes (Service),
+	Nodes_2 = ordsets:from_list (Nodes_1),
+	{ok, Nodes_2}.
 
 
 service_targets (Service, Type) ->
@@ -341,8 +343,9 @@ node_deactivate () ->
 ring_nodes () ->
 	case riak_core_ring_manager:get_my_ring () of
 		{ok, Ring} ->
-			Nodes = riak_core_ring:all_members (Ring),
-			{ok, Nodes};
+			Nodes_1 = riak_core_ring:all_members (Ring),
+			Nodes_2 = ordsets:from_list (Nodes_1),
+			{ok, Nodes_2};
 		Error = {error, _Reason} ->
 			Error
 	end.
@@ -361,8 +364,9 @@ ring_size () ->
 ring_partitions () ->
 	case riak_core_ring_manager:get_my_ring () of
 		{ok, Ring} ->
-			Partitions = riak_core_ring:all_owners (Ring),
-			{ok, Partitions};
+			Partitions_1 = riak_core_ring:all_owners (Ring),
+			Partitions_2 = ordsets:from_list (Partitions_1),
+			{ok, Partitions_2};
 		Error = {error, _Reason} ->
 			Error
 	end.
@@ -372,7 +376,7 @@ ring_include (Node)
 		when is_atom (Node) ->
 	case net_adm:ping (Node) of
 		pong ->
-			case riak_core_gossip:send_ring (Node) of
+			case riak_core_gossip:send_ring (erlang:node (), Node) of
 				ok ->
 					ok;
 				Error = {error, _Reason} ->
@@ -391,6 +395,79 @@ ring_exclude (Node)
 	catch
 		error : badarg ->
 			ok
+	end.
+
+
+ring_stable () ->
+	% FIXME: This is an incredible ugly hack...
+	try
+		ring_stable_1 ()
+	catch _ : Reason ->
+		ok = mosaic_transcript:trace_warning ("ring stability check failed; retrying after a timeout!", [{reason, Reason}]),
+		ok = timer:sleep (1000),
+		ring_stable ()
+	end.
+
+ring_stable_1 () ->
+	{ok, RingNodes} = ring_nodes (),
+	Nodes = ordsets:union (RingNodes, ordsets:from_list ([erlang:node () | erlang:nodes ()])),
+	{PartitionReplies, FailedNodes} = rpc:multicall (Nodes, mosaic_cluster_tools, ring_partitions, []),
+	AllPartitions = [Partition || {ok, Partition} <- PartitionReplies],
+	case FailedNodes of
+		[] ->
+			UniquePartitions = lists:foldl (
+					fun (Partition, OldCache) ->
+						case ordsets:is_element (Partition, OldCache) of
+							true ->
+								OldCache;
+							false ->
+								ordsets:add_element (Partition, OldCache)
+						end
+					end,
+					ordsets:new (),
+					AllPartitions),
+			case UniquePartitions of
+				[Partitions] ->
+					OwnedPartitions = orddict:from_list (
+							[
+								{Node, ordsets:from_list ([Partition || {Partition, Node_1} <- Partitions, Node_1 =:= Node])}
+								|| Node <- Nodes]),
+					ActivePartitions = orddict:from_list (
+							[
+								{Node, ordsets:from_list (
+										[
+											Partition || {_, Partition} <-
+												[
+													rpc:call (Node, riak_core_vnode, get_mod_index, [Vnode])
+													|| {_, Vnode, _, _} <- supervisor:which_children ({riak_core_vnode_sup, Node})]])}
+								|| Node <- Nodes]),
+					TransferringPartitions = lists:foldl (
+							fun (Node, TransferringPartitions) ->
+								NodeOwnedPartitions = orddict:fetch (Node, OwnedPartitions),
+								NodeActivePartitions = orddict:fetch (Node, ActivePartitions),
+								case
+										ordsets:union (
+												ordsets:subtract (NodeOwnedPartitions, NodeActivePartitions),
+												ordsets:subtract (NodeActivePartitions, NodeOwnedPartitions)) of
+									[] ->
+										TransferringPartitions;
+									NodeTransferringPartitions ->
+										orddict:append (Node, NodeTransferringPartitions, TransferringPartitions)
+								end
+							end,
+							orddict:new (),
+							Nodes),
+					case TransferringPartitions of
+						[] ->
+							ok;
+						_ ->
+							{error, {transferring, TransferringPartitions}}
+					end;
+				_ ->
+					{error, {diverging, UniquePartitions}}
+			end;
+		_ ->
+			{error, {nodedown, FailedNodes}}
 	end.
 
 
