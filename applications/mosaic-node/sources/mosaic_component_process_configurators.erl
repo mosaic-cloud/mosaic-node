@@ -111,21 +111,21 @@ configure_create_hardcoded (Type, Identifier, Configuration, ExtraOptions)
 		'mosaic-components:java-driver-hdfs' ->
 			configure_create_java_component (Identifier, <<"mosaic-components-java-driver-hdfs--run-component">>, Configuration, ExtraOptions);
 		
-		'mosaic-examples-realtime-feeds:fetcher' ->
-			configure_create_generic_component (Identifier, <<"mosaic-examples-realtime-feeds-backend--run-fetcher">>, Configuration, ExtraOptions);
-		'mosaic-examples-realtime-feeds:indexer' ->
-			configure_create_generic_component (Identifier, <<"mosaic-examples-realtime-feeds-backend--run-indexer">>, Configuration, ExtraOptions);
-		'mosaic-examples-realtime-feeds:scavanger' ->
-			configure_create_generic_component (Identifier, <<"mosaic-examples-realtime-feeds-backend--run-scavanger">>, Configuration, ExtraOptions);
-		'mosaic-examples-realtime-feeds:leacher' ->
-			configure_create_generic_component (Identifier, <<"mosaic-examples-realtime-feeds-backend--run-leacher">>, Configuration, ExtraOptions);
-		'mosaic-examples-realtime-feeds:pusher' ->
-			configure_create_generic_component (Identifier, <<"mosaic-examples-realtime-feeds-backend--run-pusher">>, Configuration, ExtraOptions);
+		'mosaic-applications-realtime-feeds:fetcher' ->
+			configure_create_generic_component (Identifier, <<"mosaic-applications-realtime-feeds-backend--run-fetcher">>, Configuration, ExtraOptions);
+		'mosaic-applications-realtime-feeds:indexer' ->
+			configure_create_generic_component (Identifier, <<"mosaic-applications-realtime-feeds-backend--run-indexer">>, Configuration, ExtraOptions);
+		'mosaic-applications-realtime-feeds:scavanger' ->
+			configure_create_generic_component (Identifier, <<"mosaic-applications-realtime-feeds-backend--run-scavanger">>, Configuration, ExtraOptions);
+		'mosaic-applications-realtime-feeds:leacher' ->
+			configure_create_generic_component (Identifier, <<"mosaic-applications-realtime-feeds-backend--run-leacher">>, Configuration, ExtraOptions);
+		'mosaic-applications-realtime-feeds:pusher' ->
+			configure_create_generic_component (Identifier, <<"mosaic-applications-realtime-feeds-backend--run-pusher">>, Configuration, ExtraOptions);
 		
-		'mosaic-examples-realtime-feeds:frontend-java' ->
-			configure_create_java_component (Identifier, <<"mosaic-examples-realtime-feeds-frontend-java--run-component">>, Configuration, ExtraOptions);
-		'mosaic-examples-realtime-feeds:indexer-java' ->
-			configure_create_java_component (Identifier, <<"mosaic-examples-realtime-feeds-indexer-java--run-component">>, Configuration, ExtraOptions);
+		'mosaic-applications-realtime-feeds:frontend-java' ->
+			configure_create_java_component (Identifier, <<"mosaic-applications-realtime-feeds-frontend-java--run-component">>, Configuration, ExtraOptions);
+		'mosaic-applications-realtime-feeds:indexer-java' ->
+			configure_create_java_component (Identifier, <<"mosaic-applications-realtime-feeds-indexer-java--run-component">>, Configuration, ExtraOptions);
 		
 		'mosaic-tests:socat' ->
 			configure_create_socat_component (Identifier, Configuration, ExtraOptions);

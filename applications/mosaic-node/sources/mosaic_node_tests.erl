@@ -78,7 +78,7 @@ test () ->
 						{define_and_create_processes, 'mosaic-components:java-driver-amqp', json, null, 1},
 						{define_and_create_processes, 'mosaic-components:java-driver-riak', json, null, 1},
 						{sleep, 2 * 1000}]};
-			{ok, 'examples-realtime-feeds'} ->
+			{ok, 'applications-realtime-feeds'} ->
 				{ok, defaults, [
 						{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui},
 						{define_and_create_processes, 'mosaic-components:rabbitmq', json, null, 1},
@@ -87,19 +87,19 @@ test () ->
 						{sleep, 2 * 1000},
 						{define_and_create_processes, 'mosaic-components:httpg', json, null, 1},
 						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:fetcher', json, null, 1},
+						{define_and_create_processes, 'mosaic-applications-realtime-feeds:fetcher', json, null, 1},
 						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer', json, null, 1},
+						{define_and_create_processes, 'mosaic-applications-realtime-feeds:indexer', json, null, 1},
 						{sleep, 2 * 1000},
-						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:scavanger', json, null, 1},
+						%{define_and_create_processes, 'mosaic-applications-realtime-feeds:scavanger', json, null, 1},
 						%{sleep, 2 * 1000},
-						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:leacher', json, null, 1},
+						%{define_and_create_processes, 'mosaic-applications-realtime-feeds:leacher', json, null, 1},
 						%{sleep, 2 * 1000},
-						%{define_and_create_processes, 'mosaic-examples-realtime-feeds:pusher', json, null, 1},
+						%{define_and_create_processes, 'mosaic-applications-realtime-feeds:pusher', json, null, 1},
 						%{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend-java', json, null, 1},
+						{define_and_create_processes, 'mosaic-applications-realtime-feeds:frontend-java', json, null, 1},
 						{sleep, 2 * 1000}]};
-			{ok, 'examples-realtime-feeds-java'} ->
+			{ok, 'applications-realtime-feeds-java'} ->
 				{ok, defaults, [
 						{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui},
 						{define_and_create_processes, 'mosaic-components:rabbitmq', json, null, 1},
@@ -108,15 +108,15 @@ test () ->
 						{sleep, 2 * 1000},
 						{define_and_create_processes, 'mosaic-components:httpg', json, null, 1},
 						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:fetcher', json, null, 1},
+						{define_and_create_processes, 'mosaic-applications-realtime-feeds:fetcher', json, null, 1},
 						{sleep, 2 * 1000},
 						{define_and_create_processes, 'mosaic-components:java-driver-amqp', json, null, 1},
 						{sleep, 2 * 1000},
 						{define_and_create_processes, 'mosaic-components:java-driver-riak', json, null, 1},
 						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:indexer-java', json, null, 1},
+						{define_and_create_processes, 'mosaic-applications-realtime-feeds:indexer-java', json, null, 1},
 						{sleep, 2 * 1000},
-						{define_and_create_processes, 'mosaic-examples-realtime-feeds:frontend-java', json, null, 1},
+						{define_and_create_processes, 'mosaic-applications-realtime-feeds:frontend-java', json, null, 1},
 						{sleep, 2 * 1000}]};
 			{ok, 'ring-join-leave'} ->
 				Self = erlang:node (),
