@@ -123,6 +123,26 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 			case mosaic_cluster_tools:ring_stable () of
 				ok ->
 					ok;
+				{error, {diverging, UniquePartitions}} ->
+					{ok, json, {struct, [
+							{ok, false},
+							{error, <<"diverging">>},
+							{partitions, [
+										{struct, [
+													{
+															enforce_ok_1 (mosaic_generic_coders:encode_hex_data (<<Partition : 160>>)),
+															enforce_ok_1 (mosaic_generic_coders:encode_atom (Node))}
+												|| {Partition, Node} <- Partitions]}
+									|| Partitions <- UniquePartitions]}]}};
+				{error, {transferring, TransferringPartitions}} ->
+					{ok, json, {struct, [
+							{ok, false},
+							{error, <<"tranferring">>},
+							{partitions, {struct, [
+										{
+												enforce_ok_1 (mosaic_generic_coders:encode_atom (Node)),
+												[enforce_ok_1 (mosaic_generic_coders:encode_hex_data (<<Partition : 160>>)) || Partition <- Partitions]}
+									|| {Node, Partitions} <- TransferringPartitions]}}]}};
 				Error = {error, _Reason} ->
 					Error
 			end;
