@@ -374,16 +374,21 @@ ring_partitions () ->
 
 ring_include (Node)
 		when is_atom (Node) ->
-	case net_adm:ping (Node) of
-		pong ->
-			case riak_core_gossip:send_ring (erlang:node (), Node) of
-				ok ->
+	{ok, Nodes} = ring_nodes (),
+	AlreadyMember = ordsets:is_element (Node, Nodes),
+	if
+		not AlreadyMember ->
+			case net_adm:ping (Node) of
+				pong ->
+					{ok, Ring} = riak_core_ring_manager:get_my_ring (),
+					gen_server:cast({riak_core_gossip, Node}, {reconcile_ring, Ring}),
+					gen_server:cast({riak_core_gossip, Node}, {send_ring_to, erlang:node ()}),
 					ok;
-				Error = {error, _Reason} ->
-					Error
+				pang ->
+					{error, nodedown}
 			end;
-		pang ->
-			{error, nodedown}
+		true ->
+			{error, already_member}
 	end.
 
 
@@ -452,7 +457,7 @@ ring_stable_1 () ->
 									[] ->
 										TransferringPartitions;
 									NodeTransferringPartitions ->
-										orddict:append (Node, NodeTransferringPartitions, TransferringPartitions)
+										orddict:store (Node, NodeTransferringPartitions, TransferringPartitions)
 								end
 							end,
 							orddict:new (),
