@@ -45,18 +45,19 @@ trace (Level, Message, Report)
 
 
 trace (Level, Process, [LastStackTrace | _], Message, Report) ->
+	% Source = {source, Process, LastStackTrace, Level},
 	ok = case Level of
 		debugging ->
-			ok = error_logger:info_report ([Message, {source, Process, LastStackTrace, Level} | Report]),
+			ok = error_logger:info_report ([Message | Report]),
 			ok;
 		information ->
-			ok = error_logger:info_report ([Message, {source, Process, LastStackTrace, Level} | Report]),
+			ok = error_logger:info_report ([Message | Report]),
 			ok;
 		warning ->
-			ok = error_logger:warning_report ([Message, {source, Process, LastStackTrace, Level} | Report]),
+			ok = error_logger:warning_report ([Message | Report]),
 			ok;
 		error ->
-			ok = error_logger:error_report ([Message, {source, Process, LastStackTrace, Level} | Report]),
+			ok = error_logger:error_report ([Message | Report]),
 			ok
 	end,
 	ok.
