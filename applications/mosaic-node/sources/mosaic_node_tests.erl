@@ -16,7 +16,7 @@ test () ->
 		{ok, Scenario, Actions} = case application:get_env (mosaic_node, tests_scenario) of
 			{ok, boot} ->
 				{ok, defaults, [
-						{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui}]};
+						{boot}, {ring, reboot}, {activate}, {initialize}, {start, discovery}, {start, wui}]};
 			{ok, Enforcement} when (Enforcement =:= 'enforce-node-by-name') orelse (Enforcement =:= 'enforce-node-by-index') ->
 				{ok, Executable} = mosaic_generic_coders:os_bin_get (<<"mosaic_port_process_dummy.elf">>),
 				{ok, Nodes} = application:get_env (mosaic_node, tests_nodes),
