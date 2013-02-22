@@ -81,15 +81,21 @@ start_discovery () ->
 	JoinFunction = fun (Event, void) ->
 			ok = case Event of
 				{mosaic_discovery_events, broadcasted, {mosaic_node, node, Node}} when is_atom (Node) ->
-					% ok = mosaic_transcript:trace_information ("joining node...", [{node, Node}]),
-					ok = case mosaic_cluster_tools:ring_include (Node) of
-						ok ->
-							ok;
-						{error, Reason} ->
-							ok = mosaic_transcript:trace_error ("failed joining node; ignoring!", [{node, Node}, {reason, Reason}]),
+					if
+						Node > erlang:node () ->
+							ok = case mosaic_cluster_tools:ring_include (Node) of
+								ok ->
+									ok = mosaic_transcript:trace_information ("joining node...", [{node, Node}]),
+									ok;
+								{error, already_member} ->
+									ok;
+								{error, Reason} ->
+									ok = mosaic_transcript:trace_error ("failed joining node; ignoring!", [{node, Node}, {reason, Reason}]),
+									ok
+							end;
+						true ->
 							ok
-					end,
-					ok;
+					end;
 				{mosaic_discovery_events, broadcasted, Message} ->
 					ok = mosaic_transcript:trace_error ("received invalid broadcast message; ignoring!", [{message, Message}]),
 					ok;
