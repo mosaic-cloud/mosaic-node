@@ -56,11 +56,11 @@ broadcast (Message, Count, Delay) ->
 	broadcast (mosaic_discovery_agent_tcp, Message, Count, Delay).
 
 broadcast (Agent, Message) ->
-	broadcast (Agent, Message, infinity, 6000).
+	broadcast (Agent, Message, infinity, default).
 
 broadcast (Agent, Message, Count, Delay)
 		when (is_atom (Agent) orelse is_pid (Agent)),
-				((Count =:= infinity) orelse (is_integer (Count) andalso (Count > 0))), is_integer (Delay), (Delay > 0) ->
+				((Count =:= infinity) orelse (is_integer (Count) andalso (Count > 0))), ((Delay =:= default) orelse (is_integer (Delay) andalso (Delay > 0))) ->
 	gen_server:call (Agent, {mosaic_discovery_agent_tcp, broadcast, Message, Count, Delay}).
 
 
@@ -118,12 +118,25 @@ handle_call ({mosaic_discovery_agent_tcp, stop, Signal}, _Sender, State) ->
 	end;
 	
 handle_call ({mosaic_discovery_agent_tcp, broadcast, Message, Count, Delay}, _Sender, OldState = #state{broadcasts = OldBroadcasts})
-		when ((Count =:= infinity) orelse (is_integer (Count) andalso (Count > 0))), is_integer (Delay), (Delay > 0) ->
+		when ((Count =:= infinity) orelse (is_integer (Count) andalso (Count > 0))), ((Delay =:= default) orelse (is_integer (Delay) andalso (Delay > 0))) ->
+	{ok, SignalDelay} = case Delay of
+		default ->
+			case application:get_env (mosaic_node, discovery_agent_tcp_default_broadcast_delay) of
+				{ok, DefaultDelay} when is_integer (DefaultDelay), (DefaultDelay > 0) ->
+					{ok, DefaultDelay};
+				undefined ->
+					{error, unconfigured}
+			end;
+		_ ->
+			{ok, Delay}
+	end,
 	Reference = erlang:make_ref (),
-	case timer:send_interval (Delay, {mosaic_discovery_agent_tcp_internals, broadcast, Reference}) of
+	SignalMessage = {mosaic_discovery_agent_tcp_internals, broadcast, Reference},
+	case timer:send_interval (SignalDelay, SignalMessage) of
 		{ok, Timer} ->
-			NewBroadcast = #broadcast{reference = Reference, message = Message, count = Count, delay = Delay, timer = Timer},
+			NewBroadcast = #broadcast{reference = Reference, message = Message, count = Count, delay = SignalDelay, timer = Timer},
 			NewBroadcasts = orddict:store (Reference, NewBroadcast, OldBroadcasts),
+			{ok, _} = timer:send_after (1000, SignalMessage),
 			{reply, {ok, Reference}, OldState#state{broadcasts = NewBroadcasts}};
 		Error = {error, _Reason} ->
 			Error
@@ -218,7 +231,6 @@ send (Domain, SocketPort, Payload) ->
 											binary, {packet, 2}, {active, false}],
 									Outputer = proc_lib:spawn_link (
 											fun () ->
-												% ok = mosaic_transcript:trace_information ("broadcasting...", [{target, {SocketIp, SocketPort}}]),
 												case gen_tcp:connect (SocketIp, SocketPort, SocketOptions) of
 													{ok, Socket} ->
 														erlang:self () ! {tcp_connect, Socket},
@@ -317,7 +329,6 @@ inputer_loop (Agent, Socket, SourceIp, SourcePort) ->
 	end,
 	case gen_tcp:recv (Socket, 0, 250) of
 		{ok, Payload} ->
-			% ok = mosaic_transcript:trace_information ("broadcasted...", [{source, {SourceIp, SourcePort}}]),
 			Agent ! {tcp, Socket, SourceIp, SourcePort, Payload},
 			inputer_loop (Agent, Socket, SourceIp, SourcePort);
 		{error, timeout} ->
