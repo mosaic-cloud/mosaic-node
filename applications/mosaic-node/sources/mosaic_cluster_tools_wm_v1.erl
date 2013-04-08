@@ -120,13 +120,19 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 					Error
 			end;
 		{ring, stable} ->
+			Self = erlang:node (),
+			Peers = erlang:nodes (),
+			Nodes = [Self | Peers],
 			case mosaic_cluster_tools:ring_stable () of
 				ok ->
-					ok;
+					{ok, json, {struct, [
+							{ok, true},
+							{nodes, [enforce_ok_1 (mosaic_generic_coders:encode_atom (Node)) || Node <- Nodes]}]}};
 				{error, {diverging, UniquePartitions}} ->
 					{ok, json, {struct, [
 							{ok, false},
 							{error, <<"diverging">>},
+							{nodes, [enforce_ok_1 (mosaic_generic_coders:encode_atom (Node)) || Node <- Nodes]},
 							{partitions, [
 										{struct, [
 													{
@@ -138,6 +144,7 @@ handle_as_json (Request, State = #state{target = Target, arguments = Arguments})
 					{ok, json, {struct, [
 							{ok, false},
 							{error, <<"tranferring">>},
+							{nodes, [enforce_ok_1 (mosaic_generic_coders:encode_atom (Node)) || Node <- Nodes]},
 							{partitions, {struct, [
 										{
 												enforce_ok_1 (mosaic_generic_coders:encode_atom (Node)),
