@@ -490,7 +490,7 @@ process_post (Request, State = #state{target = Target, arguments = Json}) ->
 			try
 				ok = enforce_ok (mosaic_json_coders:validate_json (Json, json_schema (process_specifications))),
 				{struct, ProcessSpecifications_} = Json,
-				ProcessSpecifications = lists:keysort (5, lists:map (
+				ProcessSpecifications = lists:keysort (6, lists:map (
 						fun ({ProcessName, {struct, ProcessSpecification}}) ->
 							[
 									{<<"annotation">>, ProcessAnnotation},
