@@ -257,6 +257,22 @@ configure_create_java_component (Identifier, ExecutableName, Configuration, Extr
 	{error, {invalid_configuration, Configuration}}.
 
 
+configure_create_socat_component (Identifier, defaults, ExtraOptions)
+		when is_binary (Identifier), is_list (ExtraOptions) ->
+	configure_create_socat_component (Identifier, {json, [<<"tests">>, 24704]}, ExtraOptions);
+	
+configure_create_socat_component (Identifier, {json, [Token, Port]}, ExtraOptions)
+		when is_binary (Identifier), is_binary (Token), is_integer (Port), is_list (ExtraOptions) ->
+	configure_create_socat_component (Identifier, {json, Port}, ExtraOptions);
+	
+configure_create_socat_component (Identifier, {json, [Token, Endpoint]}, ExtraOptions)
+		when is_binary (Identifier), is_binary (Token), is_binary (Endpoint), is_list (ExtraOptions) ->
+	configure_create_socat_component (Identifier, {json, Endpoint}, ExtraOptions);
+	
+configure_create_socat_component (Identifier, {json, Port}, ExtraOptions)
+		when is_binary (Identifier), is_integer (Port), is_list (ExtraOptions) ->
+	configure_create_socat_component (Identifier, {json, <<"tcp-listen:", (enforce_ok_1 (mosaic_generic_coders:encode_integer (Port))) / binary, ",reuseaddr,forever,fork">>}, ExtraOptions);
+	
 configure_create_socat_component (Identifier, {json, Endpoint}, ExtraOptions)
 		when is_binary (Identifier), is_binary (Endpoint), is_list (ExtraOptions) ->
 	try
@@ -270,10 +286,6 @@ configure_create_socat_component (Identifier, {json, Endpoint}, ExtraOptions)
 				| ExtraOptions],
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
-	
-configure_create_socat_component (Identifier, {json, [Token, Endpoint]}, ExtraOptions)
-		when is_binary (Identifier), is_binary (Token), is_binary (Endpoint), is_list (ExtraOptions) ->
-	configure_create_socat_component (Identifier, {json, Endpoint}, ExtraOptions);
 	
 configure_create_socat_component (Identifier, Configuration, ExtraOptions)
 		when is_binary (Identifier), is_list (ExtraOptions) ->
