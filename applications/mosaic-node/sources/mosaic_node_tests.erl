@@ -49,6 +49,10 @@ test () ->
 				{ok, defaults, [
 						{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui},
 						{define_and_create_processes, 'mosaic-components:couchdb', json, null, 1}]};
+			{ok, 'mysql'} ->
+				{ok, defaults, [
+						{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui},
+						{define_and_create_processes, 'mosaic-components:mysql', json, null, 1}]};
 			{ok, 'riak-kv-4'} ->
 				{ok, defaults, [
 						{boot}, {ring, reboot}, {activate}, {initialize}, {start, wui},
