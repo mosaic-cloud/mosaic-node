@@ -6,9 +6,7 @@ trap 'printf "[ee] failed: %s\n" "${BASH_COMMAND}" >&2' ERR || exit 1
 test "${#}" -eq 0
 
 cd -- "$( dirname -- "$( readlink -e -- "${0}" )" )"
-
-rm -Rf ./.generated
-mkdir ./.generated
+test -d ./.generated
 
 (
 	cat <<'EOS'
