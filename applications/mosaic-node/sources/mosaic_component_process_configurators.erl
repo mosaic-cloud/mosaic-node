@@ -165,7 +165,7 @@ configure_create_generic_component (Identifier, ExecutableName, Configuration, E
 	{error, {invalid_configuration, Configuration}}.
 
 
-configure_create_me2cp_component (Identifier, {json, [Bundle, Controller]}, ExtraOptions)
+configure_create_me2cp_component (Identifier, {json, [Bundle, Configuration, Controller]}, ExtraOptions)
 		when is_binary (Identifier), is_binary (Bundle), is_binary (Controller), is_list (ExtraOptions) ->
 	try
 		Executable = enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-me2cp--run-component">>)),
@@ -177,7 +177,25 @@ configure_create_me2cp_component (Identifier, {json, [Bundle, Controller]}, Extr
 					{arguments, [
 						enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
 						Bundle,
+						enforce_ok_1 (mosaic_json_coders:encode_json (Configuration)),
 						Controller]}]}
+				| ExtraOptions],
+		{ok, Options}
+	catch throw : Error = {error, _Reason} -> Error end;
+	
+configure_create_me2cp_component (Identifier, {json, [Bundle, Configuration]}, ExtraOptions)
+		when is_binary (Identifier), is_binary (Bundle), is_list (ExtraOptions) ->
+	try
+		Executable = enforce_ok_1 (mosaic_generic_coders:os_bin_get (<<"mosaic-components-me2cp--run-component">>)),
+		Options = [
+				{harness, [
+					{argument0, <<"[", "#", (enforce_ok_1 (mosaic_component_coders:encode_component (Identifier))) / binary, "]">>}]},
+				{execute, [
+					{executable, Executable},
+					{arguments, [
+						enforce_ok_1 (mosaic_component_coders:encode_component (Identifier)),
+						Bundle,
+						enforce_ok_1 (mosaic_json_coders:encode_json (Configuration))]}]}
 				| ExtraOptions],
 		{ok, Options}
 	catch throw : Error = {error, _Reason} -> Error end;
