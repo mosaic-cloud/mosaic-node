@@ -8,9 +8,9 @@
 
 (vbs:require-gcc)
 
-(vbs:define-environment-variable 'mosaic-pkg-jansson "mosaic_pkg_jansson")
+(vbs:define-environment-variable 'pallur-pkg-jansson "pallur_pkg_jansson")
 
 (vbs:define-gcc-application 'mosaic_harness
 	c: "\\./sources/mosaic_harness\\.c"
-	cflags: '( "-I${mosaic_pkg_jansson}/include" )
-	ldflags: '( "-static" "-ljansson" "-L${mosaic_pkg_jansson}/lib" ))
+	cflags: '( "-I${pallur_pkg_jansson}/include" )
+	ldflags: '( "-static" "-ljansson" "-L${pallur_pkg_jansson}/lib" ))
