@@ -6,7 +6,7 @@ trap 'printf "[ee] failed: %s\n" "${BASH_COMMAND}" >&2' ERR || exit 1
 test "${#}" -eq 0
 
 cd -- "$( dirname -- "$( readlink -e -- "${0}" )" )"
-test -d ./.generated
+test -d "${_generate_outputs}"
 
 (
 	cat <<'EOS'
@@ -37,6 +37,6 @@ EOS
 contents (Resource) when is_binary (Resource) ->
 	{error, {undefined_resource, Resource}}.
 EOS
-) >./.generated/mosaic_static_resources.erl
+) >"${_generate_outputs}/mosaic_static_resources.erl"
 
 exit 0

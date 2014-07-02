@@ -1,9 +1,11 @@
 
 (vbs:require-erlang)
 
+(define _generated (vbs:path-join (vbs:resolve-environment-variable "_generated") "mosaic-node"))
+
 (vbs:define-erlang-application 'mosaic_node
 	dependencies: '(mosaic_tools mosaic_harness riak_core webmachine mochiweb)
-	erl: "\\./(sources|\\.generated)/.*\\.erl"
+	erl: (list (vbs:paths-resolve "\\./sources/.*\\.erl") (vbs:path-join _generated "mosaic_static_resources.erl"))
 	hrl: "\\./sources/.*\\.hrl"
 	additional-ebin: "\\./sources/.*\\.app"
 	additional-priv: "\\./sources/.*\\.config")
