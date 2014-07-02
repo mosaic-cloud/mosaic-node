@@ -36,7 +36,7 @@ if test -n "${mosaic_node_temporary:-}" ; then
 elif test -n "${mosaic_temporary:-}" ; then
 	_tmp="${mosaic_temporary}/node/${_index}"
 else
-	_tmp="/tmp/mosaic/node/${_index}"
+	_tmp="${TMPDIR:-/tmp}/mosaic/node/${_index}"
 fi
 
 _erl_args+=(
