@@ -8,7 +8,8 @@
 	erl: (list (vbs:paths-resolve "\\./sources/.*\\.erl") (vbs:path-join _generated "mosaic_static_resources.erl"))
 	hrl: "\\./sources/.*\\.hrl"
 	additional-ebin: "\\./sources/.*\\.app"
-	additional-priv: "\\./sources/.*\\.config")
+	additional-priv: "\\./sources/.*\\.config"
+	otp-version: 15)
 
 (vbs:require-gcc)
 

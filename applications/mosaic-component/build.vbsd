@@ -4,4 +4,5 @@
 (vbs:define-erlang-application 'mosaic_component
 	dependencies: '(mosaic_tools mosaic_harness)
 	erl: "\\./sources/.*\\.erl"
-	additional-ebin: "\\./sources/.*\\.app")
+	additional-ebin: "\\./sources/.*\\.app"
+	otp-version: 15)

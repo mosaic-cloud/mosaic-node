@@ -2,6 +2,8 @@
 (vbs:require-erlang)
 
 (vbs:define-erlang-application 'mosaic_tools
+	dependencies: '()
 	erl: "\\./sources/.*\\.erl"
 	hrl: "\\./sources/.*\\.hrl"
-	additional-ebin: "\\./sources/.*\\.app")
+	additional-ebin: "\\./sources/.*\\.app"
+	otp-version: 15)
