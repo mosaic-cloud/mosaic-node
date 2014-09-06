@@ -88,6 +88,12 @@ if test -n "${_log}" -a -f "${_log}" ; then
 	)
 fi
 
+if test -n "${mosaic_node_path:-}" ; then
+	_erl_env+=(
+			PATH="${_PATH}:${mosaic_node_path}"
+	)
+fi
+
 mkdir -p -- "${_tmp}"
 cd -- "${_tmp}"
 
