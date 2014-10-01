@@ -5,4 +5,4 @@
 	dependencies: '(mosaic_tools mosaic_harness)
 	erl: "\\./sources/.*\\.erl"
 	additional-ebin: "\\./sources/.*\\.app"
-	otp-version: 15)
+	otp-version: '(15 16 17))

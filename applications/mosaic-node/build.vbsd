@@ -9,7 +9,7 @@
 	hrl: "\\./sources/.*\\.hrl"
 	additional-ebin: "\\./sources/.*\\.app"
 	additional-priv: "\\./sources/.*\\.config"
-	otp-version: 15)
+	otp-version: '(15))
 
 (vbs:require-gcc)
 
