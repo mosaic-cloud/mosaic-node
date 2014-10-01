@@ -5,6 +5,9 @@
 -export ([start/0, run/1, execute/1]).
 
 
+-include_lib ("kernel/include/file.hrl").
+
+
 start () ->
 	try
 		ok = case application:load (mosaic_node) of
@@ -101,6 +104,16 @@ execute ({start, System}) ->
 execute ({initialize}) ->
 	execute ({define, defaults});
 	
+execute ({define, defaults}) ->
+	ok = case mosaic_generic_coders:os_env_get (mosaic_node_definitions, {decode, fun mosaic_generic_coders:decode_string/1}, {default, none}) of
+		{ok, none} ->
+			execute ({define, {load, resource, <<"/definitions.term">>}});
+		{ok, Path} when is_binary (Path) ->
+			execute ({define, {load, file_or_folder, Path}});
+		Error = {error, _Reason} ->
+			Error
+	end;
+	
 execute ({define, {process_alias, Alias, Identifier}}) ->
 	{ok, Alias_} = mosaic_process_router:generate_alias (Alias),
 	ok = mosaic_process_router:register_alias (Alias_, Identifier),
@@ -118,11 +131,45 @@ execute ({define, {process_configurator, Type, ConfigurationEncoding, Function}}
 execute ({define, {process_configurator, Type, ConfigurationEncoding, Function, Annotation}}) ->
 	ok = mosaic_process_configurator:register (Type, ConfigurationEncoding, Function, Annotation);
 	
-execute ({define, defaults}) ->
-	{ok, _, DefinitionsData} = mosaic_static_resources:contents (<<"/definitions.term">>),
-	execute ({define, DefinitionsData});
+execute ({define, {load, resource, Path}})
+		when is_binary (Path) ->
+	ok = mosaic_transcript:trace_information ("loading definitions from resource...", [{path, Path}]),
+	{ok, _, DefinitionsData} = mosaic_static_resources:contents (Path),
+	execute ({define, {load, binary, DefinitionsData}});
 	
-execute ({define, DefinitionsData})
+execute ({define, {load, file, Path}})
+		when is_binary (Path) ->
+	ok = mosaic_transcript:trace_information ("loading definitions from file...", [{path, Path}]),
+	{ok, DefinitionsData} = file:read_file (erlang:binary_to_list (Path)),
+	execute ({define, {load, binary, DefinitionsData}});
+	
+execute ({define, {load, folder, Path}})
+		when is_binary (Path) ->
+	ok = mosaic_transcript:trace_information ("loading definitions from folder...", [{path, Path}]),
+	{ok, Files} = file:list_dir (erlang:binary_to_list (Path)),
+	ok = lists:foreach (
+			fun (File) ->
+				FilePath = <<Path / binary, "/", (erlang:list_to_binary (File)) / binary>>,
+				ok = execute ({define, {load, file_or_folder, FilePath}})
+			end,
+			Files),
+	ok;
+	
+execute ({define, {load, file_or_folder, Path}})
+		when is_binary (Path) ->
+	case file:read_file_info (erlang:binary_to_list (Path)) of
+		{ok, #file_info{type = regular}} ->
+			execute ({define, {load, file, Path}});
+		{ok, #file_info{type = directory}} ->
+			execute ({define, {load, folder, Path}});
+		{ok, #file_info{}} ->
+			{error, {invalid_path, Path}};
+		Error = {error, _} ->
+			ok = mosaic_transcript:trace_information ("failed loading definitions from file or folder...", [{path, Path}]),
+			Error
+	end;
+	
+execute ({define, {load, binary, DefinitionsData}})
 		when is_binary (DefinitionsData) ->
 	{ok, Definitions} = mosaic_generic_coders:parse_terms (DefinitionsData),
 	ok = lists:foreach (
