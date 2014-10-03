@@ -4,6 +4,7 @@
 
 -export ([configure/7]).
 -export ([configure_hardcoded/6]).
+-export ([configure_generic/6]).
 -export ([configure_static/6]).
 
 
@@ -89,17 +90,6 @@ configure_create_hardcoded (Type, Identifier, Configuration, ExtraOptions)
 	
 	case Type of
 		
-		'mosaic-components:rabbitmq' ->
-			configure_create_generic_component (Identifier, <<"mosaic-components-rabbitmq--run-component">>, Configuration, ExtraOptions);
-		'mosaic-components:riak-kv' ->
-			configure_create_generic_component (Identifier, <<"mosaic-components-riak-kv--run-component">>, Configuration, ExtraOptions);
-		'mosaic-components:couchdb' ->
-			configure_create_generic_component (Identifier, <<"mosaic-components-couchdb--run-component">>, Configuration, ExtraOptions);
-		'mosaic-components:httpg' ->
-			configure_create_generic_component (Identifier, <<"mosaic-components-httpg--run-component">>, Configuration, ExtraOptions);
-		'mosaic-components:mysql' ->
-			configure_create_generic_component (Identifier, <<"mosaic-components-mysql--run-component">>, Configuration, ExtraOptions);
-		
 		'mosaic-components:me2cp' ->
 			configure_create_me2cp_component (Identifier, Configuration, ExtraOptions);
 		
@@ -113,24 +103,6 @@ configure_create_hardcoded (Type, Identifier, Configuration, ExtraOptions)
 			configure_create_java_component (Identifier, <<"mosaic-components-java-driver-amqp--run-component">>, Configuration, ExtraOptions);
 		'mosaic-components:java-driver-riak' ->
 			configure_create_java_component (Identifier, <<"mosaic-components-java-driver-riak--run-component">>, Configuration, ExtraOptions);
-		'mosaic-components:java-driver-hdfs' ->
-			configure_create_java_component (Identifier, <<"mosaic-components-java-driver-hdfs--run-component">>, Configuration, ExtraOptions);
-		
-		'mosaic-applications-realtime-feeds:fetcher' ->
-			configure_create_generic_component (Identifier, <<"mosaic-applications-realtime-feeds-backend--run-fetcher">>, Configuration, ExtraOptions);
-		'mosaic-applications-realtime-feeds:indexer' ->
-			configure_create_generic_component (Identifier, <<"mosaic-applications-realtime-feeds-backend--run-indexer">>, Configuration, ExtraOptions);
-		'mosaic-applications-realtime-feeds:scavanger' ->
-			configure_create_generic_component (Identifier, <<"mosaic-applications-realtime-feeds-backend--run-scavanger">>, Configuration, ExtraOptions);
-		'mosaic-applications-realtime-feeds:leacher' ->
-			configure_create_generic_component (Identifier, <<"mosaic-applications-realtime-feeds-backend--run-leacher">>, Configuration, ExtraOptions);
-		'mosaic-applications-realtime-feeds:pusher' ->
-			configure_create_generic_component (Identifier, <<"mosaic-applications-realtime-feeds-backend--run-pusher">>, Configuration, ExtraOptions);
-		
-		'mosaic-applications-realtime-feeds:frontend-java' ->
-			configure_create_java_component (Identifier, <<"mosaic-applications-realtime-feeds-frontend-java--run-component">>, Configuration, ExtraOptions);
-		'mosaic-applications-realtime-feeds:indexer-java' ->
-			configure_create_java_component (Identifier, <<"mosaic-applications-realtime-feeds-indexer-java--run-component">>, Configuration, ExtraOptions);
 		
 		'mosaic-tests:socat' ->
 			configure_create_socat_component (Identifier, Configuration, ExtraOptions);
@@ -142,6 +114,22 @@ configure_create_hardcoded (Type, Identifier, Configuration, ExtraOptions)
 	end;
 	
 configure_create_hardcoded (Type, Identifier, _Configuration, ExtraOptions)
+		when is_atom (Type), is_binary (Identifier) ->
+	{error, {invalid_extra_options, ExtraOptions}}.
+
+
+configure_generic (Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent, ExtraOptions) ->
+	configure (fun configure_create_generic/4, Type, Disposition, Identifier, ConfigurationEncoding, ConfigurationContent, ExtraOptions).
+
+
+configure_create_generic (Type, Identifier, Configuration, {Executable, defaults}) ->
+	configure_create_generic (Type, Identifier, Configuration, {Executable, []});
+	
+configure_create_generic (Type, Identifier, Configuration, {Executable, ExtraOptions})
+		when is_atom (Type), is_binary (Identifier), is_binary (Executable), is_list (ExtraOptions) ->
+	configure_create_generic_component (Identifier, Executable, Configuration, ExtraOptions);
+	
+configure_create_generic (Type, Identifier, _Configuration, ExtraOptions)
 		when is_atom (Type), is_binary (Identifier) ->
 	{error, {invalid_extra_options, ExtraOptions}}.
 
