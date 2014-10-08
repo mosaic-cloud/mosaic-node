@@ -1,6 +1,6 @@
 
-{process_configurator, 'mosaic-tests:socat', term, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
-{process_configurator, 'mosaic-tests:socat', json, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
+{process_configurator, 'mosaic-tests:socat', [term, json],
+		{mosaic_component_process_configurators, configure_hardcoded, defaults}}.
 
-{process_configurator, 'mosaic-tests:exec', term, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
-{process_configurator, 'mosaic-tests:exec', json, {mosaic_component_process_configurators, configure_hardcoded, defaults}}.
+{process_configurator, 'mosaic-tests:exec', [term, json],
+		{mosaic_component_process_configurators, configure_hardcoded, defaults}}.

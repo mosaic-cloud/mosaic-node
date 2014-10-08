@@ -125,8 +125,26 @@ execute ({define, {process_group_alias, Alias, Group}}) ->
 	ok = mosaic_process_router:register_alias (Alias_, Group),
 	ok;
 	
+execute ({define, {process_configurator, Type, ConfigurationEncodings, Function}})
+		when is_list (ConfigurationEncodings) ->
+	ok = lists:foreach (
+			fun (ConfigurationEncoding) ->
+				ok = execute ({define, {process_configurator, Type, ConfigurationEncoding, Function}})
+			end,
+			ConfigurationEncodings),
+	ok;
+	
 execute ({define, {process_configurator, Type, ConfigurationEncoding, Function}}) ->
 	ok = mosaic_process_configurator:register (Type, ConfigurationEncoding, Function);
+	
+execute ({define, {process_configurator, Type, ConfigurationEncodings, Function, Annotation}})
+		when is_list (ConfigurationEncodings) ->
+	ok = lists:foreach (
+			fun (ConfigurationEncoding) ->
+				ok = execute ({define, {process_configurator, Type, ConfigurationEncoding, Function, Annotation}})
+			end,
+			ConfigurationEncodings),
+	ok;
 	
 execute ({define, {process_configurator, Type, ConfigurationEncoding, Function, Annotation}}) ->
 	ok = mosaic_process_configurator:register (Type, ConfigurationEncoding, Function, Annotation);
