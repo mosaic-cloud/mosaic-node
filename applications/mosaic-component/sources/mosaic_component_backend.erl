@@ -5,7 +5,7 @@
 
 
 -export ([start_link/0, init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2, handle_info/2]).
--export ([configure/0, resolve_callbacks_module/0]).
+-export ([configure/0, standalone/0, resolve_callbacks_module/0]).
 
 
 -import (mosaic_enforcements, [enforce_ok/1, enforce_ok_1/1]).
@@ -256,6 +256,14 @@ configure () ->
 	try
 		CallbacksModule = enforce_ok_1 (resolve_callbacks_module ()),
 		ok = enforce_ok (erlang:apply (CallbacksModule, configure, [])),
+		ok
+	catch throw : Error = {error, _Reason} -> Error end.
+
+
+standalone () ->
+	try
+		CallbacksModule = enforce_ok_1 (resolve_callbacks_module ()),
+		ok = enforce_ok (erlang:apply (CallbacksModule, standalone, [])),
 		ok
 	catch throw : Error = {error, _Reason} -> Error end.
 

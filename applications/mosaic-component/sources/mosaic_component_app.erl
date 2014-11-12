@@ -4,7 +4,7 @@
 -behaviour (application).
 
 
--export ([start/2, stop/1, boot/0]).
+-export ([start/2, stop/1, boot/0, standalone/0]).
 
 
 -import (mosaic_enforcements, [enforce_ok/1]).
@@ -31,6 +31,17 @@ boot () ->
 						ok = enforce_ok (mosaic_application_tools:load (mosaic_component)),
 						ok = enforce_ok (mosaic_component_backend:configure ()),
 						ok = enforce_ok (mosaic_application_tools:start (mosaic_component)),
+						ok
+					catch throw : Error = {error, _Reason} -> Error end
+				end).
+
+
+standalone () ->
+	mosaic_application_tools:boot (
+				fun () ->
+					try
+						ok = enforce_ok (mosaic_application_tools:load (mosaic_component)),
+						ok = enforce_ok (mosaic_component_backend:standalone ()),
 						ok
 					catch throw : Error = {error, _Reason} -> Error end
 				end).
