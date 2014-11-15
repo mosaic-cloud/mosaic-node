@@ -63,4 +63,6 @@ _erl_env+=(
 mkdir -p -- "${_tmp}"
 cd -- "${_tmp}"
 
-exec env "${_erl_env[@]}" "${_erl_bin}" "${_erl_args[@]}"
+exec env -i "${_erl_env[@]}" "${_erl_bin}" "${_erl_args[@]}"
+
+exit 1

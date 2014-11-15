@@ -6,7 +6,7 @@ if ! test "${#}" -eq 2 -o "${#}" -eq 0 ; then
 fi
 
 _fqdn="${mosaic_node_fqdn:-}"
-_fqdn_app="${mosaic_application_fqdn:-}"
+_fqdn_cluster="${mosaic_cluster_nodes_fqdn:-}"
 _ip="${mosaic_node_ip:-}"
 
 _index="${1:-0}"
@@ -27,7 +27,7 @@ _webmachine_port="$(( _erl_epmd_port + 1 + _index * 10 + 0 ))"
 _riak_handoff_port="$(( _erl_epmd_port + 1 + _index * 10 + 1 ))"
 _discovery_port="$(( _erl_epmd_port - 1 ))"
 _discovery_mcast_ip="224.0.0.1"
-_discovery_domain="${_fqdn_app:-}"
+_discovery_domain="${_fqdn_cluster:-}"
 _wui_ip="${_ip}"
 _wui_port="$(( _erl_epmd_port + 1 + _index * 10 + 2 ))"
 
@@ -50,7 +50,7 @@ if test -n "${mosaic_node_temporary:-}" ; then
 elif test -n "${mosaic_temporary:-}" ; then
 	_tmp="${mosaic_temporary}/node/${_index}"
 else
-	_tmp="${TMPDIR:-/tmp}/mosaic/node/${_index}"
+	_tmp="${TMPDIR:-/tmp/mosaic}/node/${_index}"
 fi
 
 if test -n "${mosaic_node_log:-}" ; then
@@ -58,7 +58,7 @@ if test -n "${mosaic_node_log:-}" ; then
 	_log_to_pipe=false
 else
 	_log="${_tmp}/node.log"
-	_log_to_pipe=true
+	_log_to_pipe=false
 fi
 
 _erl_args+=(
@@ -82,15 +82,21 @@ _erl_env+=(
 		mosaic_node_ip="${_ip}"
 )
 
-if test -n "${_log}" -a -f "${_log}" ; then
+if test -n "${_log}" ; then
 	_erl_env+=(
 			mosaic_node_log="${_log}"
 	)
 fi
 
+if test -n "${mosaic_node_definitions:-}" ; then
+	_erl_env+=(
+			mosaic_node_definitions="${mosaic_node_definitions}"
+	)
+fi
+
 if test -n "${mosaic_node_path:-}" ; then
 	_erl_env+=(
-			PATH="${_PATH}:${mosaic_node_path}"
+			PATH="${_PATH_extra}:${mosaic_node_path}"
 	)
 fi
 
@@ -107,6 +113,6 @@ else
 	exec </dev/null >/dev/null 2>|"${_tmp}/node.log.pipe" 1>&2
 fi
 
-exec env "${_erl_env[@]}" "${_erl_bin}" "${_erl_args[@]}"
+exec env -i "${_erl_env[@]}" "${_erl_bin}" "${_erl_args[@]}"
 
 exit 1
