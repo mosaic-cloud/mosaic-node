@@ -55,9 +55,17 @@ fi
 
 if test -n "${mosaic_node_log:-}" ; then
 	_log="${mosaic_node_log}"
-	_log_to_pipe=false
 else
 	_log="${_tmp}/node.log"
+fi
+
+if tty -s ; then
+	if test "$( readlink -e -- /dev/stderr )" == "$( tty )" ; then
+		_log_to_pipe=true
+	else
+		_log_to_pipe=false
+	fi
+else
 	_log_to_pipe=false
 fi
 
@@ -104,13 +112,13 @@ mkdir -p -- "${_tmp}"
 cd -- "${_tmp}"
 
 if test "${_log_to_pipe}" == false ; then
-	exec </dev/null >/dev/null 2>|"${_log}" 1>&2
+	exec </dev/null >/dev/null 2>|"${_log}" >&2
 else
 	if test ! -e "${_tmp}/node.log.pipe" ; then
-		mkfifo "${_tmp}/node.log.pipe"
+		mkfifo -- "${_tmp}/node.log.pipe"
 	fi
-	tee -a /dev/stderr <"${_tmp}/node.log.pipe" >|"${_log}" &
-	exec </dev/null >/dev/null 2>|"${_tmp}/node.log.pipe" 1>&2
+	tee -- "${_log}" <"${_tmp}/node.log.pipe" >&2 &
+	exec </dev/null >/dev/null 2>|"${_tmp}/node.log.pipe" >&2
 fi
 
 exec env -i "${_erl_env[@]}" "${_erl_bin}" "${_erl_args[@]}"
