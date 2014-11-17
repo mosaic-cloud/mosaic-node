@@ -95,7 +95,7 @@ enum _cleanup_action {
 };
 
 unsigned int const _timeout_slice = 100;
-unsigned int const _timeout_waitpid = 2 * 100;
+unsigned int const _timeout_waitpid = 6 * 1000;
 
 // ----------------------------------------
 
