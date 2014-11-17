@@ -48,9 +48,9 @@ fi
 if test -n "${mosaic_node_temporary:-}" ; then
 	_tmp="${mosaic_node_temporary}"
 elif test -n "${mosaic_temporary:-}" ; then
-	_tmp="${mosaic_temporary}/node/${_index}"
+	_tmp="${mosaic_temporary}/nodes/${_index}"
 else
-	_tmp="${TMPDIR:-/tmp/mosaic}/node/${_index}"
+	_tmp="${TMPDIR:-/tmp}/mosaic/nodes/${_index}"
 fi
 
 if test -n "${mosaic_node_log:-}" ; then
@@ -110,6 +110,12 @@ fi
 
 mkdir -p -- "${_tmp}"
 cd -- "${_tmp}"
+
+exec {_lock}<"${_tmp}"
+if ! flock -x -n "${_lock}" ; then
+	echo '[ee] failed to acquire lock; aborting!' >&2
+	exit 1
+fi
 
 if test "${_log_to_pipe}" == false ; then
 	exec </dev/null >/dev/null 2>|"${_log}" >&2

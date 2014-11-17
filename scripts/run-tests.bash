@@ -34,9 +34,9 @@ _wui_port="$(( _erl_epmd_port + 1 + _index * 10 + 2 ))"
 if test -n "${mosaic_node_temporary:-}" ; then
 	_tmp="${mosaic_node_temporary}"
 elif test -n "${mosaic_temporary:-}" ; then
-	_tmp="${mosaic_temporary}/node/${_index}"
+	_tmp="${mosaic_temporary}/nodes/${_index}"
 else
-	_tmp="${TMPDIR:-/tmp}/mosaic/node/${_index}"
+	_tmp="${TMPDIR:-/tmp}/mosaic/nodes/${_index}"
 fi
 
 _erl_args+=(
@@ -62,6 +62,12 @@ _erl_env+=(
 
 mkdir -p -- "${_tmp}"
 cd -- "${_tmp}"
+
+exec {_lock}<"${_tmp}"
+if ! flock -x -n "${_lock}" ; then
+	echo '[ee] failed to acquire lock; aborting!' >&2
+	exit 1
+fi
 
 exec env -i "${_erl_env[@]}" "${_erl_bin}" "${_erl_args[@]}"
 
