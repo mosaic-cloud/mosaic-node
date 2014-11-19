@@ -1,6 +1,8 @@
 
 // ----------------------------------------
 
+// FIXME: Make these configurable!
+#define TRANSCRIPT_ENABLED 0
 #define TRACE_LEVEL _trace_event_information
 #define TRACE_SOURCE 0
 
@@ -94,8 +96,10 @@ enum _cleanup_action {
 	_cleanup_action_max,
 };
 
-unsigned int const _timeout_slice = 100;
-unsigned int const _timeout_waitpid = 6 * 1000;
+unsigned int const _timeout_slice = 100 * 1000;
+unsigned int const _timeout_waitpid = 12 * 1000 * 1000;
+
+unsigned int const _transcript_enabled = TRANSCRIPT_ENABLED;
 
 // ----------------------------------------
 
@@ -578,7 +582,7 @@ static void _context_check (
 				_process_poll (_context->process);
 				if (_context->process->state == _process_state_exited) {
 					if (_context->controller_output_stream != 0) {
-						// !!!!
+						// FIXME: ???
 						struct _packet * _packet;
 						json_t * _packet_json;
 						unsigned char * _packet_payload;
@@ -1158,12 +1162,14 @@ static void _process_create (
 	_close_cleanups[3] = 0;
 	_cleanup_register_close (&_close_cleanups[3], _output_descriptors[1]);
 	
-	_pipe_outcome = pipe (_transcript_descriptors);
-	_enforce (_pipe_outcome == 0);
-	_close_cleanups[4] = 0;
-	_cleanup_register_close (&_close_cleanups[4], _transcript_descriptors[0]);
-	_close_cleanups[5] = 0;
-	_cleanup_register_close (&_close_cleanups[5], _transcript_descriptors[1]);
+	if (_transcript_enabled) {
+		_pipe_outcome = pipe (_transcript_descriptors);
+		_enforce (_pipe_outcome == 0);
+		_close_cleanups[4] = 0;
+		_cleanup_register_close (&_close_cleanups[4], _transcript_descriptors[0]);
+		_close_cleanups[5] = 0;
+		_cleanup_register_close (&_close_cleanups[5], _transcript_descriptors[1]);
+	}
 	
 	_fork_outcome = fork ();
 	_enforce (_fork_outcome >= 0);
@@ -1183,15 +1189,20 @@ static void _process_create (
 		_enforce (_pipe_outcome == 1);
 		_pipe_outcome = dup2 (_output_descriptors[0], 0);
 		_enforce (_pipe_outcome == 0);
-		_pipe_outcome = dup2 (_transcript_descriptors[1], 2);
-		_enforce (_pipe_outcome == 2);
+		if (_transcript_enabled) {
+			_pipe_outcome = dup2 (_transcript_descriptors[1], 2);
+			_enforce (_pipe_outcome == 2);
+		}
+		
 		_pipe_outcome = 0;
 		_pipe_outcome |= close (_input_descriptors[0]);
 		_pipe_outcome |= close (_input_descriptors[1]);
 		_pipe_outcome |= close (_output_descriptors[0]);
 		_pipe_outcome |= close (_output_descriptors[1]);
-		_pipe_outcome |= close (_transcript_descriptors[0]);
-		_pipe_outcome |= close (_transcript_descriptors[1]);
+		if (_transcript_enabled) {
+			_pipe_outcome |= close (_transcript_descriptors[0]);
+			_pipe_outcome |= close (_transcript_descriptors[1]);
+		}
 		_enforce (_pipe_outcome == 0);
 		
 		_exec_outcome = execve (_process->configuration->executable, (char **) _process->configuration->argument_values, (char **) _process->configuration->environment_values);
@@ -1206,10 +1217,12 @@ static void _process_create (
 		_pipe_outcome = 0;
 		_pipe_outcome |= close (_input_descriptors[1]);
 		_pipe_outcome |= close (_output_descriptors[0]);
-		_pipe_outcome |= close (_transcript_descriptors[1]);
+		if (_transcript_enabled)
+			_pipe_outcome |= close (_transcript_descriptors[1]);
 		_close_cleanups[1]->action = _cleanup_action_canceled;
 		_close_cleanups[2]->action = _cleanup_action_canceled;
-		_close_cleanups[5]->action = _cleanup_action_canceled;
+		if (_transcript_enabled)
+			_close_cleanups[5]->action = _cleanup_action_canceled;
 		_enforce (_pipe_outcome == 0);
 		
 		_process->descriptor = _fork_outcome;
@@ -1219,9 +1232,11 @@ static void _process_create (
 		_packet_stream_create (&_process->output_stream, _output_descriptors[1]);
 		_process->output_stream->state = _packet_stream_state_outputing;
 		_process->output_stream->cleanup = _close_cleanups[3];
-		_packet_stream_create (&_process->transcript_stream, _transcript_descriptors[0]);
-		_process->transcript_stream->state = _packet_stream_state_inputing_line;
-		_process->transcript_stream->cleanup = _close_cleanups[4];
+		if (_transcript_enabled) {
+			_packet_stream_create (&_process->transcript_stream, _transcript_descriptors[0]);
+			_process->transcript_stream->state = _packet_stream_state_inputing_line;
+			_process->transcript_stream->cleanup = _close_cleanups[4];
+		}
 		_process->state = _process_state_running;
 		_process->cleanup = _kill_cleanup;
 		
@@ -1254,7 +1269,7 @@ static void _process_destroy (
 		if (_process->transcript_stream != 0)
 			_packet_stream_destroy (&_process->transcript_stream);
 		_trace_information ("waiting process...");
-		for (_timeout = 0; _timeout < 6000; _timeout += _timeout_slice) {
+		for (_timeout = 0; _timeout < _timeout_waitpid; _timeout += _timeout_slice) {
 			_outcome = waitpid (_process->descriptor, &_status, WNOHANG);
 			if (_outcome == _process->descriptor)
 				break;
@@ -1268,9 +1283,13 @@ static void _process_destroy (
 			_trace_information ("process exited...");
 			_process->exit_status = _status;
 		} else if (_outcome == 0) {
-			_trace_warning ("killing process...");
-			kill (_process->descriptor, SIGTERM);
-			for (_timeout = 0; _timeout < 6000; _timeout += _timeout_slice) {
+			_trace_warning ("signalling process (TERM / INT)...");
+			_outcome = 0;
+			_outcome |= kill (_process->descriptor, SIGTERM);
+			_outcome |= kill (_process->descriptor, SIGINT);
+			if (_outcome != 0)
+				_trace_warning ("failed signalling process (TERM / INT); ignoring!");
+			for (_timeout = 0; _timeout < _timeout_waitpid; _timeout += _timeout_slice) {
 				_outcome = waitpid (_process->descriptor, &_status, WNOHANG);
 				if (_outcome == _process->descriptor) {
 					_process->exit_status = _status;
@@ -1282,11 +1301,19 @@ static void _process_destroy (
 				usleep (_timeout_slice);
 			}
 			if (_outcome != _process->descriptor) {
-				kill (_process->descriptor, SIGKILL);
-				waitpid (_process->descriptor, 0, WNOHANG);
+				_trace_warning ("signalling process (KILL)...");
+				_outcome = kill (_process->descriptor, SIGKILL);
+				if (_outcome != 0)
+					_trace_warning ("failed signalling process (KILL); ignoring!");
+				_outcome = waitpid (_process->descriptor, 0, 0);
+				if (_outcome != _process->descriptor)
+					_trace_warning ("failed waiting process (KILL); ignoring!");
+				else
+					_trace_information ("process terminated...");
 				_process->exit_status = ~0;
+			} else {
+				_trace_information ("process exited...");
 			}
-			_trace_information ("process killed...");
 		} else
 			_enforce (0);
 		_process->state = _process_state_exited;
@@ -1736,7 +1763,7 @@ static void _packet_input (
 			_packet->state = _packet_state_input_waiting_size;
 			break;
 		case _packet_state_input_ready_line :
-			// !!!!
+			// FIXME: ???
 			_assert (_packet->buffer->capacity >= 1024);
 			_packet->buffer->offset = 4;
 			_packet->buffer->available = 4;
@@ -1759,7 +1786,7 @@ static void _packet_input (
 			break;
 		case _packet_state_input_waiting_line :
 			_assert (_packet->size >= 0); _assert (_packet->buffer->offset >= 4); _assert (_packet->size == 0);
-			// !!!!
+			// FIXME: ???
 			_read_window = 1;
 			break;
 		default :
