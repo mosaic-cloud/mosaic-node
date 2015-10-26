@@ -2,7 +2,7 @@
 // ----------------------------------------
 
 // FIXME: Make these configurable!
-#define TRANSCRIPT_ENABLED 0
+#define TRANSCRIPT_ENABLED 1
 #define TRACE_LEVEL _trace_event_information
 #define TRACE_SOURCE 0
 
