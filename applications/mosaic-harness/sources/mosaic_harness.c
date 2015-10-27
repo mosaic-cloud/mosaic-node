@@ -388,6 +388,10 @@ static void _cleanup_register_kill (
 		struct _cleanup * * const _cleanup,
 		unsigned int _descriptor);
 
+static void _cleanup_initialize (void);
+
+static void _cleanup_finalize (void);
+
 static void _cleanup_execute (void);
 
 static void _cleanup_cancel (void);
@@ -405,6 +409,8 @@ unsigned int main (
 	struct _context * _context;
 	
 	_pid = getpid ();
+	
+	_cleanup_initialize ();
 	
 	_input_cleanup = 0;
 	_cleanup_register_close (&_input_cleanup, 0);
@@ -425,6 +431,8 @@ unsigned int main (
 	
 	_cleanup_execute ();
 	
+	_cleanup_finalize ();
+	
 	if (TRACE_LEVEL <= _trace_event_debugging)
 		__trace (_trace_event_information, "exited!", __func__, __LINE__);
 	
@@ -440,6 +448,10 @@ unsigned int main (
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/prctl.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <netinet/in.h>
 
 extern unsigned char const * const * const environ;
 
@@ -1066,24 +1078,48 @@ static void _process_poll (
 		struct _process * const _process)
 {
 	signed int _outcome;
+	signed int _reaped;
 	signed int _status;
 	_trace_debugging ("polling process...");
 	_assert (_process != 0);
 	_assert (_process->state == _process_state_running);
 	_assert (_process->descriptor > 0);
 	_assert (_process->cleanup != 0);
-	_outcome = waitpid (_process->descriptor, &_status, WNOHANG);
-	if (_outcome == _process->descriptor) {
-		_trace_information ("process exited...");
-		_process->descriptor = 0;
-		_process->exit_status = _status;
-		_process->state = _process_state_exited;
-		_process->cleanup->action = _cleanup_action_canceled;
-		_process->cleanup = 0;
+	_outcome = waitpid (-1, &_status, WNOHANG);
+	if (_outcome < 0) {
+		if (errno == ECHILD) {
+			_trace_error ("failed to poll processes (no more processes)!");
+			_enforce (0);
+		} else if (errno == EINTR) {
+			_trace_error ("failed to poll processes (interrupted)!");
+			return;
+		} else {
+			_trace_error ("failed to poll processes (unexpected error)!");
+			_enforce (0);
+		}
 	} else if (_outcome == 0)
-		;
-	else
-		_enforce (0);
+		return;
+	_reaped = _outcome;
+	if (_reaped == _process->descriptor) {
+		if (WIFEXITED (_status)) {
+			_trace_information ("(polled) process terminated (by exit)!");
+			_process->descriptor = 0;
+			_process->exit_status = WEXITSTATUS (_status);
+			_process->state = _process_state_exited;
+			_process->cleanup->action = _cleanup_action_canceled;
+			_process->cleanup = 0;
+		} else if (WIFSIGNALED (_status))
+			_trace_warning ("(polled) process terminated (by signal)!");
+		else
+			_trace_warning ("(polled) process terminated (by unknown)!");
+	} else {
+		if (WIFEXITED (_status))
+			_trace_warning ("(inherited) process terminated (by exit)!");
+		else if (WIFSIGNALED (_status))
+			_trace_warning ("(inherited) process terminated (by signal)!");
+		else
+			_trace_warning ("(inherited) process terminated (by unknown)!");
+	}
 }
 
 static void _process_signal (
@@ -2189,6 +2225,64 @@ static void _cleanup_register_kill (
 	_cleanup = *_cleanup_;
 	_cleanup->action = _cleanup_action_kill;
 	_cleanup->arguments.kill.descriptor = _descriptor;
+}
+
+static void _cleanup_initialize (void)
+{
+	signed int _outcome;
+	if (_pid != getpgrp ()) {
+		_outcome = setsid ();
+		if (_outcome == -1) {
+			fprintf (stderr, "[%5u][!!] failed to initialize the process session: (%d) `%s`!\n", _pid, errno, strerror (errno));
+			fflush (stderr);
+		}
+		_outcome = setpgrp ();
+		if (_outcome == -1) {
+			fprintf (stderr, "[%5u][!!] failed to initialize the process group: (%d) `%s`!\n", _pid, errno, strerror (errno));
+			fflush (stderr);
+		}
+	}
+	_outcome = prctl (PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0);
+	if (_outcome < 0) {
+		fprintf (stderr, "[%5u][!!] failed to initialize the process reaper: (%d) `%s`!\n", _pid, errno, strerror (errno));
+		fflush (stderr);
+	}
+}
+
+static void _cleanup_finalize (void)
+{
+	signed int _outcome;
+	sigset_t _signals;
+	_outcome = sigfillset (&_signals);
+	if (_outcome != 0) {
+		fprintf (stderr, "[%5u][!!] failed to create the full signal mask: (%d) `%s`!\n", _pid, errno, strerror (errno));
+		fflush (stderr);
+	}
+	_outcome = sigprocmask (SIG_SETMASK, &_signals, NULL);
+	if (_outcome != 0) {
+		fprintf (stderr, "[%5u][!!] failed to initialize the empty signal mask: (%d) `%s`!\n", _pid, errno, strerror (errno));
+		fflush (stderr);
+	}
+	while (1) {
+		_outcome = waitpid (-1, 0, WNOHANG);
+		if (_outcome == 0) {
+			fprintf (stderr, "[%5u][!!] waiting for processes...\n", _pid);
+			fflush (stderr);
+		} else if (_outcome > 0) {
+			fprintf (stderr, "[%5u][!!] waited for process (%d)!\n", _pid, _outcome);
+			fflush (stderr);
+			continue;
+		} else if (_outcome < 0) {
+			if (errno == ECHILD)
+				break;
+			fprintf (stderr, "[%5u][!!] failed to wait for processes: (%d) `%s`!\n", _pid, errno, strerror (errno));
+			fflush (stderr);
+		}
+		kill (0, SIGTERM);
+		usleep (10 * _timeout_slice);
+	}
+	fprintf (stderr, "[%5u][!!] waited for processes.\n", _pid);
+	fflush (stderr);
 }
 
 static void _cleanup_execute (void)
